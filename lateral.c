@@ -4,32 +4,43 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-char* lread(){
+#include "reader.h"
+
+char* lread() {
     char* str = readline("user> ");
+    readString(str);
     return str;
 }
 
-char* leval(char* str){
+char* leval(char* str) {
     return str;
 }
 
-int lprint(char* str){
-    if(str == NULL){
-        printf("\ngoodbye (^_^ )/\"\n");
+void lprint(char* str) {
+    printf("%s\n", str);
+}
+
+int rep() {
+    char* input = lread();
+    if(input == NULL){
+        printf("\ngoodbye! (^_^ )/\n");
         return 0;
     }
-    else{
-        printf("%s\n", str);
-        free(str);
-        return 1;
-    }
+
+    char* output = leval(input);
+    lprint(output);
+    free(output);
+    return 1;
 }
 
-int rep(){
-    return lprint(leval(lread()));
+void initializeReadline(){
+    // turn off tab completion
+    rl_bind_key('\t', rl_insert);
 }
 
 int main(){
+    initializeReadline();
+
     while(rep()){
         ;
     }
