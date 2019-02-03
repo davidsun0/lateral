@@ -6,42 +6,42 @@
 
 #include "reader.h"
 
-char* lread() {
+char* lat_read() {
     char* str = readline("user> ");
-    readString(str);
+    read_string(str);
     return str;
 }
 
-char* leval(char* str) {
+char* lat_eval(char* str) {
     return str;
 }
 
-void lprint(char* str) {
+void lat_print(char* str) {
     printf("%s\n", str);
 }
 
-int rep() {
-    char* input = lread();
+int lat_rep() {
+    char* input = lat_read();
     if(input == NULL){
         printf("\ngoodbye! (^_^ )/\n");
         return 0;
     }
 
-    char* output = leval(input);
-    lprint(output);
+    char* output = lat_eval(input);
+    lat_print(output);
     free(output);
     return 1;
 }
 
-void initializeReadline(){
+void initialize_readline(){
     // turn off tab completion
     rl_bind_key('\t', rl_insert);
 }
 
 int main(){
-    initializeReadline();
+    initialize_readline();
 
-    while(rep()){
+    while(lat_rep()){
         ;
     }
 }

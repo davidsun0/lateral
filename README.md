@@ -1,9 +1,11 @@
 # Lateral Lisp
 
-A basic dialect of Lisp written in C.
+Lateral is an interpreter for a basic dialect of Lisp.
 
 This project is for understanding how Lisps work. As a result I'm using
 as few dependencies as I can and writing most of the codebase from scratch.
+
+Lateral is loosely based off of [Make a Lisp](https://github.com/kanaka/mal).
 
 ## Building
 

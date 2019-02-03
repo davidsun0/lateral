@@ -2,9 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "list.h"
+
 #include "reader.h"
 
-int isWhiteSpace(char c){
+int is_white_space(char c){
     if(c == ' ' || c == '\t' || c == '\n' || c == '\r') {
         return 1;
     } else {
@@ -12,7 +14,7 @@ int isWhiteSpace(char c){
     }
 }
 
-int isSpecialChar(char c){
+int is_special_char(char c){
     if(c == '(' || c == ')' ||
             c == '[' || c == ']' || 
             c == '{' || c == '}' || 
@@ -24,19 +26,31 @@ int isSpecialChar(char c){
     }
 }
 
-void tokenize(char* str) {
+struct List* list_append_str(struct List* list, char* str, int len) {
+    char* sym = malloc(sizeof(char) * (len + 1));
+    strncpy(sym, str, len);
+    sym[len] = '\0';
+    return list_append(list, sym);
+}
+
+void read_tokenize(char* str) {
+    struct List* list = malloc(sizeof(struct List));
+    list->data = NULL;
+    list->next = NULL;
+    struct List* tail = list;
+
     int i = 0;
     while(str[i] != '\0') {
-        if(isWhiteSpace(str[i])) {
+        if(is_white_space(str[i])) {
             // ignore whitespace
             i ++;
         } else if(str[i] == '~' && str[i + 1] == '@'){
             // capture ~@
-            printf("~@\n");
+            tail = list_append_str(tail, str + i, 2);
             i += 2;
-        } else if(isSpecialChar(str[i])) {
+        } else if(is_special_char(str[i])) {
             // capture single special character
-            printf("%c\n", str[i]);
+            tail = list_append_str(tail, str + i, 1);
             i ++;
         } else if(str[i] == '"') {
             // capture quoted text, ignoring escaped quotes
@@ -48,12 +62,13 @@ void tokenize(char* str) {
 
             // check for unclosed quotes
             if(str[i + j] == '\0') {
+                // TODO: abort tokenizing
                 printf("error: unclosed quote in %.*s\n", j, str + i);
             } else {
                 // capture ending quote
                 j ++;
+                tail = list_append_str(tail, str + i, j);
             }
-            printf("%.*s\n", j, str + i);
             i += j;
         } else if(str[i] == ';') { 
             // captures all text following ; until a new line
@@ -61,24 +76,28 @@ void tokenize(char* str) {
             while(str[i + j] != '\n' && str[i + j] != '\0') {
                 j ++;
             }
-            printf("%.*s\n", j, str + i);
+            tail = list_append_str(tail, str + i, j);
             i += j;
         } else {
             // capture regular symbols
             int j = 1;
-            while(!isWhiteSpace(str[i + j]) && !isSpecialChar(str[i + j]) &&
-                    str[i + j] != '\0') {
+            while(!is_white_space(str[i + j]) && !is_special_char(str[i + j])
+                    && str[i + j] != '\0') {
                 j ++;
             }
-            printf("%.*s\n", j, str + i);
+            tail = list_append_str(tail, str + i, j);
             i += j;
         }
     }
+
+    list_print(list);
+    // TODO: free input string
 }
 
-void readString(char* str) {
+void read_string(char* str) {
     if(str == NULL) {
         return;
     }
-    tokenize(str);
+    read_tokenize(str);
 }
+

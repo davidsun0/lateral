@@ -4,8 +4,11 @@ LIBS = -lreadline
 
 all: lateral
 
-lateral: lateral.o reader.o
-	$(CC) $(FLAGS) lateral.o reader.o $(LIBS) -o lateral
+clean:
+	rm lateral *.o
+
+lateral: lateral.o reader.o list.o
+	$(CC) $(FLAGS) lateral.o reader.o list.o $(LIBS) -o lateral
 
 lateral.o: lateral.c reader.h
 	$(CC) $(FLAGS) lateral.c $(LIBS) -c
@@ -13,5 +16,5 @@ lateral.o: lateral.c reader.h
 reader.o: reader.h reader.c
 	$(CC) $(FLAGS) reader.c -c
 
-clean:
-	rm lateral *.o
+list.o: list.h list.c
+	$(CC) $(FLAGS) list.c -c
