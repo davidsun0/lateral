@@ -27,7 +27,6 @@ int is_special_char(char c){
 }
 
 struct List* list_append_str(struct List* list, char* str, int len) {
-
     enum object_type type;
     union Data data;
 
@@ -44,7 +43,7 @@ struct List* list_append_str(struct List* list, char* str, int len) {
     return list_append(list, type, data);
 }
 
-void read_tokenize(char* str) {
+struct List* read_tokenize(char* str) {
     struct List* list = malloc(sizeof(struct List));
     list->obj.type = empty;
     list->next = NULL;
@@ -101,14 +100,68 @@ void read_tokenize(char* str) {
         }
     }
 
-    list_print(list);
+    // list_print(list);
     // TODO: free input string
+    return list;
 }
 
-void read_string(char* str) {
-    if(str == NULL) {
-        return;
+struct Object* read_atom(struct List** tokens) {
+    // printf("read_atom %p\n", (void*) *tokens);
+    struct Object* obj = malloc(sizeof(struct Object));
+    obj->type = (*tokens)->obj.type;
+    obj->data = (*tokens)->obj.data;
+
+    // move to next token in list
+    *tokens = (*tokens)->next;
+    return obj;
+}
+
+struct Object* read_list(struct List**);
+
+struct Object* read_form(struct List** tokens) {
+    // printf("read_form %p\n", (void*) *tokens);
+    if(object_equals_char(&((*tokens)->obj), '(')) {
+        *tokens = (*tokens)->next;
+        return read_list(tokens);
+    } else {
+        return read_atom(tokens);
     }
-    read_tokenize(str);
+}
+
+struct Object* read_list(struct List** tokens) {
+    // printf("read_list %p\n", (void*) *tokens);
+    struct List* list = malloc(sizeof(struct List));
+    list->obj.type = empty;
+    list->next = NULL;
+    struct List* tail = list;
+    struct Object* obj;
+    while(*tokens != NULL && !object_equals_char(&((*tokens)->obj), ')')) {
+        obj = read_form(tokens);
+        tail = list_append_object(tail, obj);
+        free(obj);
+    }
+    if(*tokens == NULL) {
+        // TODO: abort syntax tree building
+        // mismatched parens
+        return NULL;
+    }
+    tail->next = NULL;
+    *tokens = (*tokens)->next;
+
+    obj = malloc(sizeof(struct Object));
+    obj->type = list_type;
+    obj->data.ptr = list;
+    return obj;
+}
+
+struct Object* read_string(char* str) {
+    if(str == NULL || str[0] == '\0') {
+        return NULL;
+    }
+    struct List* tokens = read_tokenize(str);
+    struct Object* obj = read_form(&tokens);
+    list_free(tokens);
+    //object_print_debug(obj);
+    return obj;
 }
 

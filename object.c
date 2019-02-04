@@ -1,11 +1,25 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "list.h"
+
 #include "object.h"
+
+int object_equals_char(struct Object* obj, char c) {
+    if(obj->type != character) {
+        return 0;
+    } else if(obj->data.character != c) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
 
 void object_free_member(struct Object* obj) {
     if(obj->type == integer || obj->type == character) {
         return;
+    } else if(obj->type == list_type) {
+        list_free(obj->data.ptr);  
     } else if(obj->data.ptr != NULL) {
         free(obj->data.ptr);
         obj->data.ptr = NULL;
@@ -37,6 +51,14 @@ void object_print_debug(struct Object* obj) {
         case integer:
             printf("type: integer\n");
             printf("data: %d\n", obj->data.integer);
+            break;
+        case list_type:
+            printf("type: list\n");
+            printf("addr: %p\n", obj->data.ptr);
+            printf("data:\n");
+            printf("=====BEGIN LIST=====\n");
+            list_print(obj->data.ptr);
+            printf("=====END LIST=====\n");
             break;
 
         case empty:

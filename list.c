@@ -4,8 +4,7 @@
 #include "list.h"
 #include "object.h"
 
-/*
-struct List* list_append(struct List* list, struct Object* obj) {
+struct List* list_append_object(struct List* list, struct Object* obj) {
     if(obj == NULL) {
         return list;
     }
@@ -27,7 +26,6 @@ struct List* list_append(struct List* list, struct Object* obj) {
         return node;
     }
 }
-*/
 
 struct List* list_append(struct List* list, enum object_type type,
         union Data data) {
