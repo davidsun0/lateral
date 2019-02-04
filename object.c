@@ -33,12 +33,15 @@ void object_free(struct Object* obj) {
 
 void object_print(struct Object* obj) {
     switch(obj->type) {
-        case symbol:
         case string:
+        case symbol:
             printf("%s", (char*) obj->data.ptr);
             break;
         case character:
             printf("%c", obj->data.character);
+            break;
+        case integer:
+            printf("%d", obj->data.integer);
             break;
         default:
             printf("%p", obj->data.ptr);

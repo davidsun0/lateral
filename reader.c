@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "object.h"
 #include "list.h"
 
 #include "reader.h"
 
 int is_white_space(char c){
-    if(c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+    if(c == ' ' || c == ',' || c == '\t' || c == '\n' || c == '\r') {
         return 1;
     } else {
         return 0;
@@ -108,8 +109,70 @@ struct List* read_tokenize(char* str) {
 struct Object* read_atom(struct List** tokens) {
     // printf("read_atom %p\n", (void*) *tokens);
     struct Object* obj = malloc(sizeof(struct Object));
-    obj->type = (*tokens)->obj.type;
-    obj->data = (*tokens)->obj.data;
+
+    char* dat;
+    char chararr[2];
+
+    if((*tokens)->obj.type == character) {
+        dat = chararr;
+        chararr[0] = (*tokens)->obj.data.character;
+        chararr[1] = '\0';
+    } else {
+        dat = (*tokens)->obj.data.ptr;
+    }
+
+    if(dat[0] == '"'){
+        // parse quoted strings
+        int length = strlen(dat);
+        char* str = malloc(sizeof(char) * (length + 1));
+        int j = 0;
+        for(int i = 0; i <= length; i ++) {
+            if(dat[i] == '\\') {
+                switch(dat[++i]) {
+                    case '"':
+                        str[j] = '"';
+                        break;
+                    case '\\':
+                        str[j] = '\\';
+                        break;
+                    case 'n':
+                        str[j] = '\n';
+                        break;
+                    default:
+                        //TODO: abort syntax tree building
+                        printf("error: unrecognized escape sequence\n");
+                        break;
+                }
+            } else {
+                str[j] = dat[i];
+            }
+            j ++;
+        }
+        obj->type = string;
+        obj->data.ptr = str;
+    } else if ('0' <= dat[0] && dat[0] <= '9') {
+        // parse integer
+        int value = 0;
+        while(*dat != '\0') {
+            if(*dat < '0' || '9' < *dat) {
+                //TODO: abort syntax tree building
+                printf("error: failed to parse integer\n");
+                break;
+            }
+            value *= 10;
+            value += *dat - '0';
+            dat ++;
+        }
+        obj->type = integer;
+        obj->data.integer = value;
+    } else {
+        // parse symbols
+        int length = strlen(dat);
+        char* str = malloc(sizeof(char) * (length + 1));
+        strcpy(str, dat);
+        obj->type = symbol;
+        obj->data.ptr = str;
+    }
 
     // move to next token in list
     *tokens = (*tokens)->next;
@@ -142,7 +205,7 @@ struct Object* read_list(struct List** tokens) {
     }
     if(*tokens == NULL) {
         // TODO: abort syntax tree building
-        // mismatched parens
+        printf("error: mismatched parens\n");
         return NULL;
     }
     tail->next = NULL;
@@ -161,7 +224,7 @@ struct Object* read_string(char* str) {
     struct List* tokens = read_tokenize(str);
     struct Object* obj = read_form(&tokens);
     list_free(tokens);
-    //object_print_debug(obj);
+    object_print_debug(obj);
     return obj;
 }
 
