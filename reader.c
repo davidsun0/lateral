@@ -101,7 +101,7 @@ struct List* read_tokenize(char* str) {
     }
 
     // list_print(list);
-    // TODO: free input string
+    free(str);
     return list;
 }
 

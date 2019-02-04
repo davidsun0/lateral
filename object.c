@@ -31,6 +31,20 @@ void object_free(struct Object* obj) {
     free(obj);
 }
 
+void object_print(struct Object* obj) {
+    switch(obj->type) {
+        case symbol:
+        case string:
+            printf("%s", (char*) obj->data.ptr);
+            break;
+        case character:
+            printf("%c", obj->data.character);
+            break;
+        default:
+            printf("%p", obj->data.ptr);
+    }
+}
+
 void object_print_debug(struct Object* obj) {
     printf("obj at %p:\n", (void*) obj);
     switch(obj->type) {

@@ -18,6 +18,8 @@ int object_equals_char(struct Object*, char);
 
 void object_free_member(struct Object*);
 void object_free(struct Object*);
+
+void object_print(struct Object*);
 void object_print_debug(struct Object*);
 
 #endif

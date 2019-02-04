@@ -4,30 +4,33 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include "object.h"
 #include "reader.h"
+#include "printer.h"
 
-char* lat_read() {
+struct Object* lat_read() {
     char* str = readline("user> ");
-    read_string(str);
-    return str;
+    return read_string(str);
 }
 
-char* lat_eval(char* str) {
-    return str;
+struct Object* lat_eval(struct Object* obj) {
+    return obj;
 }
 
-void lat_print(char* str) {
-    printf("%s\n", str);
+void lat_print(struct Object* obj) {
+    // printf("%s\n", str);
+    print_string(obj);
+    printf("\n");
 }
 
 int lat_rep() {
-    char* input = lat_read();
+    struct Object* input = lat_read();
     if(input == NULL){
         printf("\ngoodbye! (^_^ )/\n");
         return 0;
     }
 
-    char* output = lat_eval(input);
+    struct Object* output = lat_eval(input);
     lat_print(output);
     free(output);
     return 1;
