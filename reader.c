@@ -27,15 +27,26 @@ int is_special_char(char c){
 }
 
 struct List* list_append_str(struct List* list, char* str, int len) {
-    char* sym = malloc(sizeof(char) * (len + 1));
-    strncpy(sym, str, len);
-    sym[len] = '\0';
-    return list_append(list, sym);
+
+    enum object_type type;
+    union Data data;
+
+    if(len == 1) {
+        type = character;
+        data.character = str[0];
+    } else {
+        type = string;
+        char* sym = malloc(sizeof(char) * (len + 1));
+        strncpy(sym, str, len);
+        sym[len] = '\0';
+        data.ptr = sym;
+    }
+    return list_append(list, type, data);
 }
 
 void read_tokenize(char* str) {
     struct List* list = malloc(sizeof(struct List));
-    list->data = NULL;
+    list->obj.type = empty;
     list->next = NULL;
     struct List* tail = list;
 

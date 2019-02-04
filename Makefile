@@ -7,8 +7,8 @@ all: lateral
 clean:
 	rm lateral *.o
 
-lateral: lateral.o reader.o list.o
-	$(CC) $(FLAGS) lateral.o reader.o list.o $(LIBS) -o lateral
+lateral: lateral.o reader.o list.o object.o
+	$(CC) $(FLAGS) lateral.o reader.o list.o object.o $(LIBS) -o lateral
 
 lateral.o: lateral.c reader.h
 	$(CC) $(FLAGS) lateral.c $(LIBS) -c
@@ -18,3 +18,6 @@ reader.o: reader.h reader.c
 
 list.o: list.h list.c
 	$(CC) $(FLAGS) list.c -c
+
+object.o: object.h object.c
+	$(CC) $(FLAGS) object.c -c

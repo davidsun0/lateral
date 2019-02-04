@@ -2,18 +2,48 @@
 #include <stdio.h>
 
 #include "list.h"
+#include "object.h"
 
-struct List* list_append(struct List* list, void* data) {
-    while(list->next != NULL) {
-        list = list->next;
+/*
+struct List* list_append(struct List* list, struct Object* obj) {
+    if(obj == NULL) {
+        return list;
     }
 
-    if(list->data == NULL) {
-        list->data = data;
+    // insert if current node's object is empty
+    if(list->obj.type == empty) {
+        list->obj.type = obj->type;
+        list->obj.data = obj->data;
         return list;
     } else {
+        while(list->next != NULL) {
+            list = list->next;
+        }
         struct List* node = malloc(sizeof(struct List));
-        node->data = data;
+        node->obj.type = obj->type;
+        node->obj.data = obj->data;
+        node->next = NULL;
+        list->next = node;
+        return node;
+    }
+}
+*/
+
+struct List* list_append(struct List* list, enum object_type type,
+        union Data data) {
+    if(list->obj.type == empty) {
+        list->obj.type = type;
+        list->obj.data = data;
+        return list;
+    } else {
+        while(list->next != NULL) {
+            list = list->next;
+        }
+
+        struct List* node = malloc(sizeof(struct List));
+        node->obj.type = type;
+        node->obj.data = data;
+
         node->next = NULL;
         list->next = node;
         return node;
@@ -23,10 +53,8 @@ struct List* list_append(struct List* list, void* data) {
 void list_print(struct List* list) {
     while(list != NULL) {
         printf("node adr: %p\n", (void*) list);
-        printf("data adr: %p\n", list->data);
-        if(list->data != NULL) {
-            printf("data: %s\n\n", (char*) list->data);
-        }
+        object_print_debug(&list->obj);
+        printf("\n");
         list = list->next;
     }
 }
@@ -35,9 +63,7 @@ void list_free(struct List* list) {
     struct List* next;
     while(list != NULL) {
         next = list->next;
-        if(list->data != NULL) {
-            free(list->data);
-        }
+        object_free(&list->obj);
         free(list);
         list = next;
     }
