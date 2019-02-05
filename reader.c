@@ -152,6 +152,7 @@ struct Object* read_atom(struct List** tokens) {
         obj->data.ptr = str;
     } else if ('0' <= dat[0] && dat[0] <= '9') {
         // parse integer
+        // TODO: negative number parsing, float parsing
         int value = 0;
         while(*dat != '\0') {
             if(*dat < '0' || '9' < *dat) {
