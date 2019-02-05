@@ -20,21 +20,16 @@ struct Object* eval_eval(struct HashMap* env, struct Object* obj) {
         }
      } else if(obj->type == list_type) {
         // call eval on every member, returning new list
-        struct List* output = malloc(sizeof(struct List));
-        output->next = NULL;
-        output->obj.type = empty;
+        struct Object* output = list_init();
 
         struct List* list = obj->data.ptr;
         struct Object* elem;
         while(list != NULL) {
-            elem = eval_apply(env, &list->obj);
+            elem = eval_apply(env, list->obj);
             list_append_object(output, elem);
             list = list->next;
         }
-        struct Object* outobj = malloc(sizeof(struct Object));
-        outobj->type = list_type;
-        outobj->data.ptr = output;
-        return outobj;
+        return output;
      } else {
         // objects evaluate to themselves
         return obj;
@@ -45,17 +40,17 @@ struct Object* eval_apply(struct HashMap* env, struct Object* obj) {
     if(obj->type == list_type) {
         struct Object* list = eval_eval(env, obj);
         struct List* args = (struct List*)list->data.ptr;
-        struct Object* func = &args->obj;
+        struct Object* func = args->obj;
         args = args->next;
         // somehow call func on args
         if(func->type == c_fn) {
             struct Object* arg1 = NULL;
             if(args != NULL) {
-                arg1 = &args->obj;
+                arg1 = args->obj;
             }
             struct Object* arg2 = NULL;
             if(args != NULL && args->next != NULL) {
-                arg2 = &args->next->obj;
+                arg2 = args->next->obj;
             }
             return func->data.fn_ptr(arg1, arg2);
         } else {

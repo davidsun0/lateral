@@ -4,54 +4,52 @@
 #include "list.h"
 #include "object.h"
 
-struct List* list_append_object(struct List* list, struct Object* obj) {
-    if(obj == NULL) {
-        return list;
-    }
+struct Object* list_init() {
+    struct List* list = malloc(sizeof(struct List));
+    list->obj = NULL;
+    list->next = NULL;
+    union Data data;
+    data.ptr = list;
+    return object_init(list_type, data);
+}
 
-    // insert if current node's object is empty
-    if(list->obj.type == empty) {
-        list->obj.type = obj->type;
-        list->obj.data = obj->data;
-        return list;
+void list_append_object(struct Object* list_obj, struct Object* append) {
+    if(list_obj == NULL || list_obj->type != list_type) {
+        return;
+    }
+    struct List* list = (struct List*) list_obj->data.ptr;
+    while(list->next != NULL) {
+        list = list->next;
+    }
+    if(list->obj == NULL) {
+        list->obj = append;
     } else {
-        while(list->next != NULL) {
-            list = list->next;
-        }
         struct List* node = malloc(sizeof(struct List));
-        node->obj.type = obj->type;
-        node->obj.data = obj->data;
+        node->obj = append;
         node->next = NULL;
         list->next = node;
-        return node;
     }
 }
 
-struct List* list_append(struct List* list, enum object_type type,
+void list_append(struct Object* list_obj, enum object_type type,
         union Data data) {
-    if(list->obj.type == empty) {
-        list->obj.type = type;
-        list->obj.data = data;
-        return list;
-    } else {
-        while(list->next != NULL) {
-            list = list->next;
-        }
-
-        struct List* node = malloc(sizeof(struct List));
-        node->obj.type = type;
-        node->obj.data = data;
-
-        node->next = NULL;
-        list->next = node;
-        return node;
+    if(list_obj == NULL || list_obj->type != list_type) {
+        return;
     }
+    struct Object* append = malloc(sizeof(struct Object));
+    append->type = type;
+    append->data = data;
+    list_append_object(list_obj, append);
 }
 
 void list_print(struct List* list) {
     while(list != NULL) {
         printf("node adr: %p\n", (void*) list);
-        object_print_debug(&list->obj);
+        if(list->obj != NULL) {
+            object_print_debug(list->obj);
+        } else {
+            printf("node has null object");
+        }
         printf("\n");
         list = list->next;
     }
@@ -61,7 +59,7 @@ void list_free(struct List* list) {
     struct List* next;
     while(list != NULL) {
         next = list->next;
-        object_free_member(&list->obj);
+        object_free_member(list->obj);
         free(list);
         list = next;
     }

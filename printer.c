@@ -11,7 +11,7 @@ void print_string(struct Object* obj) {
         printf("(");
         struct List* node = obj->data.ptr;
         while(node != NULL) {
-            print_string(&(node->obj));
+            print_string(node->obj);
             node = node->next;
             if(node != NULL) {
                 printf(" ");

@@ -11,11 +11,10 @@ struct HashMap* envir;
 struct Object* add(struct Object* a, struct Object* b) {
     if(a == NULL || b == NULL) {
         return NULL;
-    } else if(a->type == integer && b->type == integer){
-        struct Object* obj = malloc(sizeof(struct Object));
-        obj->type = integer;
-        obj->data.integer = a->data.integer + b->data.integer;
-        return obj;
+    } else if(a->type == int_type && b->type == int_type){
+        union Data data;
+        data.int_type = a->data.int_type + b->data.int_type;
+        return object_init(int_type, data);
     } else {
         // TODO: some kind of error checking
         return NULL;
@@ -24,11 +23,9 @@ struct Object* add(struct Object* a, struct Object* b) {
 
 void env_init() {
     envir = hashmap_init(128);
-    struct Object* plus = malloc(sizeof(struct Object));
-    plus->type = c_fn;
-    plus->data.fn_ptr = &add;
-    hashmap_set(envir, "+", plus);
 
-    struct Object* test = hashmap_get(envir, "+");
-    printf("%p : %p\n", (void*) plus, (void*) test);
+    union Data data;
+    data.fn_ptr = &add;
+    struct Object* plus = object_init(c_fn, data);
+    hashmap_set(envir, "+", plus);
 }

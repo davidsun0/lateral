@@ -5,18 +5,23 @@
 
 #include "object.h"
 
+struct Object* object_init(enum object_type type, union Data data) {
+    struct Object* obj = malloc(sizeof(struct Object));
+    obj->type = type;
+    obj->data = data;
+    return obj;
+}
+
 int object_equals_char(struct Object* obj, char c) {
-    if(obj->type != character) {
-        return 0;
-    } else if(obj->data.character != c) {
-        return 0;
-    } else {
+    if(obj != NULL && obj->type == char_type && obj->data.char_type == c) {
         return 1;
+    } else {
+        return 0;
     }
 }
 
 void object_free_member(struct Object* obj) {
-    if(obj->type == integer || obj->type == character ||
+    if(obj->type == int_type || obj->type == char_type ||
             obj->type == c_fn) {
         return;
     } else if(obj->type == list_type) {
@@ -38,11 +43,11 @@ void object_print(struct Object* obj) {
         case symbol:
             printf("%s", (char*) obj->data.ptr);
             break;
-        case character:
-            printf("%c", obj->data.character);
+        case char_type:
+            printf("%c", obj->data.char_type);
             break;
-        case integer:
-            printf("%d", obj->data.integer);
+        case int_type:
+            printf("%d", obj->data.int_type);
             break;
         default:
             printf("%p", obj->data.ptr);
@@ -62,13 +67,13 @@ void object_print_debug(struct Object* obj) {
             printf("addr: %p\n", obj->data.ptr);
             printf("data: %s\n", (char*) obj->data.ptr);
             break;
-        case character:
+        case char_type:
             printf("type: character\n");
-            printf("data: %c\n", obj->data.character);
+            printf("data: %c\n", obj->data.char_type);
             break;
-        case integer:
+        case int_type:
             printf("type: integer\n");
-            printf("data: %d\n", obj->data.integer);
+            printf("data: %d\n", obj->data.int_type);
             break;
         case list_type:
             printf("type: list\n");

@@ -27,13 +27,13 @@ int is_special_char(char c){
     }
 }
 
-struct List* list_append_str(struct List* list, char* str, int len) {
+void list_append_str(struct Object* list, char* str, int len) {
     enum object_type type;
     union Data data;
 
     if(len == 1) {
-        type = character;
-        data.character = str[0];
+        type = char_type;
+        data.char_type = str[0];
     } else {
         type = string;
         char* sym = malloc(sizeof(char) * (len + 1));
@@ -41,14 +41,11 @@ struct List* list_append_str(struct List* list, char* str, int len) {
         sym[len] = '\0';
         data.ptr = sym;
     }
-    return list_append(list, type, data);
+    list_append(list, type, data);
 }
 
-struct List* read_tokenize(char* str) {
-    struct List* list = malloc(sizeof(struct List));
-    list->obj.type = empty;
-    list->next = NULL;
-    struct List* tail = list;
+struct Object* read_tokenize(char* str) {
+    struct Object* list = list_init();
 
     int i = 0;
     while(str[i] != '\0') {
@@ -57,11 +54,11 @@ struct List* read_tokenize(char* str) {
             i ++;
         } else if(str[i] == '~' && str[i + 1] == '@'){
             // capture ~@
-            tail = list_append_str(tail, str + i, 2);
+            list_append_str(list, str + i, 2);
             i += 2;
         } else if(is_special_char(str[i])) {
             // capture single special character
-            tail = list_append_str(tail, str + i, 1);
+            list_append_str(list, str + i, 1);
             i ++;
         } else if(str[i] == '"') {
             // capture quoted text, ignoring escaped quotes
@@ -78,7 +75,7 @@ struct List* read_tokenize(char* str) {
             } else {
                 // capture ending quote
                 j ++;
-                tail = list_append_str(tail, str + i, j);
+                list_append_str(list, str + i, j);
             }
             i += j;
         } else if(str[i] == ';') { 
@@ -87,7 +84,7 @@ struct List* read_tokenize(char* str) {
             while(str[i + j] != '\n' && str[i + j] != '\0') {
                 j ++;
             }
-            tail = list_append_str(tail, str + i, j);
+            list_append_str(list, str + i, j);
             i += j;
         } else {
             // capture regular symbols
@@ -96,12 +93,12 @@ struct List* read_tokenize(char* str) {
                     && str[i + j] != '\0') {
                 j ++;
             }
-            tail = list_append_str(tail, str + i, j);
+            list_append_str(list, str + i, j);
             i += j;
         }
     }
 
-    // list_print(list);
+    // object_print_debug(list);
     free(str);
     return list;
 }
@@ -113,12 +110,12 @@ struct Object* read_atom(struct List** tokens) {
     char* dat;
     char chararr[2];
 
-    if((*tokens)->obj.type == character) {
+    if((*tokens)->obj->type == char_type) {
         dat = chararr;
-        chararr[0] = (*tokens)->obj.data.character;
+        chararr[0] = (*tokens)->obj->data.char_type;
         chararr[1] = '\0';
     } else {
-        dat = (*tokens)->obj.data.ptr;
+        dat = (*tokens)->obj->data.ptr;
     }
 
     if(dat[0] == '"'){
@@ -150,10 +147,15 @@ struct Object* read_atom(struct List** tokens) {
         }
         obj->type = string;
         obj->data.ptr = str;
-    } else if ('0' <= dat[0] && dat[0] <= '9') {
+    } else if (dat[0] == '-' || ('0' <= dat[0] && dat[0] <= '9')) {
         // parse integer
-        // TODO: negative number parsing, float parsing
+        // TODO: float parsing
         int value = 0;
+        int negative = 0;
+        if(dat[0] == '-') {
+            negative = 1;
+            dat ++;
+        }
         while(*dat != '\0') {
             if(*dat < '0' || '9' < *dat) {
                 //TODO: abort syntax tree building
@@ -164,8 +166,11 @@ struct Object* read_atom(struct List** tokens) {
             value += *dat - '0';
             dat ++;
         }
-        obj->type = integer;
-        obj->data.integer = value;
+        if(negative) {
+            value = -1 * value;
+        }
+        obj->type = int_type;
+        obj->data.int_type = value;
     } else {
         // parse symbols
         int length = strlen(dat);
@@ -184,7 +189,7 @@ struct Object* read_list(struct List**);
 
 struct Object* read_form(struct List** tokens) {
     // printf("read_form %p\n", (void*) *tokens);
-    if(object_equals_char(&((*tokens)->obj), '(')) {
+    if(object_equals_char((*tokens)->obj, '(')) {
         *tokens = (*tokens)->next;
         return read_list(tokens);
     } else {
@@ -194,44 +199,42 @@ struct Object* read_form(struct List** tokens) {
 
 struct Object* read_list(struct List** tokens) {
     // printf("read_list %p\n", (void*) *tokens);
-    struct List* list = malloc(sizeof(struct List));
-    list->obj.type = empty;
-    list->next = NULL;
-    struct List* tail = list;
+    struct Object* list = list_init();
+
     struct Object* obj;
-    while(*tokens != NULL && !object_equals_char(&((*tokens)->obj), ')')) {
+    while(*tokens != NULL && !object_equals_char((*tokens)->obj, ')')) {
         obj = read_form(tokens);
-        tail = list_append_object(tail, obj);
-        free(obj);
+        list_append_object(list, obj);
     }
     if(*tokens == NULL) {
         // TODO: abort syntax tree building
         printf("error: mismatched parens\n");
         return NULL;
     }
-    tail->next = NULL;
     *tokens = (*tokens)->next;
 
-    obj = malloc(sizeof(struct Object));
-    obj->type = list_type;
-    obj->data.ptr = list;
-    return obj;
+    return list;
 }
 
 struct Object* read_string(char* str) {
     if(str == NULL || str[0] == '\0') {
         return NULL;
     }
-    struct List* tokens = read_tokenize(str);
-    struct List* tokens_head = tokens;
-    struct Object* obj = read_form(&tokens);
+    struct Object* tokens = read_tokenize(str);
+    // printf("tokens:\n");
+    // object_print_debug(tokens);
+    struct List* token_list = (struct List*) tokens->data.ptr;
+    struct Object* obj = read_form(&token_list);
+    /*
     if(tokens != NULL) {
         printf("error: unexpected token\n");
-        object_print_debug(&tokens->obj);
+        object_print_debug(tokens->obj);
         // TODO: abort reading
     }
+    */
     // printf("tokens: %p\t%p\n", (void *) tokens, (void *) tokens_head);
-    list_free(tokens_head);
+    // list_free(tokens_head);
+    // printf("ast:\n");
     // object_print_debug(obj);
     return obj;
 }
