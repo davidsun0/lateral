@@ -5,8 +5,12 @@
 #include <readline/history.h>
 
 #include "object.h"
+#include "env.h"
 #include "reader.h"
+#include "eval.h"
 #include "printer.h"
+
+extern struct HashMap* envir;
 
 struct Object* lat_read() {
     char* str = readline("user> ");
@@ -14,13 +18,13 @@ struct Object* lat_read() {
 }
 
 struct Object* lat_eval(struct Object* obj) {
-    return obj;
+    return eval_apply(envir, eval_eval(envir, obj));
 }
 
 void lat_print(struct Object* obj) {
-    // printf("%s\n", str);
     print_string(obj);
     printf("\n");
+    // object_print_debug(obj);
 }
 
 int lat_rep() {
@@ -43,6 +47,7 @@ void initialize_readline(){
 
 int main(){
     initialize_readline();
+    env_init();
 
     while(lat_rep()){
         ;

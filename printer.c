@@ -5,7 +5,9 @@
 #include "printer.h"
 
 void print_string(struct Object* obj) {
-    if(obj->type == list_type) {
+    if(obj == NULL) {
+        printf("printing NULL Object");
+    } else if(obj->type == list_type) {
         printf("(");
         struct List* node = obj->data.ptr;
         while(node != NULL) {

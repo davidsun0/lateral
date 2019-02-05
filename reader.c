@@ -223,9 +223,16 @@ struct Object* read_string(char* str) {
         return NULL;
     }
     struct List* tokens = read_tokenize(str);
+    struct List* tokens_head = tokens;
     struct Object* obj = read_form(&tokens);
-    list_free(tokens);
-    object_print_debug(obj);
+    if(tokens != NULL) {
+        printf("error: unexpected token\n");
+        object_print_debug(&tokens->obj);
+        // TODO: abort reading
+    }
+    // printf("tokens: %p\t%p\n", (void *) tokens, (void *) tokens_head);
+    list_free(tokens_head);
+    // object_print_debug(obj);
     return obj;
 }
 

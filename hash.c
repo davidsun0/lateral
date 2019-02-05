@@ -8,6 +8,7 @@ int hashmap_string_hash(char* str) {
     int hash = 5381;
     while(*str != '\0') {
         hash = hash * 33 + *str;
+        str ++;
     }
     return hash;
 }
@@ -16,9 +17,9 @@ struct HashMap* hashmap_init(int size) {
     struct HashMap* map = malloc(sizeof(struct HashMap));
     map->size = size;
     map->load = 0;
-    map->pairs = malloc(sizeof(struct KeyValue) * size);
+    map->pairs = malloc(sizeof(struct KeyValue*) * size);
     for(int i = 0; i < size; i ++) {
-        map->pairs = NULL;
+        map->pairs[i] = NULL;
     }
     return map;
 }

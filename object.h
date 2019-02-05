@@ -1,10 +1,16 @@
 #ifndef LATERAL_OBJECT_H
 #define LATERAL_OBJECT_H
 
-enum object_type {empty, symbol, list_type, character, integer, string};
+enum object_type {empty,            // not nil, for internal use only
+    symbol,
+    list_type,
+    character, integer, string,
+    c_fn                            // pointer to function defined in C
+};
 
 union Data {
     void* ptr;
+    struct Object* (*fn_ptr)(struct Object*, struct Object*);
     char character;
     int integer;
 };

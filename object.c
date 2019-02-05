@@ -16,7 +16,8 @@ int object_equals_char(struct Object* obj, char c) {
 }
 
 void object_free_member(struct Object* obj) {
-    if(obj->type == integer || obj->type == character) {
+    if(obj->type == integer || obj->type == character ||
+            obj->type == c_fn) {
         return;
     } else if(obj->type == list_type) {
         list_free(obj->data.ptr);  
@@ -76,6 +77,10 @@ void object_print_debug(struct Object* obj) {
             printf("=====BEGIN LIST=====\n");
             list_print(obj->data.ptr);
             printf("=====END LIST=====\n");
+            break;
+        case c_fn:
+            printf("type: c function\n");
+            printf("addr: %p\n", obj->data.ptr);
             break;
 
         case empty:
