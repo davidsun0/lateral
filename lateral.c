@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -8,35 +9,33 @@
 #include "env.h"
 #include "reader.h"
 #include "eval.h"
-#include "printer.h"
 
 extern struct HashMap* envir;
-
-struct Object* lat_read() {
-    char* str = readline("user> ");
-    return read_string(str);
-}
 
 struct Object* lat_eval(struct Object* obj) {
     return eval_apply(envir, eval_eval(envir, obj));
 }
 
-void lat_print(struct Object* obj) {
-    print_string(obj);
-    printf("\n");
-    // object_print_debug(obj);
-}
-
 int lat_rep() {
-    struct Object* input = lat_read();
-    if(input == NULL){
+    char* input_str = readline("user> ");
+    if(input_str == NULL){
         printf("\ngoodbye! (^_^ )/\n");
+        return 0;
+    } else if(strcmp(input_str, "") == 0) {
+        return 1;
+    }
+
+    struct Object* input = read_string(input_str);
+    // error parsing, return to read again
+    if(input == NULL) {
         return 0;
     }
 
-    struct Object* output = lat_eval(input);
-    lat_print(output);
-    free(output);
+    struct Object* output = eval_apply(envir, input);
+    //lat_eval(input);
+    // lat_print(output);
+    object_print_string(output);
+    printf("\n");
     return 1;
 }
 

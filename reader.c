@@ -78,14 +78,14 @@ struct Object* read_tokenize(char* str) {
                 list_append_str(list, str + i, j);
             }
             i += j;
-        } else if(str[i] == ';') { 
-            // captures all text following ; until a new line
-            int j = 1;
-            while(str[i + j] != '\n' && str[i + j] != '\0') {
-                j ++;
+        } else if(str[i] == ';') {
+            // ; signifies a comment. Ignore all characters until new line
+            // int j = 1;
+            while(str[i] != '\n' && str[i] != '\0') {
+                i ++;
             }
-            list_append_str(list, str + i, j);
-            i += j;
+            // list_append_str(list, str + i, j);
+            // i += j;
         } else {
             // capture regular symbols
             int j = 1;
@@ -221,20 +221,14 @@ struct Object* read_string(char* str) {
         return NULL;
     }
     struct Object* tokens = read_tokenize(str);
-    // printf("tokens:\n");
-    // object_print_debug(tokens);
     struct List* token_list = (struct List*) tokens->data.ptr;
     struct Object* obj = read_form(&token_list);
-    /*
-    if(tokens != NULL) {
+
+    if(token_list != NULL) {
         printf("error: unexpected token\n");
-        object_print_debug(tokens->obj);
-        // TODO: abort reading
+        // object_print_debug(tokens->obj);
     }
-    */
-    // printf("tokens: %p\t%p\n", (void *) tokens, (void *) tokens_head);
-    // list_free(tokens_head);
-    // printf("ast:\n");
+
     // object_print_debug(obj);
     return obj;
 }

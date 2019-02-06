@@ -32,25 +32,36 @@ void object_free_member(struct Object* obj) {
     }
 }
 
+/*
 void object_free(struct Object* obj) {
     object_free_member(obj);
     free(obj);
 }
+*/
 
-void object_print(struct Object* obj) {
-    switch(obj->type) {
-        case string:
-        case symbol:
-            printf("%s", (char*) obj->data.ptr);
-            break;
-        case char_type:
-            printf("%c", obj->data.char_type);
-            break;
-        case int_type:
-            printf("%d", obj->data.int_type);
-            break;
-        default:
-            printf("%p", obj->data.ptr);
+void object_print_string(struct Object* obj) {
+    if(obj == NULL) {
+        printf("[null object]\n");
+    } else if(obj->type == list_type) {
+        printf("(");
+        struct List* node = obj->data.ptr;
+        while(node != NULL) {
+            object_print_string(node->obj);
+            node = node->next;
+            if(node != NULL) {
+                printf(" ");
+            }
+        }
+        printf(")");
+    } else if(obj->type == string || obj->type == symbol) {
+        // string based types
+        printf("%s", (char*) obj->data.ptr);
+    } else if(obj->type == char_type) {
+        printf("%c", obj->data.char_type);
+    } else if(obj->type == int_type) {
+        printf("%d", obj->data.int_type);
+    } else {
+        printf("%p", obj->data.ptr);
     }
 }
 

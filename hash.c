@@ -25,7 +25,18 @@ struct HashMap* hashmap_init(int size) {
 }
 
 struct HashMap* hashmap_double_size(struct HashMap* map) {
-
+    struct HashMap* new_map = hashmap_init(map->size * 2);
+    for(int i = 0; i < map->size; i ++) {
+        if(map->pairs[i] != NULL) {
+            struct KeyValueList* list = map->pairs[i];
+            while(list != NULL) {
+                hashmap_set(new_map, list->keyValue.key, list->keyValue.value);
+                list = list->next;
+            }
+        }
+    }
+    hashmap_free_map(map);
+    return new_map;
 }
 
 void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
@@ -50,7 +61,7 @@ void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
             // replace existing value
             if(strcmp(key, list->keyValue.key) == 0) {
                 // maybe not a good idea?
-                object_free(list->keyValue.value);
+                // object_free(list->keyValue.value);
                 list->keyValue.value = value;
                 replaced = 1;
                 break;
@@ -87,5 +98,15 @@ struct Object* hashmap_get(struct HashMap* map, char* key) {
 }
 
 void hashmap_free_map(struct HashMap* map) {
-    ;
+    for(int i = 0; i < map->size; i ++) {
+        if(map->pairs[i] != NULL) {
+            struct KeyValueList* list = map->pairs[i];
+            struct KeyValueList* prev = list;
+            while(list != NULL) {
+                prev = list;
+                list = list->next;
+                free(prev);
+            }
+        }
+    }
 }
