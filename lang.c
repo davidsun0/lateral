@@ -1,22 +1,35 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "object.h"
+#include "list.h"
 #include "hash.h"
 #include "env.h"
 
 struct Envir* global_env;
 
-struct Object* sum(struct Object* a, struct Object* b) {
-    if(a == NULL || b == NULL) {
-        return NULL;
-    } else if(a->type == int_type && b->type == int_type){
-        union Data data;
-        data.int_type = a->data.int_type + b->data.int_type;
-        return object_init(int_type, data);
-    } else {
-        // TODO: some kind of error checking
+struct Object* sum(struct List* args) {
+    if(args->obj == NULL) {
+        printf("wrong number of arguments to +\n");
+        // TODO: error checking
         return NULL;
     }
+    int value = 0;
+    while(args != NULL) {
+        if(args->obj->type != int_type) {
+            printf("wrong type of argument to +, expected int\n");
+            return NULL;
+        }
+        value += args->obj->data.int_type;
+        args = args->next;
+    }
+    union Data data;
+    data.int_type = value;
+    return object_init(int_type, data);
+}
+
+struct Object* lambda(struct List* args) {
+    return NULL;
 }
 
 void env_init() {

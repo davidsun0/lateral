@@ -1,6 +1,8 @@
 #ifndef LATERAL_OBJECT_H
 #define LATERAL_OBJECT_H
 
+struct List;
+
 enum object_type {
     empty,                          // not nil, for internal use only
     symbol,
@@ -11,12 +13,16 @@ enum object_type {
     func_type                       // lisp function
 };
 
-struct Func;
+struct Func {
+    struct List* args;
+    struct Object* expr;
+};
+
 
 union Data {
     void* ptr;
     struct Func* func;
-    struct Object* (*fn_ptr)(struct Object*, struct Object*);
+    struct Object* (*fn_ptr)(struct List*);
     char char_type;
     int int_type;
 };
@@ -35,13 +41,5 @@ void object_free(struct Object*);
 
 void object_print_string(struct Object*);
 void object_print_debug(struct Object*);
-
-#include "list.h"
-
-struct Func {
-    struct List* args;
-    struct Object* expr;
-};
-
 
 #endif

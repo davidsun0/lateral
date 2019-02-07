@@ -46,6 +46,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
         arg_list = arg_list->next;
         // somehow call func on args
         if(func->type == c_fn) {
+            /*
             struct Object* arg1 = NULL;
             if(arg_list != NULL) {
                 arg1 = arg_list->obj;
@@ -54,7 +55,8 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             if(arg_list != NULL && arg_list->next != NULL) {
                 arg2 = arg_list->next->obj;
             }
-            return func->data.fn_ptr(arg1, arg2);
+            */
+            return func->data.fn_ptr(arg_list);
         } else if(func->type == func_type) {
             struct Func* fn_struct = (struct Func*) func->data.ptr;
             // create local environment for function evaluation

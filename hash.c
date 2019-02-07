@@ -47,6 +47,7 @@ void hashmap_free_map(struct HashMap* map) {
 }
 
 void hashmap_double_size(struct HashMap* map) {
+    printf("resizing hashmap...");
     // TODO: rewrite to only make new array of lists
     struct HashMap* new_map = hashmap_init(map->size * 2);
     for(int i = 0; i < map->size; i ++) {

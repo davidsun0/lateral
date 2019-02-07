@@ -60,6 +60,8 @@ void object_print_string(struct Object* obj) {
         printf("%c", obj->data.char_type);
     } else if(obj->type == int_type) {
         printf("%d", obj->data.int_type);
+    } else if(obj->type == c_fn) {
+        printf("fn @ %p", obj->data.ptr);
     } else {
         printf("%p", obj->data.ptr);
     }
