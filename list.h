@@ -13,6 +13,8 @@ struct List {
 struct Object* list_init();
 void list_append_object(struct Object*, struct Object*);
 void list_append(struct Object*, enum object_type, union Data);
+
+int list_length(struct List*);
 void list_print(struct List*);
 void list_free(struct List*);
 

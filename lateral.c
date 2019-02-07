@@ -9,12 +9,9 @@
 #include "env.h"
 #include "reader.h"
 #include "eval.h"
+#include "lang.h"
 
-extern struct HashMap* envir;
-
-struct Object* lat_eval(struct Object* obj) {
-    return eval_apply(envir, eval_eval(envir, obj));
-}
+extern struct Envir* global_env;
 
 int lat_rep() {
     char* input_str = readline("user> ");
@@ -31,7 +28,7 @@ int lat_rep() {
         return 0;
     }
 
-    struct Object* output = eval_apply(envir, input);
+    struct Object* output = eval_apply(global_env, input);
     //lat_eval(input);
     // lat_print(output);
     object_print_string(output);

@@ -1,16 +1,21 @@
 #ifndef LATERAL_OBJECT_H
 #define LATERAL_OBJECT_H
 
-enum object_type {empty,            // not nil, for internal use only
+enum object_type {
+    empty,                          // not nil, for internal use only
     symbol,
     list_type,
     char_type, string,
     int_type, float_type,
-    c_fn                            // pointer to function defined in C
+    c_fn,                           // pointer to function defined in C
+    func_type                       // lisp function
 };
+
+struct Func;
 
 union Data {
     void* ptr;
+    struct Func* func;
     struct Object* (*fn_ptr)(struct Object*, struct Object*);
     char char_type;
     int int_type;
@@ -28,8 +33,15 @@ int object_equals_char(struct Object*, char);
 void object_free_member(struct Object*);
 void object_free(struct Object*);
 
-void object_print(struct Object*);
 void object_print_string(struct Object*);
 void object_print_debug(struct Object*);
+
+#include "list.h"
+
+struct Func {
+    struct List* args;
+    struct Object* expr;
+};
+
 
 #endif

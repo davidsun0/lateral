@@ -13,6 +13,16 @@ struct Object* list_init() {
     return object_init(list_type, data);
 }
 
+void list_free(struct List* list) {
+    struct List* next;
+    while(list != NULL) {
+        next = list->next;
+        object_free_member(list->obj);
+        free(list);
+        list = next;
+    }
+}
+
 void list_append_object(struct Object* list_obj, struct Object* append) {
     if(list_obj == NULL || list_obj->type != list_type) {
         return;
@@ -42,6 +52,15 @@ void list_append(struct Object* list_obj, enum object_type type,
     list_append_object(list_obj, append);
 }
 
+int list_length(struct List* list) {
+    int length = 0;
+    while(list != NULL) {
+        list = list->next;
+        length ++;
+    }
+    return length;
+}
+
 void list_print(struct List* list) {
     while(list != NULL) {
         printf("node adr: %p\n", (void*) list);
@@ -52,15 +71,5 @@ void list_print(struct List* list) {
         }
         printf("\n");
         list = list->next;
-    }
-}
-
-void list_free(struct List* list) {
-    struct List* next;
-    while(list != NULL) {
-        next = list->next;
-        object_free_member(list->obj);
-        free(list);
-        list = next;
     }
 }

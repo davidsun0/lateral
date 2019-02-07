@@ -24,7 +24,30 @@ struct HashMap* hashmap_init(int size) {
     return map;
 }
 
-struct HashMap* hashmap_double_size(struct HashMap* map) {
+struct KeyValueList* hashmap_kvlist_init(char* key, struct Object* value) {
+    struct KeyValueList* kvlist = malloc(sizeof(struct KeyValueList));
+    kvlist->next = NULL;
+    kvlist->keyValue.key = key;
+    kvlist->keyValue.value = value;
+    return kvlist;
+}
+
+void hashmap_free_map(struct HashMap* map) {
+    for(int i = 0; i < map->size; i ++) {
+        if(map->pairs[i] != NULL) {
+            struct KeyValueList* list = map->pairs[i];
+            struct KeyValueList* prev = list;
+            while(list != NULL) {
+                prev = list;
+                list = list->next;
+                free(prev);
+            }
+        }
+    }
+}
+
+void hashmap_double_size(struct HashMap* map) {
+    // TODO: rewrite to only make new array of lists
     struct HashMap* new_map = hashmap_init(map->size * 2);
     for(int i = 0; i < map->size; i ++) {
         if(map->pairs[i] != NULL) {
@@ -36,23 +59,22 @@ struct HashMap* hashmap_double_size(struct HashMap* map) {
         }
     }
     hashmap_free_map(map);
-    return new_map;
 }
 
-void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
+void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
+    char* key = malloc(sizeof(char) * strlen(key_ptr));
+    strcpy(key, key_ptr);
+
     int hash = hashmap_string_hash(key) % map->size;
     if((float)(map->load + 1)/map->size > 0.7) {
-        map = hashmap_double_size(map);
+        hashmap_double_size(map);
         hash = hashmap_string_hash(key) % map->size;
     }
 
     if(map->pairs[hash] == NULL) {
         // init new linked list and set object
-        struct KeyValueList* list = malloc(sizeof(struct KeyValueList));
-        list->next = NULL;
-        list->keyValue.key = key;
-        list->keyValue.value = value;
-        map->pairs[hash] = list;
+        struct KeyValueList* kvlist = hashmap_kvlist_init(key, value);
+        map->pairs[hash] = kvlist;
     } else {
         struct KeyValueList* list = map->pairs[hash];
         struct KeyValueList* prev;
@@ -60,8 +82,6 @@ void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
         while(list != NULL) {
             // replace existing value
             if(strcmp(key, list->keyValue.key) == 0) {
-                // maybe not a good idea?
-                // object_free(list->keyValue.value);
                 list->keyValue.value = value;
                 replaced = 1;
                 break;
@@ -71,11 +91,7 @@ void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
         }
         // append to list
         if(!replaced) {
-            struct KeyValueList* node = malloc(sizeof(struct KeyValueList));
-            node->next = NULL;
-            node->keyValue.key = key;
-            node->keyValue.value = value;
-            prev->next = node;
+            prev->next = hashmap_kvlist_init(key, value);
         }
     }
     map->load ++;
@@ -94,19 +110,5 @@ struct Object* hashmap_get(struct HashMap* map, char* key) {
             list = list->next;
         }
         return NULL;
-    }
-}
-
-void hashmap_free_map(struct HashMap* map) {
-    for(int i = 0; i < map->size; i ++) {
-        if(map->pairs[i] != NULL) {
-            struct KeyValueList* list = map->pairs[i];
-            struct KeyValueList* prev = list;
-            while(list != NULL) {
-                prev = list;
-                list = list->next;
-                free(prev);
-            }
-        }
     }
 }
