@@ -3,4 +3,6 @@
 
 void env_init();
 
+struct Object* lambda(struct List*);
+
 #endif

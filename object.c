@@ -83,7 +83,7 @@ void object_free(struct Object* obj) {
 
 void object_print_string(struct Object* obj) {
     if(obj == NULL) {
-        printf("[null object]\n");
+        printf("[null object]");
     } else if(obj->type == list_type) {
         printf("(");
         struct List* node = obj->data.ptr;
@@ -104,6 +104,8 @@ void object_print_string(struct Object* obj) {
         printf("%d", obj->data.int_type);
     } else if(obj->type == c_fn) {
         printf("c_fn<%p>", obj->data.ptr);
+    } else if(obj->type == func_type) {
+        printf("fn<%p>", obj->data.ptr);
     } else {
         printf("%p", obj->data.ptr);
     }

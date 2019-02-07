@@ -6,29 +6,9 @@
 #include "list.h"
 #include "hash.h"
 #include "env.h"
+#include "lang.h"
 
 #include "eval.h"
-
-struct Object* fn_eval(struct List* args) {
-    return NULL;
-}
-
-struct Object* lambda(struct List* args) {
-    if(args->obj->type != list_type 
-            && args->next->next != NULL) {
-        // TODO: error checking
-        printf("wrong number of arguments to fn\n");
-        return NULL;
-    }
-    struct Func* fn = malloc(sizeof(struct Func));
-    fn->args = args->obj->data.ptr;
-    fn->expr = (struct Object*) (args->next->obj);
-    // list_print(fn->args);
-    // object_print_debug(fn->expr);
-    union Data data;
-    data.func = fn;
-    return object_init(func_type, data);
-}
 
 struct Object* eval_eval(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
@@ -69,10 +49,19 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 return sp->next->obj;
             } else if(object_equals_symbol(sp->obj, "fn")) {
                 return lambda(sp->next);
+            } else if(object_equals_symbol(sp->obj, "def")) {
+                if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
+                    printf("wrong type / number of args to def\n");
+                    return NULL;
+                }
+                struct Object* sym = sp->next->obj;
+                struct Object* val = sp->next->next->obj;
+                val = eval_apply(env, val);
+                envir_set(env, sym->data.ptr, val);
+                return val;
             }
         }
         struct Object* list = eval_eval(env, obj);
-        
         // for special forms like quote
         if(list->type != list_type) {
             return list;

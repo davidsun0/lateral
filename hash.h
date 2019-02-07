@@ -21,7 +21,7 @@ struct HashMap {
 
 struct KeyValueList* hashmap_kvlist_init(char*, struct Object*);
 
-int hashmap_string_hash(char*);
+unsigned int hashmap_string_hash(char*);
 struct HashMap* hashmap_init(int size);
 
 void hashmap_double_size(struct HashMap*);

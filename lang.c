@@ -8,6 +8,21 @@
 
 struct Envir* global_env;
 
+struct Object* lambda(struct List* args) {
+    if(args->obj->type != list_type
+            || args->next->next != NULL) {
+        // TODO: error checking
+        printf("wrong number of arguments to fn\n");
+        return NULL;
+    }
+    struct Func* fn = malloc(sizeof(struct Func));
+    fn->args = args->obj->data.ptr;
+    fn->expr = (struct Object*) (args->next->obj);
+    union Data data;
+    data.func = fn;
+    return object_init(func_type, data);
+}
+
 struct Object* sum(struct List* args) {
     if(args->obj == NULL) {
         printf("wrong number of arguments to +\n");

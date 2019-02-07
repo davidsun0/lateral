@@ -4,8 +4,8 @@
 
 #include "hash.h"
 
-int hashmap_string_hash(char* str) {
-    int hash = 5381;
+unsigned int hashmap_string_hash(char* str) {
+    unsigned int hash = 5381;
     while(*str != '\0') {
         hash = hash * 33 + *str;
         str ++;
@@ -63,11 +63,12 @@ void hashmap_double_size(struct HashMap* map) {
 }
 
 void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
-    char* key = malloc(sizeof(char) * strlen(key_ptr));
+    char* key = malloc(sizeof(char) * (strlen(key_ptr) + 1));
     strcpy(key, key_ptr);
 
-    int hash = hashmap_string_hash(key) % map->size;
+    unsigned int hash = hashmap_string_hash(key) % map->size;
     if((float)(map->load + 1)/map->size > 0.7) {
+        printf("resizing hashmap\n");
         hashmap_double_size(map);
         hash = hashmap_string_hash(key) % map->size;
     }
