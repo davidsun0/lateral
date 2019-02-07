@@ -4,7 +4,6 @@
 struct List;
 
 enum object_type {
-    empty,                          // not nil, for internal use only
     symbol,
     list_type,
     char_type, string,
@@ -13,11 +12,14 @@ enum object_type {
     func_type                       // lisp function
 };
 
+enum quote {
+    none, semi, full
+};
+
 struct Func {
     struct List* args;
     struct Object* expr;
 };
-
 
 union Data {
     void* ptr;
@@ -30,11 +32,14 @@ union Data {
 struct Object {
     enum object_type type;
     union Data data;
+    enum quote quote;
 };
 
 struct Object* object_init(enum object_type, union Data);
+struct Object* object_copy(struct Object*);
 
 int object_equals_char(struct Object*, char);
+int object_equals_symbol(struct Object*, char*);
 
 void object_free_member(struct Object*);
 void object_free(struct Object*);

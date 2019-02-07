@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "object.h"
 #include "list.h"
@@ -8,10 +9,42 @@
 
 #include "eval.h"
 
+struct Object* fn_eval(struct List* args) {
+    return NULL;
+}
+
+struct Object* lambda(struct List* args) {
+    if(args->obj->type != list_type 
+            && args->next->next != NULL) {
+        // TODO: error checking
+        printf("wrong number of arguments to fn\n");
+        return NULL;
+    }
+    struct Func* fn = malloc(sizeof(struct Func));
+    fn->args = args->obj->data.ptr;
+    fn->expr = (struct Object*) (args->next->obj);
+    // list_print(fn->args);
+    // object_print_debug(fn->expr);
+    union Data data;
+    data.func = fn;
+    return object_init(func_type, data);
+}
+
 struct Object* eval_eval(struct Envir* env, struct Object* obj) {
-    if(obj->type == symbol) {
+    if(obj->type == list_type) {
+        struct List* list = obj->data.ptr;
+        // call eval on every member, returning new list
+        struct Object* output = list_init();
+
+        struct Object* elem;
+        while(list != NULL) {
+            elem = eval_apply(env, list->obj);
+            list_append_object(output, elem);
+            list = list->next;
+        }
+        return output;
+     } else if(obj->type == symbol) {
         // look up symbol in environment
-        // struct Object* val = hashmap_get(env, obj->data.ptr);
         struct Object* val = envir_search(env, obj->data.ptr);
         if(val == NULL) {
             // TODO: error handling
@@ -20,18 +53,6 @@ struct Object* eval_eval(struct Envir* env, struct Object* obj) {
         } else {
             return val;
         }
-     } else if(obj->type == list_type) {
-        // call eval on every member, returning new list
-        struct Object* output = list_init();
-
-        struct List* list = obj->data.ptr;
-        struct Object* elem;
-        while(list != NULL) {
-            elem = eval_apply(env, list->obj);
-            list_append_object(output, elem);
-            list = list->next;
-        }
-        return output;
      } else {
         // objects evaluate to themselves
         return obj;
@@ -40,22 +61,28 @@ struct Object* eval_eval(struct Envir* env, struct Object* obj) {
 
 struct Object* eval_apply(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
+        // special forms
+        if(obj->type == list_type) {
+            struct List* sp = obj->data.ptr;
+            if(object_equals_symbol(sp->obj, "quote")) {
+                // TODO: copy object?
+                return sp->next->obj;
+            } else if(object_equals_symbol(sp->obj, "fn")) {
+                return lambda(sp->next);
+            }
+        }
         struct Object* list = eval_eval(env, obj);
+        
+        // for special forms like quote
+        if(list->type != list_type) {
+            return list;
+        }
+
         struct List* arg_list = (struct List*)list->data.ptr;
         struct Object* func = arg_list->obj;
         arg_list = arg_list->next;
-        // somehow call func on args
+
         if(func->type == c_fn) {
-            /*
-            struct Object* arg1 = NULL;
-            if(arg_list != NULL) {
-                arg1 = arg_list->obj;
-            }
-            struct Object* arg2 = NULL;
-            if(arg_list != NULL && arg_list->next != NULL) {
-                arg2 = arg_list->next->obj;
-            }
-            */
             return func->data.fn_ptr(arg_list);
         } else if(func->type == func_type) {
             struct Func* fn_struct = (struct Func*) func->data.ptr;
@@ -83,14 +110,14 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             }
             // evaluate function expression
             local->outer = env;
-            struct Object* result = eval_eval(local, fn_struct->expr);
+            struct Object* result = eval_apply(local, fn_struct->expr);
             // clean up temporary environment
             envir_free(local);
             return result;
         } else {
-            printf("error: token ");
+            printf("error: symbol ");
             object_print_string(func);
-            printf(" is not a function");
+            printf(" is not a function\n");
             return NULL;
         }
     } else {

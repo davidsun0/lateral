@@ -28,10 +28,6 @@ struct Object* sum(struct List* args) {
     return object_init(int_type, data);
 }
 
-struct Object* lambda(struct List* args) {
-    return NULL;
-}
-
 void env_init() {
     global_env = envir_init(128);
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "list.h"
 
@@ -9,7 +10,38 @@ struct Object* object_init(enum object_type type, union Data data) {
     struct Object* obj = malloc(sizeof(struct Object));
     obj->type = type;
     obj->data = data;
+    obj->quote = none;
     return obj;
+}
+
+struct Object* object_copy(struct Object* obj) {
+    if(obj == NULL)
+        return NULL;
+
+    union Data dat;
+    if(obj->type == char_type || obj->type == int_type || obj->type == c_fn) {
+        // direct copy
+        dat = obj->data;
+    } else if(obj->type == symbol || obj->type == string) {
+        // string copy
+        int length = strlen(obj->data.ptr);
+        char* str = malloc(sizeof(char) * (length + 1));
+        strcpy(str, obj->data.ptr);
+        dat.ptr = str;
+    } else if(obj->type == list_type) {
+        struct Object* clone = list_init();
+        struct List* list = obj->data.ptr;
+        while(list != NULL) {
+            list_append_object(clone, object_copy(list->obj));
+            list = list->next;
+        }
+        return clone;
+    } else if(obj->type == func_type) {
+        printf("implement object_copy for functions\n");
+        return NULL;
+    }
+    // copy structure + recurse for list, func
+    return object_init(obj->type, dat);
 }
 
 int object_equals_char(struct Object* obj, char c) {
@@ -20,6 +52,16 @@ int object_equals_char(struct Object* obj, char c) {
     }
 }
 
+int object_equals_symbol(struct Object* obj, char* str) {
+    if(obj != NULL && obj->type == symbol &&
+            strcmp(obj->data.ptr, str) == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*
 void object_free_member(struct Object* obj) {
     if(obj->type == int_type || obj->type == char_type ||
             obj->type == c_fn) {
@@ -31,7 +73,7 @@ void object_free_member(struct Object* obj) {
         obj->data.ptr = NULL;
     }
 }
-
+*/
 /*
 void object_free(struct Object* obj) {
     object_free_member(obj);
@@ -61,7 +103,7 @@ void object_print_string(struct Object* obj) {
     } else if(obj->type == int_type) {
         printf("%d", obj->data.int_type);
     } else if(obj->type == c_fn) {
-        printf("fn @ %p", obj->data.ptr);
+        printf("c_fn<%p>", obj->data.ptr);
     } else {
         printf("%p", obj->data.ptr);
     }
@@ -101,9 +143,6 @@ void object_print_debug(struct Object* obj) {
             printf("addr: %p\n", obj->data.ptr);
             break;
 
-        case empty:
-            printf("EMPTY\n");
-            break;
         default:
             printf("unknown type\n");
             printf("data/addr: %p\n", obj->data.ptr);

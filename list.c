@@ -17,7 +17,7 @@ void list_free(struct List* list) {
     struct List* next;
     while(list != NULL) {
         next = list->next;
-        object_free_member(list->obj);
+        // object_free_member(list->obj);
         free(list);
         list = next;
     }
