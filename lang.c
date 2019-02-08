@@ -26,6 +26,23 @@ struct Object* lambda(struct List* args) {
     return object_init(func_type, data);
 }
 
+struct Object* equals(struct List* args) {
+    if(args == NULL || args->obj == NULL) {
+        return nil_obj;
+    } else {
+        struct Object* first = args->obj;
+        struct List* node = args->next;
+        while(node != NULL) {
+            if(object_equals_value(first, node->obj)) {
+                node = node->next;
+            } else {
+                return nil_obj;
+            }
+        }
+        return true_obj;
+    }
+}
+
 struct Object* sum(struct List* args) {
     if(args->obj == NULL) {
         printf("wrong number of arguments to +\n");
@@ -64,4 +81,5 @@ void env_init() {
     envir_set(global_env, "nil", nil_obj);
 
     envir_insert_cfn(&sum, "+");
+    envir_insert_cfn(&equals, "=");
 }

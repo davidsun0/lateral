@@ -60,6 +60,29 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             val = eval_apply(env, val);
             envir_set(env, sym->data.ptr, val);
             return val;
+        } else if(object_equals_symbol(sp->obj, "if")) {
+            int argc = list_length(sp) - 1;
+            if(argc == 2) {
+                struct Object* pred = sp->next->obj;
+                struct Object* tclause = sp->next->next->obj;
+                if(!object_equals_value(nil_obj, eval_apply(env, pred))) {
+                    return eval_eval(env, tclause);
+                } else {
+                    return nil_obj;
+                }
+            } else if(argc == 3) {
+                struct Object* pred = sp->next->obj;
+                struct Object* tclause = sp->next->next->obj;
+                struct Object* fclause = sp->next->next->next->obj;
+                if(!object_equals_value(nil_obj, eval_apply(env, pred))) {
+                    return eval_eval(env, tclause);
+                } else {
+                    return eval_eval(env, fclause);
+                }
+            } else {
+                printf("wrong number of args to if (expects 2 or 3)\n");
+                return NULL;
+            }
         }
         struct Object* list = eval_eval(env, obj);
         // for special forms like quote

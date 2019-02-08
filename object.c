@@ -65,6 +65,28 @@ int object_equals_symbol(struct Object* obj, char* str) {
     }
 }
 
+int object_equals_value(struct Object* a, struct Object* b) {
+    if(a == b) {
+        // also covers if both a and b are NULL
+        return 1;
+    } else if(a == NULL || b == NULL) {
+        return 0;
+    } else if(a->type != b->type) {
+        return 0;
+    }
+
+    if(int_type == a->type) {
+        return a->data.int_type == b->data.int_type ? 1 : 0;
+    } else if(char_type == a->type) {
+        return a->data.char_type == b->data.char_type ? 1 : 0;
+    } else if(symbol == a->type || string == a->type) {
+        return strcmp(a->data.ptr, b->data.ptr) == 0 ? 1 : 0;
+    } else {
+        return a->data.ptr == b->data.ptr ? 1 : 0;
+    }
+    // TODO: list comparison
+}
+
 /*
 void object_free(struct Object* obj) {
     object_free_member(obj);
