@@ -8,6 +8,9 @@
 
 struct Envir* global_env;
 
+struct Object* true_obj;
+struct Object* nil_obj;
+
 struct Object* lambda(struct List* args) {
     if(args->obj->type != list_type
             || args->next->next != NULL) {
@@ -43,11 +46,22 @@ struct Object* sum(struct List* args) {
     return object_init(int_type, data);
 }
 
+void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
+    union Data data;
+    data.fn_ptr = fn_ptr;
+    struct Object* fn = object_init(c_fn, data);
+    envir_set(global_env, name, fn);
+}
+
 void env_init() {
     global_env = envir_init(128);
 
-    union Data data;
-    data.fn_ptr = &sum;
-    struct Object* plus = object_init(c_fn, data);
-    envir_set(global_env, "+", plus);
+    union Data temp;
+    temp.ptr = NULL;
+    true_obj = object_init(true, temp);
+    nil_obj = object_init(nil, temp);
+    envir_set(global_env, "t", true_obj);
+    envir_set(global_env, "nil", nil_obj);
+
+    envir_insert_cfn(&sum, "+");
 }

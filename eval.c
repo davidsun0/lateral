@@ -42,24 +42,24 @@ struct Object* eval_eval(struct Envir* env, struct Object* obj) {
 struct Object* eval_apply(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
         // special forms
-        if(obj->type == list_type) {
-            struct List* sp = obj->data.ptr;
-            if(object_equals_symbol(sp->obj, "quote")) {
-                // TODO: copy object?
-                return sp->next->obj;
-            } else if(object_equals_symbol(sp->obj, "fn")) {
-                return lambda(sp->next);
-            } else if(object_equals_symbol(sp->obj, "def")) {
-                if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
-                    printf("wrong type / number of args to def\n");
-                    return NULL;
-                }
-                struct Object* sym = sp->next->obj;
-                struct Object* val = sp->next->next->obj;
-                val = eval_apply(env, val);
-                envir_set(env, sym->data.ptr, val);
-                return val;
+        struct List* sp = obj->data.ptr;
+        if(sp->obj == NULL) {
+            return nil_obj;
+        } else if(object_equals_symbol(sp->obj, "quote")) {
+            // TODO: copy object?
+            return sp->next->obj;
+        } else if(object_equals_symbol(sp->obj, "fn")) {
+            return lambda(sp->next);
+        } else if(object_equals_symbol(sp->obj, "def")) {
+            if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
+                printf("wrong type / number of args to def\n");
+                return NULL;
             }
+            struct Object* sym = sp->next->obj;
+            struct Object* val = sp->next->next->obj;
+            val = eval_apply(env, val);
+            envir_set(env, sym->data.ptr, val);
+            return val;
         }
         struct Object* list = eval_eval(env, obj);
         // for special forms like quote

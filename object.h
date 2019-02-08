@@ -5,9 +5,10 @@ struct List;
 
 enum object_type {
     symbol,
-    list_type,
+    nil, true,
     char_type, string,
     int_type, float_type,
+    list_type,
     c_fn,                           // pointer to function defined in C
     func_type                       // lisp function
 };

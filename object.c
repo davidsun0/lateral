@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "list.h"
+#include "lang.h"
 
 #include "object.h"
 
@@ -15,8 +16,11 @@ struct Object* object_init(enum object_type type, union Data data) {
 }
 
 struct Object* object_copy(struct Object* obj) {
-    if(obj == NULL)
+    if(obj == NULL) {
         return NULL;
+    } else if(obj == true_obj || obj == nil_obj) {
+        return obj;
+    }
 
     union Data dat;
     if(obj->type == char_type || obj->type == int_type || obj->type == c_fn) {
@@ -62,19 +66,6 @@ int object_equals_symbol(struct Object* obj, char* str) {
 }
 
 /*
-void object_free_member(struct Object* obj) {
-    if(obj->type == int_type || obj->type == char_type ||
-            obj->type == c_fn) {
-        return;
-    } else if(obj->type == list_type) {
-        list_free(obj->data.ptr);  
-    } else if(obj->data.ptr != NULL) {
-        free(obj->data.ptr);
-        obj->data.ptr = NULL;
-    }
-}
-*/
-/*
 void object_free(struct Object* obj) {
     object_free_member(obj);
     free(obj);
@@ -84,28 +75,34 @@ void object_free(struct Object* obj) {
 void object_print_string(struct Object* obj) {
     if(obj == NULL) {
         printf("[null object]");
-    } else if(obj->type == list_type) {
+    } else if(list_type == obj->type) {
         printf("(");
         struct List* node = obj->data.ptr;
-        while(node != NULL) {
-            object_print_string(node->obj);
-            node = node->next;
-            if(node != NULL) {
-                printf(" ");
+        if(node->obj != NULL) {
+            while(node != NULL) {
+                object_print_string(node->obj);
+                node = node->next;
+                if(node != NULL) {
+                    printf(" ");
+                }
             }
         }
         printf(")");
-    } else if(obj->type == string || obj->type == symbol) {
+    } else if(string == obj->type || symbol == obj->type) {
         // string based types
         printf("%s", (char*) obj->data.ptr);
-    } else if(obj->type == char_type) {
+    } else if(char_type == obj->type) {
         printf("%c", obj->data.char_type);
-    } else if(obj->type == int_type) {
+    } else if(int_type == obj->type) {
         printf("%d", obj->data.int_type);
-    } else if(obj->type == c_fn) {
+    } else if(c_fn == obj->type) {
         printf("c_fn<%p>", obj->data.ptr);
-    } else if(obj->type == func_type) {
+    } else if(func_type == obj->type) {
         printf("fn<%p>", obj->data.ptr);
+    } else if(true_obj == obj) {
+        printf("t");
+    } else if(nil_obj == obj) {
+        printf("nil");
     } else {
         printf("%p", obj->data.ptr);
     }
@@ -143,6 +140,12 @@ void object_print_debug(struct Object* obj) {
         case c_fn:
             printf("type: c function\n");
             printf("addr: %p\n", obj->data.ptr);
+            break;
+        case true:
+            printf("truth object\n");
+            break;
+        case nil:
+            printf("nil object\n");
             break;
 
         default:

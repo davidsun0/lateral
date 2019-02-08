@@ -16,7 +16,6 @@ extern struct Envir* global_env;
 int lat_rep() {
     char* input_str = readline("user> ");
     if(input_str == NULL){
-        printf("\ngoodbye! (^_^ )/\n");
         return 0;
     } else if(strcmp(input_str, "") == 0) {
         return 1;
@@ -29,8 +28,6 @@ int lat_rep() {
     }
 
     struct Object* output = eval_apply(global_env, input);
-    //lat_eval(input);
-    // lat_print(output);
     object_print_string(output);
     printf("\n");
     return 1;
@@ -48,4 +45,5 @@ int main(){
     while(lat_rep()){
         ;
     }
+    printf("goodbye! ('v' )/\n");
 }
