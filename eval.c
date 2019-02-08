@@ -43,16 +43,50 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
         // special forms
         struct List* sp = obj->data.ptr;
+        // TODO: compare all special forms at once
         if(sp->obj == NULL) {
+            // empty list evaluates to nil
             return nil_obj;
         } else if(object_equals_symbol(sp->obj, "quote")) {
             // TODO: copy object?
             return sp->next->obj;
+        } else if(object_equals_symbol(sp->obj, "or")) {
+            sp = sp->next;
+            if(sp == NULL) {
+                printf("error: or expects at least one argument\n");
+                return NULL;
+            }
+            struct Object* val;
+            while(sp != NULL) {
+                val = eval_apply(env, sp->obj);
+                if(val == NULL)
+                    return NULL;
+                if(val != nil_obj)
+                    return true_obj;
+                sp = sp->next;
+            }
+            return nil_obj;
+        } else if(object_equals_symbol(sp->obj, "and")) {
+            sp = sp->next;
+            if(sp == NULL) {
+                printf("error: and expects at least one argument\n");
+                return NULL;
+            }
+            struct Object* val;
+            while(sp != NULL) {
+                val = eval_apply(env, sp->obj);
+                if(val == NULL)
+                    return NULL;
+                if(val == nil_obj)
+                    return nil_obj;
+                sp = sp->next;
+            }
+            return true_obj;
         } else if(object_equals_symbol(sp->obj, "fn")) {
             return lambda(sp->next);
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
-                printf("wrong type / number of args to def\n");
+                printf("error: wrong type / number of args to def\n");
                 return NULL;
             }
             struct Object* sym = sp->next->obj;
@@ -62,30 +96,96 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             return val;
         } else if(object_equals_symbol(sp->obj, "if")) {
             int argc = list_length(sp) - 1;
-            if(argc == 2) {
+            if(argc == 2 || argc == 3) {
                 struct Object* pred = sp->next->obj;
                 struct Object* tclause = sp->next->next->obj;
                 if(!object_equals_value(nil_obj, eval_apply(env, pred))) {
                     return eval_eval(env, tclause);
                 } else {
-                    return nil_obj;
-                }
-            } else if(argc == 3) {
-                struct Object* pred = sp->next->obj;
-                struct Object* tclause = sp->next->next->obj;
-                struct Object* fclause = sp->next->next->next->obj;
-                if(!object_equals_value(nil_obj, eval_apply(env, pred))) {
-                    return eval_eval(env, tclause);
-                } else {
-                    return eval_eval(env, fclause);
+                    if(argc == 3) {
+                        struct Object* fclause = sp->next->next->next->obj;
+                        return eval_eval(env, fclause);
+                    } else {
+                        return nil_obj;
+                    }
                 }
             } else {
-                printf("wrong number of args to if (expects 2 or 3)\n");
+                printf("error: wrong number of args to if (expects 2 or 3)\n");
                 return NULL;
             }
+        } else if(object_equals_symbol(sp->obj, "cond")) {
+            sp = sp->next;
+            int argc = list_length(sp);
+            if(argc == 0 || argc % 2 != 0) {
+                printf("error: cond expects an even number of arguments\n");
+                return NULL;
+            }
+            struct Object* pred;
+            int argnum = 0;
+            while(sp != NULL) {
+                if(object_equals_symbol(sp->obj, ":else")) {
+                    if(argnum != argc - 2) {
+                        printf("%d / %d\n", argnum, argc);
+                        printf("unexpected :else symbol\n");
+                        return NULL;
+                    } else {
+                        return eval_apply(env, sp->next->obj);
+                    }
+                }
+                pred = eval_apply(env, sp->obj);
+                if(pred == NULL)
+                    return NULL;
+                if(pred != nil_obj)
+                    return eval_apply(env, sp->next->obj);
+                argnum += 2;
+                sp = sp->next->next;
+            }
+            return nil_obj;
+        } else if(object_equals_symbol(sp->obj, "let")) {
+            sp = sp->next;
+            // get bindings
+            if(sp->obj->type != list_type 
+                    || list_length(sp->obj->data.ptr) % 2 != 0) {
+                printf("error: let expects an even number of bindings\n");
+                return NULL;
+            }
+            struct List* bindings = sp->obj->data.ptr;
+            struct Envir* local = envir_init(list_length(bindings) * 2);
+            // map bindings to environment
+            while(bindings != NULL) {
+                if(bindings->obj->type != symbol) {
+                    printf("error: binding is not symbol\n");
+                    envir_free(local);
+                    return NULL;
+                }
+                envir_set(local, (char*) bindings->obj->data.ptr,
+                        bindings->next->obj);
+                bindings = bindings->next->next;
+            }
+            // push environment
+            local->outer = env;
+            // evaluate like progn
+            sp = sp->next;
+            while(sp->next != NULL) {
+                eval_apply(local, sp->obj);
+                sp = sp->next;
+            }
+            struct Object* result = eval_apply(local, sp->obj);
+            envir_free(local);
+            return result;
+        } else if(object_equals_symbol(sp->obj, "progn")) {
+            sp = sp->next;
+            while(sp->next != NULL) {
+                eval_apply(env, sp->obj);
+                sp = sp->next;
+            }
+            return eval_apply(env, sp->obj);
         }
+
+
         struct Object* list = eval_eval(env, obj);
-        // for special forms like quote
+        // if the expression evaluated to non-list type
+        // i.e. evaluated by a special form
         if(list->type != list_type) {
             return list;
         }
