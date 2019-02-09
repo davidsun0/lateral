@@ -6,12 +6,14 @@
 #include <readline/history.h>
 
 #include "object.h"
+#include "garbage.h"
 #include "env.h"
 #include "reader.h"
 #include "eval.h"
 #include "lang.h"
 
-extern struct Envir* global_env;
+extern struct Envir* user_env;
+extern int object_count;
 
 int lat_rep() {
     char* input_str = readline("user> ");
@@ -27,9 +29,11 @@ int lat_rep() {
         return 0;
     }
 
-    struct Object* output = eval_apply(global_env, input);
+    struct Object* output = eval_apply(user_env, input);
     object_print_string(output);
     printf("\n");
+    // printf("objects: %d\n", object_count);
+    gc_run();
     return 1;
 }
 
@@ -40,6 +44,7 @@ void initialize_readline(){
 
 int main(){
     initialize_readline();
+    gc_init();
     env_init();
 
     while(lat_rep()){

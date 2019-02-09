@@ -4,14 +4,24 @@
 
 #include "list.h"
 #include "lang.h"
+#include "garbage.h"
 
 #include "object.h"
 
 struct Object* object_init(enum object_type type, union Data data) {
     struct Object* obj = malloc(sizeof(struct Object));
+    if(obj == NULL) {
+        gc_run();
+        obj = malloc(sizeof(struct Object));
+        if(obj == NULL) {
+            perror("fatal: out of memory\n");
+            exit(1);
+        }
+    }
     obj->type = type;
     obj->data = data;
-    obj->quote = none;
+    obj->marked = 0;
+    gc_insert_object(obj);
     return obj;
 }
 
@@ -87,12 +97,107 @@ int object_equals_value(struct Object* a, struct Object* b) {
     // TODO: list comparison
 }
 
-/*
+void object_mark(struct Object* obj) {
+    if(obj == NULL || obj->marked)
+        return;
+
+    obj->marked = 1;
+    if(obj->type == list_type) {
+        struct List* list = (struct List*) obj->data.ptr;
+        while(list != NULL) {
+            object_mark(list->obj);
+            list = list->next;
+        }
+    } else if(obj->type == func_type) {
+        struct Func* func = (struct Func*)obj->data.ptr;
+        struct List* args = func->args;
+        while(args != NULL) {
+            object_mark(args->obj);
+            args = args->next;
+        }
+        object_mark(func->expr);
+    }
+}
+
 void object_free(struct Object* obj) {
-    object_free_member(obj);
+    if(obj == NULL)
+        return;
+
+    switch(obj->type) {
+        case symbol:
+        case string:
+            free(obj->data.ptr);
+            break;
+
+        case c_fn:
+        case nil:
+        case true:
+            printf("warning: trying to free an unfreeable type\n");
+            return;
+        default:
+            break;
+    }
+
+    if(list_type == obj->type) {
+        // printf("freeing list\n");
+        struct List* list = (struct List*) obj->data.ptr;
+        struct List* next = list->next;
+        while(list != NULL) {
+            free(list);
+            list = next;
+            if(next != NULL)
+                next = next->next;
+        }
+    } else if(func_type == obj->type) {
+        printf("freeing fn\n");
+        struct List* list = ((struct Func*) obj->data.ptr)->args;
+        struct List* next = list->next;
+        while(list != NULL) {
+            free(list);
+            list = next;
+            if(next != NULL)
+                next = next->next;
+        }
+    }
     free(obj);
 }
-*/
+
+void object_print_type(enum object_type type) {
+    switch(type) {
+        case symbol:
+            printf("symbol");
+            break;
+        case string:
+            printf("string");
+            break;
+        case char_type:
+            printf("char");
+            break;
+        case int_type:
+            printf("int");
+            break;
+        case float_type:
+            printf("float");
+            break;
+        case list_type:
+            printf("list");
+            break;
+        case c_fn:
+            printf("c_fn");
+            break;
+        case func_type:
+            printf("func");
+            break;
+        case nil:
+            printf("nil");
+            break;
+        case true:
+            printf("true");
+            break;
+        default:
+            printf("unknown type");
+    }
+}
 
 void object_print_string(struct Object* obj) {
     if(obj == NULL) {
@@ -122,7 +227,7 @@ void object_print_string(struct Object* obj) {
     } else if(func_type == obj->type) {
         printf("fn<%p>", obj->data.ptr);
     } else if(true_obj == obj) {
-        printf("t");
+        printf("true");
     } else if(nil_obj == obj) {
         printf("nil");
     } else {
@@ -130,48 +235,50 @@ void object_print_string(struct Object* obj) {
     }
 }
 
-void object_print_debug(struct Object* obj) {
-    printf("obj at %p:\n", (void*) obj);
+void object_debug(struct Object* obj, int indent) {
+    for(int i = 0; i < indent; i ++) {
+        printf("  ");
+    }
+    printf("adr %p:\n", (void*) obj);
+
+    for(int i = 0; i < indent; i ++) {
+        printf("  ");
+    }
+    object_print_type(obj->type);
+    printf("\n");
+
+    for(int i = 0; i < indent; i ++) {
+        printf("  ");
+    }
+    if(obj->marked) {
+        printf("mark\n");
+    } else {
+        printf("no mark\n");
+    }
+
+    for(int i = 0; i < indent; i ++) {
+        printf("  ");
+    }
     switch(obj->type) {
         case symbol:
-            printf("type: symbol\n");
-            printf("addr: %p\n", obj->data.ptr);
             printf("data: %s\n", (char*) obj->data.ptr);
             break;
         case string:
-            printf("type: string\n");
-            printf("addr: %p\n", obj->data.ptr);
             printf("data: %s\n", (char*) obj->data.ptr);
             break;
         case char_type:
-            printf("type: character\n");
             printf("data: %c\n", obj->data.char_type);
             break;
         case int_type:
-            printf("type: integer\n");
             printf("data: %d\n", obj->data.int_type);
             break;
         case list_type:
-            printf("type: list\n");
-            printf("addr: %p\n", obj->data.ptr);
             printf("data:\n");
-            printf("=====BEGIN LIST=====\n");
-            list_print(obj->data.ptr);
-            printf("=====END LIST=====\n");
+            // printf("=====BEGIN LIST=====\n");
+            list_print(obj->data.ptr, indent + 1);
+            // printf("=====END LIST=====\n");
             break;
-        case c_fn:
-            printf("type: c function\n");
-            printf("addr: %p\n", obj->data.ptr);
-            break;
-        case true:
-            printf("truth object\n");
-            break;
-        case nil:
-            printf("nil object\n");
-            break;
-
         default:
-            printf("unknown type\n");
-            printf("data/addr: %p\n", obj->data.ptr);
+            printf("data: %p\n", obj->data.ptr);
     }
 }

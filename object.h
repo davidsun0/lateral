@@ -13,10 +13,6 @@ enum object_type {
     func_type                       // lisp function
 };
 
-enum quote {
-    none, semi, full
-};
-
 struct Func {
     struct List* args;
     struct Object* expr;
@@ -33,7 +29,7 @@ union Data {
 struct Object {
     enum object_type type;
     union Data data;
-    enum quote quote;
+    int marked;
 };
 
 struct Object* object_init(enum object_type, union Data);
@@ -43,10 +39,12 @@ int object_equals_char(struct Object*, char);
 int object_equals_symbol(struct Object*, char*);
 int object_equals_value(struct Object*, struct Object*);
 
-void object_free_member(struct Object*);
 void object_free(struct Object*);
 
+void object_print_type(enum object_type);
 void object_print_string(struct Object*);
-void object_print_debug(struct Object*);
+void object_debug(struct Object*, int);
+
+void object_mark(struct Object*);
 
 #endif

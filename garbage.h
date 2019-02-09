@@ -1,0 +1,10 @@
+#ifndef LATERAL_GARBAGE_H
+#define LATERAL_GARBAGE_H
+
+void gc_init();
+
+void gc_insert_object(struct Object*);
+
+void gc_run();
+
+#endif

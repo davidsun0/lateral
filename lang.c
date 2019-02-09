@@ -7,6 +7,7 @@
 #include "env.h"
 
 struct Envir* global_env;
+struct Envir* user_env;
 
 struct Object* true_obj;
 struct Object* nil_obj;
@@ -19,7 +20,7 @@ struct Object* lat_lambda(struct List* args) {
         return NULL;
     }
     struct Func* fn = malloc(sizeof(struct Func));
-    fn->args = args->obj->data.ptr;
+    fn->args = list_copy_struct(args->obj->data.ptr);
     fn->expr = (struct Object*) (args->next->obj);
     union Data data;
     data.func = fn;
@@ -95,4 +96,8 @@ void env_init() {
     envir_insert_cfn(&lat_plus, "+");
     envir_insert_cfn(&lat_equals, "=");
     envir_insert_cfn(&lat_print, "print");
+
+    user_env = envir_init(128);
+    user_env->outer = global_env;
+    global_env->inner = user_env;
 }

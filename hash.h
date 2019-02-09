@@ -3,13 +3,9 @@
 
 #include "object.h"
 
-struct KeyValue {
+struct KeyValueList {
     char* key;
     struct Object* value;
-};
-
-struct KeyValueList {
-    struct KeyValue keyValue;
     struct KeyValueList* next;
 };
 

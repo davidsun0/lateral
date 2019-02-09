@@ -164,7 +164,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             }
             // push environment
             local->outer = env;
-            // evaluate like progn
+            // evaluate like 'do'
             sp = sp->next;
             while(sp->next != NULL) {
                 eval_apply(local, sp->obj);
@@ -212,14 +212,14 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 will_recurse = 0;
                 while(expr != NULL) {
                     value = eval_apply(local, expr->obj);
-                    if(value->type == list_type && 
+                    if(value->type == list_type &&
                             object_equals_symbol(
                                 ((struct List*) value->data.ptr)->obj, "recur"
                                 )
                             ) {
                         if(expr->next != NULL) {
-                            printf("error: recursion must be in the tail \
-                                    position\n");
+                            printf("error: recursion must be in the tail"
+                                   " position\n");
                             envir_free(local);
                             return NULL;
                         } else {
@@ -239,7 +239,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                     while(bindings != NULL) {
                         if(new_vals == NULL) {
                             printf("error: recursion must have the same number"
-                                   "of arguments as loop bindings");
+                                   " of arguments as loop bindings");
                             envir_free(local);
                             return NULL;
                         }
@@ -249,8 +249,8 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                         new_vals = new_vals->next;
                     }
                     if(new_vals != NULL) {
-                        printf("error: recursion must have the same number of\
-                                arguments as loop bindings");
+                        printf("error: recursion must have the same number of"
+                               " arguments as loop bindings");
                         envir_free(local);
                         return NULL;
                     }

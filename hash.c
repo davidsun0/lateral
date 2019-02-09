@@ -27,8 +27,8 @@ struct HashMap* hashmap_init(int size) {
 struct KeyValueList* hashmap_kvlist_init(char* key, struct Object* value) {
     struct KeyValueList* kvlist = malloc(sizeof(struct KeyValueList));
     kvlist->next = NULL;
-    kvlist->keyValue.key = key;
-    kvlist->keyValue.value = value;
+    kvlist->key = key;
+    kvlist->value = value;
     return kvlist;
 }
 
@@ -87,8 +87,8 @@ void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
         int replaced = 0;
         while(list != NULL) {
             // replace existing value
-            if(strcmp(key, list->keyValue.key) == 0) {
-                list->keyValue.value = value;
+            if(strcmp(key, list->key) == 0) {
+                list->value = value;
                 replaced = 1;
                 break;
             }
@@ -110,8 +110,8 @@ struct Object* hashmap_get(struct HashMap* map, char* key) {
     } else {
         struct KeyValueList* list = map->pairs[hash];
         while(list != NULL) {
-            if(strcmp(key, list->keyValue.key) == 0) {
-                return list->keyValue.value;
+            if(strcmp(key, list->key) == 0) {
+                return list->value;
             }
             list = list->next;
         }
