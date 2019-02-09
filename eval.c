@@ -83,7 +83,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             }
             return true_obj;
         } else if(object_equals_symbol(sp->obj, "fn")) {
-            return lambda(sp->next);
+            return lat_lambda(sp->next);
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
                 printf("error: wrong type / number of args to def\n");
@@ -104,7 +104,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 } else {
                     if(argc == 3) {
                         struct Object* fclause = sp->next->next->next->obj;
-                        return eval_eval(env, fclause);
+                        return eval_apply(env, fclause);
                     } else {
                         return nil_obj;
                     }
@@ -144,7 +144,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
         } else if(object_equals_symbol(sp->obj, "let")) {
             sp = sp->next;
             // get bindings
-            if(sp->obj->type != list_type 
+            if(sp->obj->type != list_type
                     || list_length(sp->obj->data.ptr) % 2 != 0) {
                 printf("error: let expects an even number of bindings\n");
                 return NULL;
@@ -159,7 +159,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                     return NULL;
                 }
                 envir_set(local, (char*) bindings->obj->data.ptr,
-                        bindings->next->obj);
+                        eval_apply(local, bindings->next->obj));
                 bindings = bindings->next->next;
             }
             // push environment
@@ -173,13 +173,105 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             struct Object* result = eval_apply(local, sp->obj);
             envir_free(local);
             return result;
-        } else if(object_equals_symbol(sp->obj, "progn")) {
+        } else if(object_equals_symbol(sp->obj, "do")) {
             sp = sp->next;
             while(sp->next != NULL) {
                 eval_apply(env, sp->obj);
                 sp = sp->next;
             }
             return eval_apply(env, sp->obj);
+        } else if(object_equals_symbol(sp->obj, "loop")) {
+            sp = sp->next;
+            if(sp->obj->type != list_type ||
+                    list_length(sp->obj->data.ptr) % 2 != 0) {
+                printf("error: loop expects an even number of bindings\n");
+                return NULL;
+            }
+            struct List* bind_list = sp->obj->data.ptr;
+            int argc = list_length(bind_list);
+            struct Envir* local = envir_init(argc * 4);
+            local->outer = env;
+            struct List* bindings = bind_list;
+            while(bindings != NULL) {
+                if(bindings->obj->type != symbol) {
+                    printf("error: binding is not a symbol\n");
+                    envir_free(local);
+                    return NULL;
+                }
+                envir_set(local, (char*) bindings->obj->data.ptr,
+                        eval_apply(local, bindings->next->obj));
+                bindings = bindings->next->next;
+            }
+            envir_set(local, "recur", true_obj);
+            struct List* expr_list = sp->next;
+            struct List* expr = expr_list;
+            struct Object* value;
+            int will_recurse;
+            do {
+                // list_print(expr);
+                will_recurse = 0;
+                while(expr != NULL) {
+                    value = eval_apply(local, expr->obj);
+                    if(value->type == list_type && 
+                            object_equals_symbol(
+                                ((struct List*) value->data.ptr)->obj, "recur"
+                                )
+                            ) {
+                        if(expr->next != NULL) {
+                            printf("error: recursion must be in the tail \
+                                    position\n");
+                            envir_free(local);
+                            return NULL;
+                        } else {
+                            will_recurse = 1;
+                        }
+                    }
+                    expr = expr->next;
+                }
+                if(will_recurse) {
+                    // reset expressions in the loop
+                    expr = expr_list;
+                    // rebind variables
+                    bindings = bind_list;
+                    struct List* new_vals = value->data.ptr;
+                    // ignore 'recur' token
+                    new_vals = new_vals->next;
+                    while(bindings != NULL) {
+                        if(new_vals == NULL) {
+                            printf("error: recursion must have the same number"
+                                   "of arguments as loop bindings");
+                            envir_free(local);
+                            return NULL;
+                        }
+                        envir_set(local, (char*) bindings->obj->data.ptr,
+                                new_vals->obj);
+                        bindings = bindings->next->next;
+                        new_vals = new_vals->next;
+                    }
+                    if(new_vals != NULL) {
+                        printf("error: recursion must have the same number of\
+                                arguments as loop bindings");
+                        envir_free(local);
+                        return NULL;
+                    }
+                }
+            } while(will_recurse);
+            return value;
+        } else if(object_equals_symbol(sp->obj, "recur")) {
+            // find recur obj in env
+            if(envir_get(env, "recur") == NULL) {
+                printf("error: no matching loop for recur\n");
+                return NULL;
+            }
+            // return working list with other parts evaluated
+            struct Object* recur_list = list_init();
+            list_append_object(recur_list, sp->obj);
+            sp = sp->next;
+            while(sp != NULL) {
+                list_append_object(recur_list, eval_apply(env, sp->obj));
+                sp = sp->next;
+            }
+            return recur_list;
         }
 
 

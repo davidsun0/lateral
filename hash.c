@@ -48,6 +48,8 @@ void hashmap_free_map(struct HashMap* map) {
 
 void hashmap_double_size(struct HashMap* map) {
     printf("resizing hashmap...");
+    printf("load: %d\tcapacity: %d\n", map->load, map->size);
+    /*
     // TODO: rewrite to only make new array of lists
     struct HashMap* new_map = hashmap_init(map->size * 2);
     for(int i = 0; i < map->size; i ++) {
@@ -60,6 +62,7 @@ void hashmap_double_size(struct HashMap* map) {
         }
     }
     hashmap_free_map(map);
+    */
 }
 
 void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
@@ -77,6 +80,7 @@ void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
         // init new linked list and set object
         struct KeyValueList* kvlist = hashmap_kvlist_init(key, value);
         map->pairs[hash] = kvlist;
+        map->load ++;
     } else {
         struct KeyValueList* list = map->pairs[hash];
         struct KeyValueList* prev;
@@ -94,9 +98,9 @@ void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
         // append to list
         if(!replaced) {
             prev->next = hashmap_kvlist_init(key, value);
+            map->load ++;
         }
     }
-    map->load ++;
 }
 
 struct Object* hashmap_get(struct HashMap* map, char* key) {

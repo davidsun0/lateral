@@ -121,9 +121,9 @@ struct Object* read_atom(struct List** tokens) {
     if(dat[0] == '"'){
         // parse quoted strings
         int length = strlen(dat);
-        char* str = malloc(sizeof(char) * (length + 1));
+        char* str = malloc(sizeof(char) * (length - 1));
         int j = 0;
-        for(int i = 0; i <= length; i ++) {
+        for(int i = 1; i < length - 1; i ++) {
             if(dat[i] == '\\') {
                 switch(dat[++i]) {
                     case '"':
@@ -145,6 +145,7 @@ struct Object* read_atom(struct List** tokens) {
             }
             j ++;
         }
+        str[j] = '\0';
         obj->type = string;
         obj->data.ptr = str;
     } else if (dat[0] == '-' || ('0' <= dat[0] && dat[0] <= '9')) {

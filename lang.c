@@ -11,7 +11,7 @@ struct Envir* global_env;
 struct Object* true_obj;
 struct Object* nil_obj;
 
-struct Object* lambda(struct List* args) {
+struct Object* lat_lambda(struct List* args) {
     if(args->obj->type != list_type
             || args->next->next != NULL) {
         // TODO: error checking
@@ -26,7 +26,7 @@ struct Object* lambda(struct List* args) {
     return object_init(func_type, data);
 }
 
-struct Object* equals(struct List* args) {
+struct Object* lat_equals(struct List* args) {
     if(args == NULL || args->obj == NULL) {
         return nil_obj;
     } else {
@@ -43,16 +43,16 @@ struct Object* equals(struct List* args) {
     }
 }
 
-struct Object* sum(struct List* args) {
+struct Object* lat_plus(struct List* args) {
     if(args->obj == NULL) {
-        printf("wrong number of arguments to +\n");
+        printf("error: wrong number of arguments to +\n");
         // TODO: error checking
         return NULL;
     }
     int value = 0;
     while(args != NULL) {
         if(args->obj->type != int_type) {
-            printf("wrong type of argument to +, expected int\n");
+            printf("error: wrong type of argument to +, expected int\n");
             return NULL;
         }
         value += args->obj->data.int_type;
@@ -61,6 +61,18 @@ struct Object* sum(struct List* args) {
     union Data data;
     data.int_type = value;
     return object_init(int_type, data);
+}
+
+struct Object* lat_print(struct List* args) {
+    while(args != NULL) {
+        object_print_string(args->obj);
+        args = args->next;
+        if(args != NULL) {
+            printf(" ");
+        }
+    }
+    printf("\n");
+    return nil_obj;
 }
 
 void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
@@ -80,6 +92,7 @@ void env_init() {
     envir_set(global_env, "t", true_obj);
     envir_set(global_env, "nil", nil_obj);
 
-    envir_insert_cfn(&sum, "+");
-    envir_insert_cfn(&equals, "=");
+    envir_insert_cfn(&lat_plus, "+");
+    envir_insert_cfn(&lat_equals, "=");
+    envir_insert_cfn(&lat_print, "print");
 }
