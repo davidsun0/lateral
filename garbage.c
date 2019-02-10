@@ -8,10 +8,14 @@
 
 #include "garbage.h"
 
+#define MAX_OBJ_COUNT 512
+
 int object_count = 0;
+int max_object_count = MAX_OBJ_COUNT;
 
 struct List* all_objects;
 extern struct Envir* global_env;
+extern struct Envir* user_env;
 
 void gc_init() {
     all_objects = list_bare_init();
@@ -21,6 +25,9 @@ void gc_init() {
 void gc_insert_object(struct Object* obj) {
     list_bare_prepend(&all_objects, obj);
     object_count ++;
+    if(object_count >= max_object_count) {
+        gc_run();
+    }
 }
 
 void gc_print(struct Object* obj) {
@@ -75,4 +82,17 @@ void gc_run() {
     }
     // printf("%d objects collected\n", stale_count);
     // list_print(all_objects, 0);
+}
+
+void gc_delete_everything_yes_im_sure() {
+    hashmap_free_map(global_env->map);
+    hashmap_free_map(user_env->map);
+
+    struct List* node = all_objects;
+    while(node != NULL) {
+        object_free(node->obj);
+        struct List* next = node->next;
+        free(node);
+        node = next;
+    }
 }

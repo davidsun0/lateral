@@ -130,10 +130,12 @@ void object_free(struct Object* obj) {
             break;
 
         case c_fn:
+            printf("warning: freeing function defined in c\n");
+            break;
         case nil:
         case true:
-            printf("warning: trying to free an unfreeable type\n");
-            return;
+            printf("warning: freeing language critical object\n");
+            break;
         default:
             break;
     }
@@ -158,6 +160,7 @@ void object_free(struct Object* obj) {
             if(next != NULL)
                 next = next->next;
         }
+        free(obj->data.ptr);
     }
     free(obj);
 }

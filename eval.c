@@ -83,6 +83,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             }
             return true_obj;
         } else if(object_equals_symbol(sp->obj, "fn")) {
+            // TODO: evaluate non-argument values for lexial binding
             return lat_lambda(sp->next);
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
@@ -256,6 +257,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                     }
                 }
             } while(will_recurse);
+            envir_free(local);
             return value;
         } else if(object_equals_symbol(sp->obj, "recur")) {
             // find recur obj in env

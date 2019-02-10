@@ -103,10 +103,21 @@ void list_append(struct Object* list_obj, enum object_type type,
     if(list_obj == NULL || list_obj->type != list_type) {
         return;
     }
-    struct Object* append = malloc(sizeof(struct Object));
-    append->type = type;
-    append->data = data;
-    list_append_object(list_obj, append);
+    struct Object* append = object_init(type, data);
+
+    struct List* list = (struct List*) list_obj->data.ptr;
+    while(list->next != NULL) {
+        list = list->next;
+    }
+
+    if(list->obj == NULL) {
+        list->obj = append;
+    } else {
+        struct List* node = malloc(sizeof(struct List));
+        node->obj = append;
+        node->next = NULL;
+        list->next = node;
+    }
 }
 
 int list_length(struct List* list) {

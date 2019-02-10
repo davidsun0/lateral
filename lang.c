@@ -4,7 +4,9 @@
 #include "object.h"
 #include "list.h"
 #include "hash.h"
+#include "reader.h"
 #include "env.h"
+#include "eval.h"
 
 struct Envir* global_env;
 struct Envir* user_env;
@@ -44,6 +46,40 @@ struct Object* lat_equals(struct List* args) {
     }
 }
 
+struct Object* lat_read(struct List* args) {
+    if(args->obj == NULL || args->obj->type != string || args->next != NULL) {
+        printf("error: read expects one string argument\n");
+        return NULL;
+    }
+    struct Object* output = read_string(args->obj->data.ptr);
+    if(output == NULL) {
+        return nil_obj;
+    } else {
+        return output;
+    }
+}
+
+struct Object* lat_eval(struct List* args) {
+    if(args->obj == NULL || args->next != NULL) {
+        printf("error: eval expects one argument\n");
+        return NULL;
+    }
+    struct Object* output = eval_apply(user_env, args->obj);
+    return output;
+}
+
+struct Object* lat_print(struct List* args) {
+    while(args != NULL) {
+        object_print_string(args->obj);
+        args = args->next;
+        if(args != NULL) {
+            printf(" ");
+        }
+    }
+    printf("\n");
+    return nil_obj;
+}
+
 struct Object* lat_plus(struct List* args) {
     if(args->obj == NULL) {
         printf("error: wrong number of arguments to +\n");
@@ -63,19 +99,6 @@ struct Object* lat_plus(struct List* args) {
     data.int_type = value;
     return object_init(int_type, data);
 }
-
-struct Object* lat_print(struct List* args) {
-    while(args != NULL) {
-        object_print_string(args->obj);
-        args = args->next;
-        if(args != NULL) {
-            printf(" ");
-        }
-    }
-    printf("\n");
-    return nil_obj;
-}
-
 void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
     union Data data;
     data.fn_ptr = fn_ptr;
@@ -93,9 +116,12 @@ void env_init() {
     envir_set(global_env, "t", true_obj);
     envir_set(global_env, "nil", nil_obj);
 
+    envir_insert_cfn(&lat_read, "read");
+    envir_insert_cfn(&lat_eval, "eval");
+    envir_insert_cfn(&lat_print, "print");
+
     envir_insert_cfn(&lat_plus, "+");
     envir_insert_cfn(&lat_equals, "=");
-    envir_insert_cfn(&lat_print, "print");
 
     user_env = envir_init(128);
     user_env->outer = global_env;

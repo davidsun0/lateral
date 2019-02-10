@@ -7,25 +7,12 @@
 
 #include "reader.h"
 
-int is_white_space(char c){
-    if(c == ' ' || c == ',' || c == '\t' || c == '\n' || c == '\r') {
-        return 1;
-    } else {
-        return 0;
-    }
-}
+#define is_white_space(c) ((c) == ' ' || (c) == ',' || (c) == '\t' || \
+        (c) == '\n' || (c) == '\r')
 
-int is_special_char(char c){
-    if(c == '(' || c == ')' ||
-            c == '[' || c == ']' || 
-            c == '{' || c == '}' || 
-            c == '\'' || c == '`' || c == '~' ||
-            c == '^' || c == '@') {
-        return 1;
-    } else {
-        return 0;
-    }
-}
+#define is_special_char(c) ((c) == '(' || (c) == ')' || (c) == '[' || \
+        (c) == ']' || (c) == '{' || (c) == '}' || (c) == '\'' || c == '`' || \
+        (c) == '~' || (c) == '^' || (c) == '@')
 
 void list_append_str(struct Object* list, char* str, int len) {
     enum object_type type;
@@ -99,13 +86,11 @@ struct Object* read_tokenize(char* str) {
     }
 
     // object_print_debug(list);
-    free(str);
     return list;
 }
 
 struct Object* read_atom(struct List** tokens) {
     // printf("read_atom %p\n", (void*) *tokens);
-    struct Object* obj = malloc(sizeof(struct Object));
 
     char* dat;
     char chararr[2];
@@ -118,6 +103,8 @@ struct Object* read_atom(struct List** tokens) {
         dat = (*tokens)->obj->data.ptr;
     }
 
+    enum object_type type;
+    union Data data;
     if(dat[0] == '"'){
         // parse quoted strings
         int length = strlen(dat);
@@ -146,8 +133,8 @@ struct Object* read_atom(struct List** tokens) {
             j ++;
         }
         str[j] = '\0';
-        obj->type = string;
-        obj->data.ptr = str;
+        type = string;
+        data.ptr = str;
     } else if (dat[0] == '-' || ('0' <= dat[0] && dat[0] <= '9')) {
         // parse integer
         // TODO: float parsing
@@ -170,20 +157,20 @@ struct Object* read_atom(struct List** tokens) {
         if(negative) {
             value = -1 * value;
         }
-        obj->type = int_type;
-        obj->data.int_type = value;
+        type = int_type;
+        data.int_type = value;
     } else {
         // parse symbols
         int length = strlen(dat);
         char* str = malloc(sizeof(char) * (length + 1));
         strcpy(str, dat);
-        obj->type = symbol;
-        obj->data.ptr = str;
+        type = symbol;
+        data.ptr = str;
     }
 
     // move to next token in list
     *tokens = (*tokens)->next;
-    return obj;
+    return object_init(type, data);
 }
 
 struct Object* read_list(struct List**);
@@ -233,4 +220,3 @@ struct Object* read_string(char* str) {
     // object_print_debug(obj);
     return obj;
 }
-

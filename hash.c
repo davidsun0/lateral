@@ -26,8 +26,10 @@ struct HashMap* hashmap_init(int size) {
 
 struct KeyValueList* hashmap_kvlist_init(char* key, struct Object* value) {
     struct KeyValueList* kvlist = malloc(sizeof(struct KeyValueList));
+    char* key_copy = malloc(sizeof(char) * (strlen(key) + 1));
+    strcpy(key_copy, key);
     kvlist->next = NULL;
-    kvlist->key = key;
+    kvlist->key = key_copy;
     kvlist->value = value;
     return kvlist;
 }
@@ -40,14 +42,17 @@ void hashmap_free_map(struct HashMap* map) {
             while(list != NULL) {
                 prev = list;
                 list = list->next;
+                free(prev->key);
                 free(prev);
             }
         }
     }
+    free(map->pairs);
+    free(map);
 }
 
 void hashmap_double_size(struct HashMap* map) {
-    printf("resizing hashmap...");
+    printf("resizing not implemented");
     printf("load: %d\tcapacity: %d\n", map->load, map->size);
     /*
     // TODO: rewrite to only make new array of lists
@@ -65,10 +70,7 @@ void hashmap_double_size(struct HashMap* map) {
     */
 }
 
-void hashmap_set(struct HashMap* map, char* key_ptr, struct Object* value) {
-    char* key = malloc(sizeof(char) * (strlen(key_ptr) + 1));
-    strcpy(key, key_ptr);
-
+void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
     unsigned int hash = hashmap_string_hash(key) % map->size;
     if((float)(map->load + 1)/map->size > 0.7) {
         printf("resizing hashmap\n");
@@ -116,5 +118,19 @@ struct Object* hashmap_get(struct HashMap* map, char* key) {
             list = list->next;
         }
         return NULL;
+    }
+}
+
+void hashmap_debug(struct HashMap* map) {
+    for(int i = 0; i < map->size; i ++) {
+        if(map->pairs[i] != NULL) {
+            struct KeyValueList* kvlist = map->pairs[i];
+            while(kvlist != NULL) {
+                printf("key: %s\nvalue: ", kvlist->key);
+                object_debug(kvlist->value, 0);
+                printf("\n");
+                kvlist = kvlist->next;
+            }
+        }
     }
 }

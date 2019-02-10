@@ -25,4 +25,6 @@ void hashmap_set(struct HashMap*, char* key, struct Object* value);
 struct Object* hashmap_get(struct HashMap*, char* key);
 
 void hashmap_free_map(struct HashMap*);
+
+void hashmap_debug(struct HashMap*);
 #endif
