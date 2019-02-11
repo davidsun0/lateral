@@ -37,6 +37,7 @@ struct Object* object_copy(struct Object*);
 
 int object_equals_char(struct Object*, char);
 int object_equals_symbol(struct Object*, char*);
+int object_equals_string(struct Object*, char*);
 int object_equals_value(struct Object*, struct Object*);
 
 void object_free(struct Object*);

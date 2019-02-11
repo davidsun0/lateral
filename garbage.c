@@ -8,7 +8,7 @@
 
 #include "garbage.h"
 
-#define MAX_OBJ_COUNT 512
+#define MAX_OBJ_COUNT 256
 
 int object_count = 0;
 int max_object_count = MAX_OBJ_COUNT;
@@ -82,6 +82,9 @@ void gc_run() {
     }
     // printf("%d objects collected\n", stale_count);
     // list_print(all_objects, 0);
+    if(object_count >= max_object_count) {
+        max_object_count *= 2;
+    }
 }
 
 void gc_delete_everything_yes_im_sure() {

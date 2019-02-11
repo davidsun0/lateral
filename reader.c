@@ -7,14 +7,14 @@
 
 #include "reader.h"
 
-#define is_white_space(c) ((c) == ' ' || (c) == ',' || (c) == '\t' || \
-        (c) == '\n' || (c) == '\r')
+#define is_white_space(c) ((c) == ' ' || (c) == '\n' || (c) == ',' || \
+        (c) == '\t' || (c) == '\r')
 
 #define is_special_char(c) ((c) == '(' || (c) == ')' || (c) == '[' || \
         (c) == ']' || (c) == '{' || (c) == '}' || (c) == '\'' || c == '`' || \
-        (c) == '~' || (c) == '^' || (c) == '@')
+        (c) == '^' || (c) == '~')
 
-void list_append_str(struct Object* list, char* str, int len) {
+struct Object* read_make_token(char* str, int len) {
     enum object_type type;
     union Data data;
 
@@ -28,85 +28,98 @@ void list_append_str(struct Object* list, char* str, int len) {
         sym[len] = '\0';
         data.ptr = sym;
     }
-    list_append(list, type, data);
+    return object_init(type, data);
 }
 
-struct Object* read_tokenize(char* str) {
-    struct Object* list = list_init();
-
+// TODO: rename chars_read
+struct Object* read_emit_token(char* str, int* chars_read) {
     int i = 0;
-    while(str[i] != '\0') {
-        if(is_white_space(str[i])) {
-            // ignore whitespace
+    if(str[i] == '\0') {
+        *chars_read += i;
+        return NULL;
+    } else if(is_white_space(str[i])) {
+        while(str[i] != '\0' && is_white_space(str[i])) {
             i ++;
-        } else if(str[i] == '~' && str[i + 1] == '@'){
-            // capture ~@
-            list_append_str(list, str + i, 2);
-            i += 2;
-        } else if(is_special_char(str[i])) {
-            // capture single special character
-            list_append_str(list, str + i, 1);
-            i ++;
-        } else if(str[i] == '"') {
-            // capture quoted text, ignoring escaped quotes
-            int j = 1;
-            while(!(str[i + j] == '"' && str[i + j - 1] != '\\') &&
-                    str[i + j] != '\0') {
-                j ++;
-            }
-
-            // check for unclosed quotes
-            if(str[i + j] == '\0') {
-                // TODO: abort tokenizing
-                printf("error: unclosed quote in %.*s\n", j, str + i);
-            } else {
-                // capture ending quote
-                j ++;
-                list_append_str(list, str + i, j);
-            }
-            i += j;
-        } else if(str[i] == ';') {
-            // ; signifies a comment. Ignore all characters until new line
-            // int j = 1;
-            while(str[i] != '\n' && str[i] != '\0') {
-                i ++;
-            }
-            // list_append_str(list, str + i, j);
-            // i += j;
-        } else {
-            // capture regular symbols
-            int j = 1;
-            while(!is_white_space(str[i + j]) && !is_special_char(str[i + j])
-                    && str[i + j] != '\0') {
-                j ++;
-            }
-            list_append_str(list, str + i, j);
-            i += j;
         }
+        *chars_read += i;
+        return NULL;
+    } else if(is_special_char(str[i])) {
+        i = 1;
+        if(str[i - 1] == '~' && str[i] == '@') {
+            i ++;
+        }
+        *chars_read += i;
+        return read_make_token(str, i);
+    } else if(str[i] == ';') {
+        // comments
+        while(str[i] != '\0' && str[i] != '\n') {
+            i ++;
+        }
+        *chars_read += i;
+        return NULL;
+    } else if(str[i] == '"') {
+        // strings
+        i ++;
+        while(str[i] != '\0' && str[i] != '"') {
+            if(str[i] == '\\' && str[i + 1] == '"')
+                i ++;
+            i ++;
+        }
+        if(str[i] == '"') {
+            // read the closing quotation
+            i ++;
+        } else {
+            // TODO: error handling
+            printf("error: unclosed quotation\n");
+            printf("%c\n", str[i]);
+            *chars_read += i;
+            return NULL;
+        }
+        *chars_read += i;
+        return read_make_token(str, i);
+    } else {
+        while(str[i] != '\0' && !is_white_space(str[i])
+                && !is_special_char(str[i])) {
+            i ++;
+        }
+        *chars_read += i;
+        return read_make_token(str, i);
     }
-
-    // object_print_debug(list);
-    return list;
 }
 
-struct Object* read_atom(struct List** tokens) {
-    // printf("read_atom %p\n", (void*) *tokens);
+struct Object* read_next_token(char* str, int* pos) {
+    struct Object* result;
+    int lastpos = *pos;
+    while(1) {
+        result = read_emit_token(str + *pos, pos);
+        if(result != NULL) {
+            break;
+        } else if(lastpos == *pos) {
+            return NULL;
+        }
+        lastpos = *pos;
+    }
+    return result;
+}
 
+// TODO: rename str
+struct Object* read_make_atom(struct Object* str) {
     char* dat;
     char chararr[2];
 
-    if((*tokens)->obj->type == char_type) {
+    if(str->type == char_type) {
         dat = chararr;
-        chararr[0] = (*tokens)->obj->data.char_type;
+        chararr[0] = str->data.char_type;
         chararr[1] = '\0';
     } else {
-        dat = (*tokens)->obj->data.ptr;
+        dat = str->data.ptr;
     }
 
     enum object_type type;
     union Data data;
     if(dat[0] == '"'){
         // parse quoted strings
+        printf("parsing %s\n", dat);
         int length = strlen(dat);
         char* str = malloc(sizeof(char) * (length - 1));
         int j = 0;
@@ -167,56 +180,79 @@ struct Object* read_atom(struct List** tokens) {
         type = symbol;
         data.ptr = str;
     }
-
-    // move to next token in list
-    *tokens = (*tokens)->next;
     return object_init(type, data);
 }
 
-struct Object* read_list(struct List**);
+int read_list(char*, int*, struct Object*);
 
-struct Object* read_form(struct List** tokens) {
-    // printf("read_form %p\n", (void*) *tokens);
-    if(object_equals_char((*tokens)->obj, '(')) {
-        *tokens = (*tokens)->next;
-        return read_list(tokens);
+int read_form(char* str, int* pos, struct Object* tree) {
+    struct Object* token = read_next_token(str, pos);
+    if(token == NULL) {
+        return 1;
+    } else if(object_equals_char(token, '(')) {
+        int error = read_list(str, pos, tree);
+        return error;
+    } else if(object_equals_char(token, ')')) {
+        return ')';
+    } else if(object_equals_char(token, '\'') ||
+            object_equals_char(token, '~') ||
+            object_equals_char(token, '`') ||
+            object_equals_string(token, "~@")) {
+
+        struct Object* list = list_init();
+        char* sym_str = malloc(sizeof(char) * 24);
+        if(object_equals_char(token, '\'')) {
+            strcpy(sym_str, "quote");
+        } else if(object_equals_char(token, '~')) {
+            strcpy(sym_str, "unquote");
+        } else if(object_equals_char(token, '`')) {
+            strcpy(sym_str, "quasiquote");
+        } else {
+            strcpy(sym_str, "unquote-splicing");
+        }
+        union Data data;
+        data.ptr = sym_str;
+        list_append(list, symbol, data);
+
+        read_form(str, pos, list);
+        list_append_object(tree, list);
+        return 0;
     } else {
-        return read_atom(tokens);
+        struct Object* atom = read_make_atom(token);
+        list_append_object(tree, atom);
+        return 0;
     }
 }
 
-struct Object* read_list(struct List** tokens) {
-    // printf("read_list %p\n", (void*) *tokens);
+int read_list(char* str, int* pos, struct Object* tree) {
     struct Object* list = list_init();
-
-    struct Object* obj;
-    while(*tokens != NULL && !object_equals_char((*tokens)->obj, ')')) {
-        obj = read_form(tokens);
-        list_append_object(list, obj);
+    while(1) {
+        int error = read_form(str, pos, list);
+        if(error == ')') {
+            list_append_object(tree, list);
+            return 0;
+        } else if(error != 0) {
+            return error;
+        }
     }
-    if(*tokens == NULL) {
-        // TODO: abort syntax tree building
-        printf("error: mismatched parens\n");
-        return NULL;
-    }
-    *tokens = (*tokens)->next;
-
-    return list;
+    return 0;
 }
 
 struct Object* read_string(char* str) {
     if(str == NULL || str[0] == '\0') {
         return NULL;
     }
-    struct Object* tokens = read_tokenize(str);
-    struct List* token_list = (struct List*) tokens->data.ptr;
-    struct Object* obj = read_form(&token_list);
 
-    if(token_list != NULL) {
-        printf("error: unexpected token\n");
-        // object_print_debug(tokens->obj);
+    int pos = 0;
+    struct Object* tree = list_init();
+    read_form(str, &pos, tree);
+    struct List* tree_list = (struct List*) tree->data.ptr;
+
+    int posb = pos;
+    if(read_next_token(str, &posb) != NULL) {
+        printf("error: unexpected token(s)\n");
+        printf("tokens: %s\n", str + pos);
     }
 
-    // object_print_debug(obj);
-    return obj;
+    return tree_list->obj;
 }

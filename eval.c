@@ -48,7 +48,6 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             // empty list evaluates to nil
             return nil_obj;
         } else if(object_equals_symbol(sp->obj, "quote")) {
-            // TODO: copy object?
             return sp->next->obj;
         } else if(object_equals_symbol(sp->obj, "or")) {
             sp = sp->next;
@@ -288,7 +287,9 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
         struct Object* func = arg_list->obj;
         arg_list = arg_list->next;
 
-        if(func->type == c_fn) {
+        if(func == NULL) {
+            return NULL;
+        } else if(func->type == c_fn) {
             return func->data.fn_ptr(arg_list);
         } else if(func->type == func_type) {
             struct Func* fn_struct = (struct Func*) func->data.ptr;

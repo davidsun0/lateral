@@ -144,7 +144,6 @@ void list_print(struct List* list, int indent) {
             }
             printf("node has null object");
         }
-        printf("\n");
         list = list->next;
     }
 }

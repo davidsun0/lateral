@@ -75,6 +75,15 @@ int object_equals_symbol(struct Object* obj, char* str) {
     }
 }
 
+int object_equals_string(struct Object* obj, char* str) {
+    if(obj != NULL && obj->type == string &&
+            strcmp(obj->data.ptr, str) == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 int object_equals_value(struct Object* a, struct Object* b) {
     if(a == b) {
         // also covers if both a and b are NULL

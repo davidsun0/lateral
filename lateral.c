@@ -51,5 +51,5 @@ int main(){
     while(lat_rep()){
         ;
     }
-    printf("goodbye! ('v' )/\n");
+    printf("\ngoodbye! ('v' )/\n");
 }
