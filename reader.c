@@ -31,31 +31,30 @@ struct Object* read_make_token(char* str, int len) {
     return object_init(type, data);
 }
 
-// TODO: rename chars_read
-struct Object* read_emit_token(char* str, int* chars_read) {
+struct Object* read_emit_token(char* str, int* pos) {
     int i = 0;
     if(str[i] == '\0') {
-        *chars_read += i;
+        *pos += i;
         return NULL;
     } else if(is_white_space(str[i])) {
         while(str[i] != '\0' && is_white_space(str[i])) {
             i ++;
         }
-        *chars_read += i;
+        *pos += i;
         return NULL;
     } else if(is_special_char(str[i])) {
         i = 1;
         if(str[i - 1] == '~' && str[i] == '@') {
             i ++;
         }
-        *chars_read += i;
+        *pos += i;
         return read_make_token(str, i);
     } else if(str[i] == ';') {
         // comments
         while(str[i] != '\0' && str[i] != '\n') {
             i ++;
         }
-        *chars_read += i;
+        *pos += i;
         return NULL;
     } else if(str[i] == '"') {
         // strings
@@ -72,17 +71,17 @@ struct Object* read_emit_token(char* str, int* chars_read) {
             // TODO: error handling
             printf("error: unclosed quotation\n");
             printf("%c\n", str[i]);
-            *chars_read += i;
+            *pos += i;
             return NULL;
         }
-        *chars_read += i;
+        *pos += i;
         return read_make_token(str, i);
     } else {
         while(str[i] != '\0' && !is_white_space(str[i])
                 && !is_special_char(str[i])) {
             i ++;
         }
-        *chars_read += i;
+        *pos += i;
         return read_make_token(str, i);
     }
 }
@@ -102,17 +101,16 @@ struct Object* read_next_token(char* str, int* pos) {
     return result;
 }
 
-// TODO: rename str
-struct Object* read_make_atom(struct Object* str) {
+struct Object* read_make_atom(struct Object* obj) {
     char* dat;
     char chararr[2];
 
-    if(str->type == char_type) {
+    if(obj->type == char_type) {
         dat = chararr;
-        chararr[0] = str->data.char_type;
+        chararr[0] = obj->data.char_type;
         chararr[1] = '\0';
     } else {
-        dat = str->data.ptr;
+        dat = obj->data.ptr;
     }
 
     enum object_type type;

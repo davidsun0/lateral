@@ -14,19 +14,32 @@ struct Envir* user_env;
 struct Object* true_obj;
 struct Object* nil_obj;
 
-struct Object* lat_lambda(struct List* args) {
-    if(args->obj->type != list_type
-            || args->next->next != NULL) {
-        // TODO: error checking
-        printf("wrong number of arguments to fn\n");
-        return NULL;
+struct Object* lat_cons(struct List* args) {
+    if(list_length(args) != 2
+            || args->next->obj == NULL
+            || args->next->obj->type != list_type) {
+        printf("error: cons expects two arguments\n");
     }
-    struct Func* fn = malloc(sizeof(struct Func));
-    fn->args = list_copy_struct(args->obj->data.ptr);
-    fn->expr = (struct Object*) (args->next->obj);
-    union Data data;
-    data.func = fn;
-    return object_init(func_type, data);
+    struct Object* output = list_init();
+    struct Object* copy = object_copy(args->obj);
+    list_append_object(output, copy);
+    struct List* list = args->next->obj->data.ptr;
+    while(list != NULL) {
+        copy = object_copy(list->obj);
+        list_append_object(output, copy);
+        list = list->next;
+    }
+    return output;
+}
+
+struct Object* lat_concat(struct List* args) {
+    struct Object* output = list_init();
+    while(args != NULL) {
+        struct Object* copy = object_copy(args->obj);
+        list_append_object(output, copy);
+        args = args->next;
+    }
+    return output;
 }
 
 struct Object* lat_equals(struct List* args) {
@@ -115,6 +128,9 @@ void env_init() {
     nil_obj = object_init(nil, temp);
     envir_set(global_env, "t", true_obj);
     envir_set(global_env, "nil", nil_obj);
+
+    envir_insert_cfn(&lat_cons, "cons");
+    envir_insert_cfn(&lat_concat, "concat");
 
     envir_insert_cfn(&lat_read, "read");
     envir_insert_cfn(&lat_eval, "eval");

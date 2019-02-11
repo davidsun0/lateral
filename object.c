@@ -160,7 +160,6 @@ void object_free(struct Object* obj) {
                 next = next->next;
         }
     } else if(func_type == obj->type) {
-        printf("freeing fn\n");
         struct List* list = ((struct Func*) obj->data.ptr)->args;
         struct List* next = list->next;
         while(list != NULL) {

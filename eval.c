@@ -83,7 +83,19 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             return true_obj;
         } else if(object_equals_symbol(sp->obj, "fn")) {
             // TODO: evaluate non-argument values for lexial binding
-            return lat_lambda(sp->next);
+            struct List* args = sp->next;
+            if(args->obj->type != list_type
+                    || args->next->next != NULL) {
+                // TODO: error checking
+                printf("wrong number of arguments to fn\n");
+                return NULL;
+            }
+            struct Func* fn = malloc(sizeof(struct Func));
+            fn->args = list_copy_struct(args->obj->data.ptr);
+            fn->expr = (struct Object*) (args->next->obj);
+            union Data data;
+            data.func = fn;
+            return object_init(func_type, data);
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
                 printf("error: wrong type / number of args to def\n");
