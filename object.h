@@ -33,12 +33,14 @@ struct Object {
 };
 
 struct Object* object_init(enum object_type, union Data);
+struct Object* object_symbol_init(char*);
 struct Object* object_copy(struct Object*);
 
 int object_equals_char(struct Object*, char);
 int object_equals_symbol(struct Object*, char*);
 int object_equals_string(struct Object*, char*);
 int object_equals_value(struct Object*, struct Object*);
+int object_is_nonempty_list(struct Object*);
 
 void object_free(struct Object*);
 

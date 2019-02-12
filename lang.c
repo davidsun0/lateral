@@ -19,20 +19,77 @@ struct Object* lat_cons(struct List* args) {
             || args->next->obj == NULL
             || args->next->obj->type != list_type) {
         printf("error: cons expects two arguments\n");
+        return NULL;
     }
     struct Object* output = list_init();
     struct Object* copy = object_copy(args->obj);
     list_append_object(output, copy);
     struct List* list = args->next->obj->data.ptr;
     while(list != NULL) {
-        copy = object_copy(list->obj);
-        list_append_object(output, copy);
+        if(list->obj != NULL) {
+            copy = object_copy(list->obj);
+            list_append_object(output, copy);
+        }
         list = list->next;
     }
     return output;
 }
 
+struct Object* lat_first(struct List* args) {
+    if(args->obj == NULL || args->next != NULL) {
+        printf("error in 'first'\n");
+        return NULL;
+    }
+    struct Object* obj = args->obj;
+    if(obj->type == list_type) {
+        struct List* list = obj->data.ptr;
+        return list->obj;
+    } else {
+        return nil_obj;
+    }
+}
+
+struct Object* lat_rest(struct List* args) {
+    if(args->obj == NULL || args->next != NULL) {
+        printf("error in 'rest'\n");
+        return NULL;
+    }
+    struct Object* obj = args->obj;
+    if(obj->type == list_type) {
+        struct List* list = obj->data.ptr;
+        list = list->next;
+        struct Object* output = list_init();
+        while(list != NULL) {
+            struct Object* copy = object_copy(list->obj);
+            list_append_object(output, copy);
+            list = list->next;
+        }
+        return output;
+    } else {
+        return nil_obj;
+    }
+}
+
 struct Object* lat_concat(struct List* args) {
+    struct Object* output = list_init();
+    while(args != NULL) {
+        if(args->obj != NULL && args->obj->type == list_type) {
+            struct List* list = args->obj->data.ptr;
+            while(list != NULL) {
+                struct Object* copy = object_copy(list->obj);
+                list_append_object(output, copy);
+                list = list->next;
+            }
+        } else {
+            struct Object* copy = object_copy(args->obj);
+            list_append_object(output, copy);
+        }
+        args = args->next;
+    }
+    return output;
+}
+
+struct Object* lat_list(struct List* args) {
     struct Object* output = list_init();
     while(args != NULL) {
         struct Object* copy = object_copy(args->obj);
@@ -101,7 +158,7 @@ struct Object* lat_plus(struct List* args) {
     }
     int value = 0;
     while(args != NULL) {
-        if(args->obj->type != int_type) {
+        if(args->obj != NULL && args->obj->type != int_type) {
             printf("error: wrong type of argument to +, expected int\n");
             return NULL;
         }
@@ -131,6 +188,7 @@ void env_init() {
 
     envir_insert_cfn(&lat_cons, "cons");
     envir_insert_cfn(&lat_concat, "concat");
+    envir_insert_cfn(&lat_list, "list");
 
     envir_insert_cfn(&lat_read, "read");
     envir_insert_cfn(&lat_eval, "eval");

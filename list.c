@@ -20,18 +20,6 @@ struct List* list_bare_init() {
     return list;
 }
 
-/*
-void list_free(struct List* list) {
-    struct List* next;
-    while(list != NULL) {
-        next = list->next;
-        // object_free_member(list->obj);
-        free(list);
-        list = next;
-    }
-}
-*/
-
 struct List* list_copy_struct(struct List* source) {
     struct List* dest = malloc(sizeof(struct List));
     struct List* dest_node = dest;

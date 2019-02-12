@@ -21,6 +21,5 @@ void list_append(struct Object*, enum object_type, union Data);
 
 int list_length(struct List*);
 void list_print(struct List*, int);
-// void list_free(struct List*);
 
 #endif

@@ -10,6 +10,146 @@
 
 #include "eval.h"
 
+struct Object* eval_quasi(struct Object* tree) {
+    /*
+    if(tree->type == list_type
+            && object_equals_symbol(
+                ((struct List*) tree->data.ptr)->obj, "quasiquote")) {
+        tree = eval_quasi(
+                ((struct List*) tree->data.ptr)->next->obj
+                );
+    }
+    */
+    object_print_string(tree);
+    printf("\n");
+    if(tree->type == list_type &&
+            ((struct List*)tree->data.ptr)->obj != NULL) {
+        // tree: ((atom ...) ...)
+        struct List* args = tree->data.ptr;
+        
+        if(object_equals_symbol(args->obj, "quasiquote")) {
+            printf("quasiquote!!!\n");
+            return eval_quasi(args->next->obj);
+        } else if(object_equals_symbol(args->obj, "unquote")) {
+            return args->next->obj;
+        } else if(args->obj->type == list_type &&
+                object_equals_symbol(
+                    ((struct List* )args->obj->data.ptr)->obj,
+                    "unquote-splicing")) {
+            struct Object* output = list_init();
+            struct Object* concat = object_symbol_init("concat");
+            list_append_object(output, concat);
+
+            struct Object* head = eval_quasi(
+                    ((struct List*) args->obj->data.ptr)->next->obj);
+            list_append_object(output, head);
+
+            args = args->next;
+            struct Object* list = list_init();
+            struct Object* list_tok = object_symbol_init("list");
+            list_append_object(list, list_tok);
+            while(args != NULL) {
+                struct Object* result = eval_quasi(args->obj);
+                list_append_object(output, result);
+                // list_append_object(list, args->obj);
+                args = args->next;
+            }
+            // list = eval_quasi(list);
+            list_append_object(output, list);
+            return output;
+        } else {
+            struct Object* output = list_init();
+            struct Object* cons = object_symbol_init("cons");
+            list_append_object(output, cons);
+            printf("==========\n");
+            object_print_string(args->obj);
+            printf("\n");
+            struct Object* head = eval_quasi(args->obj);
+            // head = eval_quasi(head);
+            object_print_string(head);
+            printf("\n============\n");
+            list_append_object(output, head);
+
+            args = args->next;
+            struct Object* list = list_init();
+            struct Object* list_tok = object_symbol_init("list");
+            list_append_object(list, list_tok);
+            while(args != NULL) {
+                struct Object* result = eval_quasi(args->obj);
+                list_append_object(list, result);
+                // list_append_object(list, args->obj);
+                args = args->next;
+            }
+            // list = eval_quasi(list);
+            list_append_object(output, list);
+            return output;
+        }
+    } else {
+        // atom
+        struct Object* output = list_init();
+        struct Object* quote = object_symbol_init("quote");
+        list_append_object(output, quote);
+        list_append_object(output, tree);
+        return output;
+    }
+}
+
+void eval_quasi2(struct Object* input, struct Object* output) {
+    // case: atom
+    // append (quote atom)
+    if(!object_is_nonempty_list(input)) {
+        struct Object* list = list_init();
+        struct Object* quote = object_symbol_init("quote");
+        list_append_object(list, quote);
+        list_append_object(list, input);
+        list_append_object(output, list);
+        return;
+    }
+
+    struct List* args = (struct List*) input->data.ptr;
+    // case: (unquote ?)
+    // append ?
+    if(object_equals_symbol(args->obj, "unquote")) {
+        if(args->next == NULL || args->next->next != NULL) {
+            printf("error: unquote expects one argument\n");
+            return;
+        }
+        list_append_object(output, args->next->obj);
+    }
+
+    // case: (splice ?)
+    // append contents of ?
+    else if (object_equals_symbol(args->obj, "unquote-splicing")) {
+        if(args->next == NULL || args->next->next != NULL) {
+            printf("error: unquote-splicing expects on argument\n");
+            return;
+        }
+        struct List* contents = (struct List*)args->next->obj->data.ptr;
+        while(contents != NULL) {
+            list_append_object(output, contents->obj);
+            contents = contents->next;
+        }
+        return;
+    }
+
+    // case: (? ? ?)
+    // append (map eval_quasi (? ? ?)) I think
+    else {
+        struct Object* list = list_init();
+        struct Object* list_tok = object_symbol_init("list");
+        list_append_object(list, list_tok);
+        // struct List* contents = (struct List*) args->obj->data.ptr;
+        struct List* contents = args;
+        while(contents != NULL) {
+            struct Object* obj = contents->obj;
+            eval_quasi2(obj, list);
+            contents = contents->next;
+        }
+        list_append_object(output, list);
+        return;
+    }
+}
+
 struct Object* eval_eval(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
         struct List* list = obj->data.ptr;
@@ -285,6 +425,16 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 sp = sp->next;
             }
             return recur_list;
+        } else if(object_equals_symbol(sp->obj, "quasiquote")) {
+            /*
+            struct Object* output = list_init();
+            eval_quasi2(sp->next->obj, output);
+            output = ((struct List*) output->data.ptr)->obj;
+            object_print_string(output);
+            printf("\n");
+            */
+            struct Object* output = eval_quasi(sp->next->obj);
+            return eval_apply(env, output);
         }
 
 

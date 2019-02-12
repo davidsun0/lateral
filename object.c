@@ -25,6 +25,14 @@ struct Object* object_init(enum object_type type, union Data data) {
     return obj;
 }
 
+struct Object* object_symbol_init(char* str) {
+    char* str_copy = malloc(sizeof(char) * (strlen(str) + 1));
+    strcpy(str_copy, str);
+    union Data data;
+    data.ptr = str_copy;
+    return object_init(symbol, data);
+}
+
 struct Object* object_copy(struct Object* obj) {
     if(obj == NULL) {
         return NULL;
@@ -84,6 +92,16 @@ int object_equals_string(struct Object* obj, char* str) {
     }
 }
 
+int object_is_nonempty_list(struct Object* obj) {
+    if(obj != NULL && obj->type == list_type) {
+        struct List* list = obj->data.ptr;
+        if(list->obj != NULL) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int object_equals_value(struct Object* a, struct Object* b) {
     if(a == b) {
         // also covers if both a and b are NULL
@@ -139,7 +157,7 @@ void object_free(struct Object* obj) {
             break;
 
         case c_fn:
-            printf("warning: freeing function defined in c\n");
+            // printf("warning: freeing function defined in c\n");
             break;
         case nil:
         case true:
