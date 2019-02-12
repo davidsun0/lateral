@@ -58,7 +58,7 @@ struct Object* object_copy(struct Object* obj) {
             list = list->next;
         }
         return clone;
-    } else if(obj->type == func_type) {
+    } else if(obj->type == func_type || obj->type == macro_type) {
         printf("implement object_copy for functions\n");
         return NULL;
     }
@@ -119,6 +119,7 @@ int object_equals_value(struct Object* a, struct Object* b) {
     } else if(symbol == a->type || string == a->type) {
         return strcmp(a->data.ptr, b->data.ptr) == 0 ? 1 : 0;
     } else {
+        printf("warning: equality not defined for lists\n");
         return a->data.ptr == b->data.ptr ? 1 : 0;
     }
     // TODO: list comparison
@@ -135,7 +136,7 @@ void object_mark(struct Object* obj) {
             object_mark(list->obj);
             list = list->next;
         }
-    } else if(obj->type == func_type) {
+    } else if(obj->type == func_type || obj->type == macro_type) {
         struct Func* func = (struct Func*)obj->data.ptr;
         struct List* args = func->args;
         while(args != NULL) {
@@ -177,7 +178,8 @@ void object_free(struct Object* obj) {
             if(next != NULL)
                 next = next->next;
         }
-    } else if(func_type == obj->type) {
+    } else if(func_type == obj->type || macro_type == obj->type) {
+        printf("freeing function / macro\n");
         struct List* list = ((struct Func*) obj->data.ptr)->args;
         struct List* next = list->next;
         while(list != NULL) {
@@ -217,6 +219,9 @@ void object_print_type(enum object_type type) {
         case func_type:
             printf("func");
             break;
+        case macro_type:
+            printf("macro");
+            break;
         case nil:
             printf("nil");
             break;
@@ -255,6 +260,8 @@ void object_print_string(struct Object* obj) {
         printf("c_fn<%p>", obj->data.ptr);
     } else if(func_type == obj->type) {
         printf("fn<%p>", obj->data.ptr);
+    } else if(macro_type == obj->type) {
+        printf("macro<%p>", obj->data.ptr);
     } else if(true_obj == obj) {
         printf("true");
     } else if(nil_obj == obj) {

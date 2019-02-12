@@ -150,6 +150,53 @@ void eval_quasi2(struct Object* input, struct Object* output) {
     }
 }
 
+int eval_is_macro(struct Envir* env, struct Object* obj) {
+    if(obj != NULL && obj->type == list_type) {
+        struct List* list = obj->data.ptr;
+        if(list->obj->type == symbol) {
+            struct Object* head = envir_search(env, list->obj->data.ptr);
+            if(head != NULL && head->type == macro_type)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+struct Object* eval_macroexpand(struct Envir* env, struct Object* obj) {
+    while(eval_is_macro(env, obj)) {
+        struct List* list = obj->data.ptr;
+        struct Object* macro = envir_search(env, list->obj->data.ptr);
+
+        struct List* m_args = ((struct Func*) macro->data.ptr)->args;
+        struct Object* m_expr = ((struct Func*) macro->data.ptr)->expr;
+
+        int argc = list_length(list->next);
+        struct Envir* local = envir_init(argc * 2);
+        list = list->next;
+        while(list != NULL && m_args != NULL) {
+            if(m_args->obj->type != symbol) {
+                printf("error: argument is not symbol\n");
+                object_print_type(m_args->obj->type);
+                envir_free(local);
+                return NULL;
+            }
+            envir_set(local, (char*) m_args->obj->data.ptr, list->obj);
+            list = list->next;
+            m_args = m_args->next;
+        }
+        if(list != NULL || m_args != NULL) {
+            printf("error: mismatched arguments\n");
+            envir_free(local);
+            return NULL;
+        }
+
+        local->outer = env;
+        obj = eval_apply(local, m_expr);
+        envir_free(local);
+    }
+    return obj;
+}
+
 struct Object* eval_eval(struct Envir* env, struct Object* obj) {
     if(obj->type == list_type) {
         struct List* list = obj->data.ptr;
@@ -180,6 +227,18 @@ struct Object* eval_eval(struct Envir* env, struct Object* obj) {
 }
 
 struct Object* eval_apply(struct Envir* env, struct Object* obj) {
+    if(eval_is_macro(env, obj)) {
+        // printf("macro expansion\n");
+        obj = eval_macroexpand(env, obj);
+        // printf("asdf\n");
+        // object_print_string(obj);
+        // printf("\niasdfasdf\n");
+        if(obj == NULL) {
+            printf("expansion failed\n");
+            return NULL;
+        }
+    }
+
     if(obj->type == list_type) {
         // special forms
         struct List* sp = obj->data.ptr;
@@ -221,13 +280,15 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 sp = sp->next;
             }
             return true_obj;
-        } else if(object_equals_symbol(sp->obj, "fn")) {
+        } else if(object_equals_symbol(sp->obj, "fn")
+                || object_equals_symbol(sp->obj, "macro")) {
             // TODO: evaluate non-argument values for lexial binding
             struct List* args = sp->next;
             if(args->obj->type != list_type
                     || args->next->next != NULL) {
                 // TODO: error checking
                 printf("wrong number of arguments to fn\n");
+                printf("expected 2, got %d\n", list_length(args));
                 return NULL;
             }
             struct Func* fn = malloc(sizeof(struct Func));
@@ -235,7 +296,11 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             fn->expr = (struct Object*) (args->next->obj);
             union Data data;
             data.func = fn;
-            return object_init(func_type, data);
+            if(object_equals_symbol(sp->obj, "fn")) {
+                return object_init(func_type, data);
+            } else {
+                return object_init(macro_type, data);
+            }
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
                 printf("error: wrong type / number of args to def\n");

@@ -34,7 +34,7 @@ int lat_rep() {
     printf("\n");
     // printf("objects: %d\n", object_count);
     free(input_str);
-    gc_run();
+    // gc_run();
     return 1;
 }
 

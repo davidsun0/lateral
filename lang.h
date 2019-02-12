@@ -8,4 +8,6 @@ struct Object* lat_lambda(struct List*);
 struct Object* true_obj;
 struct Object* nil_obj;
 
+struct Object* lat_first(struct List*);
+
 #endif

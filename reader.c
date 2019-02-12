@@ -117,7 +117,6 @@ struct Object* read_make_atom(struct Object* obj) {
     union Data data;
     if(dat[0] == '"'){
         // parse quoted strings
-        printf("parsing %s\n", dat);
         int length = strlen(dat);
         char* str = malloc(sizeof(char) * (length - 1));
         int j = 0;

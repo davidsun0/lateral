@@ -10,7 +10,8 @@ enum object_type {
     int_type, float_type,
     list_type,
     c_fn,                           // pointer to function defined in C
-    func_type                       // lisp function
+    func_type,                      // lisp function
+    macro_type
 };
 
 struct Func {
