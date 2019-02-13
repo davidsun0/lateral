@@ -18,7 +18,6 @@ struct Object* eval_quasi(struct Object* tree) {
         struct List* args = tree->data.ptr;
         
         if(object_equals_symbol(args->obj, "quasiquote")) {
-            printf("quasiquote!!!\n");
             return eval_quasi(args->next->obj);
         } else if(object_equals_symbol(args->obj, "unquote")) {
             return args->next->obj;
@@ -175,7 +174,6 @@ struct Object* eval_macroexpand(struct Envir* env, struct Object* obj) {
         }
 
         local->outer = env;
-        object_print_string(m_expr);
         obj = eval_apply(local, m_expr);
         envir_free(local);
     }
@@ -212,15 +210,9 @@ struct Object* eval_eval(struct Envir* env, struct Object* obj) {
 }
 
 struct Object* eval_apply(struct Envir* env, struct Object* obj) {
-    printf("appplying: ");
-    object_print_string(obj);
-    printf("\n");
     if(eval_is_macro(env, obj)) {
-        // printf("macro expansion\n");
         obj = eval_macroexpand(env, obj);
-        printf("asdf\n");
-        object_print_string(obj);
-        printf("\niasdfasdf\n");
+        // object_print_string(obj);
         if(obj == NULL) {
             printf("expansion failed\n");
             return NULL;
@@ -483,9 +475,9 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
             return recur_list;
         } else if(object_equals_symbol(sp->obj, "quasiquote")) {
             struct Object* output = eval_quasi(sp->next->obj);
-            printf("after quasi expansion:\n");
-            object_print_string(output);
-            printf("\n");
+            // printf("after quasi expansion:\n");
+            // object_print_string(output);
+            // printf("\n");
             return eval_apply(env, output);
         }
 
@@ -504,15 +496,7 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
         if(func == NULL) {
             return NULL;
         } else if(func->type == c_fn) {
-            if(object_equals_symbol(arg_list->obj, "fn")) {
-                printf("right here\n");
-            }
-            printf("calling function with args: ");
-            list_print(arg_list, 0);
-            printf("\n");
-            struct Object* output = func->data.fn_ptr(arg_list);
-            printf("done\n");
-            return output;
+            return func->data.fn_ptr(arg_list);
         } else if(func->type == func_type) {
             struct Func* fn_struct = (struct Func*) func->data.ptr;
             // create local environment for function evaluation
@@ -552,11 +536,4 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
     } else {
         return eval_eval(env, obj);
     }
-}
-
-struct Object* eval_expression(struct Envir* env, struct Object* obj) {
-    struct Object* result = eval_apply(env, obj);
-    object_mark(result);
-    gc_clear_working();
-    return result;
 }

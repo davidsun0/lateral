@@ -198,12 +198,12 @@ void env_init() {
     envir_insert_cfn(&lat_equals, "=");
 
     struct Object* tree = read_module("./core.lisp");
+    // printf("tree: %p\n", (void*) tree);
     struct List* exprs = tree->data.ptr;
     while(exprs != NULL) {
-        // object_debug(exprs->obj);
-        object_print_string(exprs->obj);
-        printf("\n");
-        eval_expression(global_env, exprs->obj);
+        // object_print_string(exprs->obj);
+        // printf("\n");
+        eval_apply(global_env, exprs->obj);
         exprs = exprs->next;
     }
 

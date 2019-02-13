@@ -7,6 +7,5 @@
 
 struct Object* eval_eval(struct Envir*, struct Object*);
 struct Object* eval_apply(struct Envir*, struct Object*);
-struct Object* eval_expression(struct Envir*, struct Object*);
 
 #endif

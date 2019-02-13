@@ -29,12 +29,12 @@ int lat_rep() {
         return 1;
     }
 
-    struct Object* output = eval_expression(user_env, input);
+    struct Object* output = eval_apply(user_env, input);
     object_print_string(output);
     printf("\n");
     // printf("objects: %d\n", object_count);
     free(input_str);
-    gc_run();
+    // gc_run();
     return 1;
 }
 
@@ -45,7 +45,8 @@ void initialize_readline(){
 
 int main(){
     initialize_readline();
-    gc_init();
+    int gc_base;
+    gc_init(&gc_base);
     env_init();
 
     while(lat_rep()){

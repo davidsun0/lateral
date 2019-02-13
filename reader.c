@@ -42,9 +42,7 @@ struct Object* read_make_token(int len) {
         type = string;
         if(offset - len < 0) {
             char* sym = malloc(sizeof(char) * (len + 1));
-            printf("READ FROM THE OTHER BUFFER\n");
             int runover = offset - len;
-            printf("runover: %d\n", runover);
             char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
             strncpy(sym, old_buffer + BUFFER_SIZE + runover - 1, -runover);
             strncpy(sym - runover, buffer, offset);
@@ -149,7 +147,7 @@ struct Object* read_next_token() {
         if(result != NULL) {
             break;
         } else if(end_of_input) {
-            printf("end of input string\n");
+            // printf("end of input string\n");
             return NULL;
         }
     }
@@ -300,12 +298,11 @@ struct Object* read_string(char* str) {
     offset = 0;
     length = strlen(str) + 1;
     end_of_input = 0;
-    printf("%c\n", buffer[length - 1]);
 
     struct Object* tree = list_init();
     read_form(tree);
-    object_print_string(tree);
-    printf("\n");
+    // object_print_string(tree);
+    // printf("\n");
     if(length - offset > 1) {
         printf("error: unexpected token(s) %s\n", buffer + offset);
         return NULL;
@@ -337,11 +334,12 @@ struct Object* read_module(char* filename) {
     while(!end_of_input) {
         read_form(tree);
     }
-    object_print_string(tree);
-    printf("\n");
+    // object_print_string(tree);
+    // printf("\n");
 
     fclose(file);
-    free(buffer);
+    free(buffer_a);
+    free(buffer_b);
     file = NULL;
     return tree;
 }
