@@ -125,7 +125,7 @@ void list_print(struct List* list, int indent) {
         printf("node adr: %p\n", (void*) list);
 
         if(list->obj != NULL) {
-            object_debug(list->obj, indent + 1);
+            object_print_debug(list->obj, indent + 1);
         } else {
             for(int i = 0; i < indent; i ++) {
                 printf("  ");

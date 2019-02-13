@@ -24,17 +24,17 @@ int lat_rep() {
     }
 
     struct Object* input = read_string(input_str);
-    // error parsing, return to read again
+    // error parsing, return 1 to read again
     if(input == NULL) {
-        return 0;
+        return 1;
     }
 
-    struct Object* output = eval_apply(user_env, input);
+    struct Object* output = eval_expression(user_env, input);
     object_print_string(output);
     printf("\n");
     // printf("objects: %d\n", object_count);
     free(input_str);
-    // gc_run();
+    gc_run();
     return 1;
 }
 

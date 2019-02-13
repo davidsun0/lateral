@@ -4,6 +4,7 @@
 
 #include "object.h"
 #include "list.h"
+#include "garbage.h"
 
 #include "reader.h"
 
@@ -14,89 +15,143 @@
         (c) == ']' || (c) == '{' || (c) == '}' || (c) == '\'' || c == '`' || \
         (c) == '^' || (c) == '~')
 
-struct Object* read_make_token(char* str, int len) {
+#define BUFFER_SIZE 64
+
+static FILE* file;
+static char* buffer;
+static char* buffer_a;
+static char* buffer_b;
+static int offset;
+static int length;
+static int end_of_input;
+static int end_of_file;
+
+struct Object* read_make_token(int len) {
     enum object_type type;
     union Data data;
 
     if(len == 1) {
         type = char_type;
-        data.char_type = str[0];
+        if(offset != 0) {
+            data.char_type = buffer[offset - 1];
+        } else {
+            char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
+            data.char_type = old_buffer[BUFFER_SIZE - 2];
+        }
     } else {
         type = string;
-        char* sym = malloc(sizeof(char) * (len + 1));
-        strncpy(sym, str, len);
-        sym[len] = '\0';
-        data.ptr = sym;
-    }
-    return object_init(type, data);
-}
-
-struct Object* read_emit_token(char* str, int* pos) {
-    int i = 0;
-    if(str[i] == '\0') {
-        *pos += i;
-        return NULL;
-    } else if(is_white_space(str[i])) {
-        while(str[i] != '\0' && is_white_space(str[i])) {
-            i ++;
-        }
-        *pos += i;
-        return NULL;
-    } else if(is_special_char(str[i])) {
-        i = 1;
-        if(str[i - 1] == '~' && str[i] == '@') {
-            i ++;
-        }
-        *pos += i;
-        return read_make_token(str, i);
-    } else if(str[i] == ';') {
-        // comments
-        while(str[i] != '\0' && str[i] != '\n') {
-            i ++;
-        }
-        *pos += i;
-        return NULL;
-    } else if(str[i] == '"') {
-        // strings
-        i ++;
-        while(str[i] != '\0' && str[i] != '"') {
-            if(str[i] == '\\' && str[i + 1] == '"')
-                i ++;
-            i ++;
-        }
-        if(str[i] == '"') {
-            // read the closing quotation
-            i ++;
+        if(offset - len < 0) {
+            char* sym = malloc(sizeof(char) * (len + 1));
+            printf("READ FROM THE OTHER BUFFER\n");
+            int runover = offset - len;
+            printf("runover: %d\n", runover);
+            char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
+            strncpy(sym, old_buffer + BUFFER_SIZE + runover - 1, -runover);
+            strncpy(sym - runover, buffer, offset);
+            sym[len + 1] = '\0';
+            data.ptr = sym;
         } else {
-            // TODO: error handling
-            printf("error: unclosed quotation\n");
-            printf("%c\n", str[i]);
-            *pos += i;
-            return NULL;
+            char* sym = malloc(sizeof(char) * (len + 1));
+            strncpy(sym, buffer + offset - len, len);
+            sym[len] = '\0';
+            data.ptr = sym;
         }
-        *pos += i;
-        return read_make_token(str, i);
+    }
+    struct Object* output = object_init(type, data);
+    return output;
+}
+
+char read_curr() {
+    return buffer[offset];
+}
+
+void read_inc() {
+    if(offset < length - 1) {
+        offset ++;
+    } else if(file != NULL && !end_of_file) {
+        char* next_buffer = buffer == buffer_a ? buffer_b : buffer_a;
+
+        int read = fread(next_buffer, sizeof(char), BUFFER_SIZE - 1, file);
+        if(read == 0) {
+            if(feof(file)) {
+                end_of_file = 1;
+                return;
+            } else {
+                printf("error reading file\n");
+                end_of_input = 1;
+                return;
+            }
+        } else {
+            next_buffer[read] = '\0';
+            offset = 0;
+            length = read;
+            buffer = next_buffer;
+        }
     } else {
-        while(str[i] != '\0' && !is_white_space(str[i])
-                && !is_special_char(str[i])) {
-            i ++;
-        }
-        *pos += i;
-        return read_make_token(str, i);
+        offset ++;
+        end_of_input = 1;
     }
 }
 
-struct Object* read_next_token(char* str, int* pos) {
+struct Object* read_emit_token() {
+    char c = read_curr();
+    int i = 0;
+    if(c == '\0') {
+        return NULL;
+    } else if(is_special_char(c)) {
+        read_inc();
+        i ++;
+        if(c == '~' && read_curr() == '@') {
+            read_inc();
+            i ++;
+        }
+        return read_make_token(i);
+    } else if(is_white_space(c)) {
+        while(c != '\0' && is_white_space(c)) {
+            read_inc();
+            c = read_curr();
+        }
+        return NULL;
+    } else if(c == ';') {
+        while(c != '\0' && c != '\n') {
+            read_inc();
+            c = read_curr();
+        }
+    } else if(c == '"') {
+        read_inc();
+        c = read_curr();
+        i ++;
+        while(c != '\0' && c != '"') {
+            read_inc();
+            c = read_curr();
+            i ++;
+        }
+        if(c == '"'){
+            i ++;
+            read_inc();
+        }
+        return read_make_token(i);
+    } else {
+        while(c != '\0' && !is_white_space(c) && !is_special_char(c)) {
+            read_inc();
+            c = read_curr();
+            i ++;
+        }
+        return read_make_token(i);
+    }
+    return NULL;
+}
+
+struct Object* read_next_token() {
     struct Object* result;
-    int lastpos = *pos;
     while(1) {
-        result = read_emit_token(str + *pos, pos);
+        result = read_emit_token();
         if(result != NULL) {
             break;
-        } else if(lastpos == *pos) {
+        } else if(end_of_input) {
+            printf("end of input string\n");
             return NULL;
         }
-        lastpos = *pos;
     }
     return result;
 }
@@ -180,14 +235,14 @@ struct Object* read_make_atom(struct Object* obj) {
     return object_init(type, data);
 }
 
-int read_list(char*, int*, struct Object*);
+int read_list(struct Object*);
 
-int read_form(char* str, int* pos, struct Object* tree) {
-    struct Object* token = read_next_token(str, pos);
+int read_form(struct Object* tree) {
+    struct Object* token = read_next_token();
     if(token == NULL) {
         return 1;
     } else if(object_equals_char(token, '(')) {
-        int error = read_list(str, pos, tree);
+        int error = read_list(tree);
         return error;
     } else if(object_equals_char(token, ')')) {
         return ')';
@@ -211,7 +266,7 @@ int read_form(char* str, int* pos, struct Object* tree) {
         data.ptr = sym_str;
         list_append(list, symbol, data);
 
-        read_form(str, pos, list);
+        read_form(list);
         list_append_object(tree, list);
         return 0;
     } else {
@@ -221,14 +276,15 @@ int read_form(char* str, int* pos, struct Object* tree) {
     }
 }
 
-int read_list(char* str, int* pos, struct Object* tree) {
+int read_list(struct Object* tree) {
     struct Object* list = list_init();
     while(1) {
-        int error = read_form(str, pos, list);
+        int error = read_form(list);
         if(error == ')') {
             list_append_object(tree, list);
             return 0;
         } else if(error != 0) {
+            printf("error: mismatched parens\n");
             return error;
         }
     }
@@ -240,16 +296,52 @@ struct Object* read_string(char* str) {
         return NULL;
     }
 
-    int pos = 0;
+    buffer = str;
+    offset = 0;
+    length = strlen(str) + 1;
+    end_of_input = 0;
+    printf("%c\n", buffer[length - 1]);
+
     struct Object* tree = list_init();
-    read_form(str, &pos, tree);
+    read_form(tree);
+    object_print_string(tree);
+    printf("\n");
+    if(length - offset > 1) {
+        printf("error: unexpected token(s) %s\n", buffer + offset);
+        return NULL;
+    }
     struct List* tree_list = (struct List*) tree->data.ptr;
 
-    int posb = pos;
-    if(read_next_token(str, &posb) != NULL) {
-        printf("error: unexpected token(s)\n");
-        printf("tokens: %s\n", str + pos);
+    return tree_list->obj;
+}
+
+struct Object* read_module(char* filename) {
+    file = fopen(filename, "r");
+    if(file == NULL) {
+        perror("failed to read module: ");
+        return NULL;
     }
 
-    return tree_list->obj;
+    end_of_input = 0;
+
+    buffer_a = malloc(sizeof(char) * BUFFER_SIZE);
+    buffer_b = malloc(sizeof(char) * BUFFER_SIZE);
+    buffer = buffer_a;
+    end_of_file = 0;
+
+    length = fread(buffer, sizeof(char), BUFFER_SIZE - 1, file);
+    buffer[length] = '\0';
+
+    struct Object* tree = list_init();
+    gc_insert_object(tree);
+    while(!end_of_input) {
+        read_form(tree);
+    }
+    object_print_string(tree);
+    printf("\n");
+
+    fclose(file);
+    free(buffer);
+    file = NULL;
+    return tree;
 }

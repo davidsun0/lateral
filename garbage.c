@@ -14,20 +14,27 @@ int object_count = 0;
 int max_object_count = MAX_OBJ_COUNT;
 
 struct List* all_objects;
+struct Object* working_objects;
 extern struct Envir* global_env;
 extern struct Envir* user_env;
 
 void gc_init() {
     all_objects = list_bare_init();
+    working_objects = list_init();
     object_count = 0;
 }
 
 void gc_insert_object(struct Object* obj) {
     list_bare_prepend(&all_objects, obj);
+    list_append_object(working_objects, obj);
     object_count ++;
     if(object_count >= max_object_count) {
         gc_run();
     }
+}
+
+void gc_clear_working() {
+    working_objects = list_init();
 }
 
 void gc_print(struct Object* obj) {
@@ -53,6 +60,11 @@ void gc_run() {
             }
         }
         env = env->inner;
+    }
+    struct List* working = working_objects->data.ptr;
+    while(working != NULL) {
+        object_mark(working->obj);
+        working = working->next;
     }
 
     // sweep
@@ -80,7 +92,7 @@ void gc_run() {
             curr = curr->next;
         }
     }
-    // printf("%d objects collected\n", stale_count);
+    printf("gc: %d objects collected\n", stale_count);
     // list_print(all_objects, 0);
     if(object_count >= max_object_count) {
         max_object_count *= 2;

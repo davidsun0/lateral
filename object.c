@@ -20,8 +20,9 @@ struct Object* object_init(enum object_type type, union Data data) {
     }
     obj->type = type;
     obj->data = data;
-    obj->marked = 0;
+    obj->marked = 1;
     gc_insert_object(obj);
+    obj->marked = 0;
     return obj;
 }
 
@@ -271,9 +272,13 @@ void object_print_string(struct Object* obj) {
     }
 }
 
-void object_debug(struct Object* obj, int indent) {
+void object_print_debug(struct Object* obj, int indent) {
     for(int i = 0; i < indent; i ++) {
         printf("  ");
+    }
+    if(obj == NULL) {
+        printf("[ NULL OBJECT ]\n");
+        return;
     }
     printf("adr %p:\n", (void*) obj);
 
@@ -317,4 +322,9 @@ void object_debug(struct Object* obj, int indent) {
         default:
             printf("data: %p\n", obj->data.ptr);
     }
+}
+
+void object_debug(struct Object* obj) {
+    object_print_debug(obj, 0);
+    printf("\n");
 }

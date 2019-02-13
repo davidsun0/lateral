@@ -5,4 +5,6 @@
 
 struct Object* read_string(char* str);
 
+struct Object* read_module(char* filename);
+
 #endif

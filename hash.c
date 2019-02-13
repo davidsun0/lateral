@@ -127,7 +127,7 @@ void hashmap_debug(struct HashMap* map) {
             struct KeyValueList* kvlist = map->pairs[i];
             while(kvlist != NULL) {
                 printf("key: %s\nvalue: ", kvlist->key);
-                object_debug(kvlist->value, 0);
+                object_print_debug(kvlist->value, 0);
                 printf("\n");
                 kvlist = kvlist->next;
             }
