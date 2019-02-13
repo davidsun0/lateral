@@ -3,11 +3,12 @@
 
 #include "object.h"
 #include "hash.h"
+#include "garbage.h"
 
 #include "env.h"
 
 struct Envir* envir_init(int size) {
-    struct Envir* envir = malloc(sizeof(struct Envir));
+    struct Envir* envir = gc_malloc(sizeof(struct Envir));
     envir->map = hashmap_init(size);
     envir->inner = NULL;
     envir->outer = NULL;
@@ -17,25 +18,6 @@ struct Envir* envir_init(int size) {
 void envir_free(struct Envir* envir) {
     hashmap_free_map(envir->map);
     free(envir);
-}
-
-void envir_push(struct Envir* base, struct Envir* new) {
-    while(base->inner != NULL) {
-        base = base->inner;
-    }
-    base->inner = new;
-}
-
-struct Envir* envir_pop(struct Envir* base) {
-    if(base->outer == NULL) {
-        return NULL;
-    }
-    while(base->outer->outer != NULL) {
-        base = base->outer;
-    }
-    struct Envir* pop = base->outer;
-    base->outer = NULL;
-    return pop;
 }
 
 void envir_set(struct Envir* envir, char* key, struct Object* value) {

@@ -3,10 +3,12 @@
 
 void gc_init();
 
+// checked malloc which runs garbage collection when appropriate
+void* gc_malloc(size_t);
+
+// adds object to pool for automatic collection
 void gc_insert_object(struct Object*);
-void gc_scan_stack();
 
 void gc_run();
-void gc_delete_everything_yes_im_sure();
 
 #endif

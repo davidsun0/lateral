@@ -12,10 +12,7 @@
 #include "eval.h"
 #include "lang.h"
 
-extern struct Envir* user_env;
-extern int object_count;
-
-int lat_rep() {
+static int lat_rep() {
     char* input_str = readline("user> ");
     if(input_str == NULL){
         return 0;
@@ -23,22 +20,24 @@ int lat_rep() {
         return 1;
     }
 
+    // READ
     struct Object* input = read_string(input_str);
     // error parsing, return 1 to read again
     if(input == NULL) {
         return 1;
     }
 
+    // EVALUATE
     struct Object* output = eval_apply(user_env, input);
+
+    // PRINT
     object_print_string(output);
     printf("\n");
-    // printf("objects: %d\n", object_count);
     free(input_str);
-    // gc_run();
     return 1;
 }
 
-void initialize_readline(){
+static void initialize_readline(){
     // turn off tab completion
     rl_bind_key('\t', rl_insert);
 }

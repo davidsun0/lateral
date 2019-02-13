@@ -26,7 +26,7 @@ static int length;
 static int end_of_input;
 static int end_of_file;
 
-struct Object* read_make_token(int len) {
+static struct Object* read_make_token(int len) {
     enum object_type type;
     union Data data;
 
@@ -35,13 +35,16 @@ struct Object* read_make_token(int len) {
         if(offset != 0) {
             data.char_type = buffer[offset - 1];
         } else {
+            // char exists in old buffer
             char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
+            // remember that old_buffer[BUFFER_SIZE] == '\0'
             data.char_type = old_buffer[BUFFER_SIZE - 2];
         }
     } else {
         type = string;
+        char* sym = malloc(sizeof(char) * (len + 1));
         if(offset - len < 0) {
-            char* sym = malloc(sizeof(char) * (len + 1));
+            // token extends across buffer boundary
             int runover = offset - len;
             char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
             strncpy(sym, old_buffer + BUFFER_SIZE + runover - 1, -runover);
@@ -49,7 +52,6 @@ struct Object* read_make_token(int len) {
             sym[len + 1] = '\0';
             data.ptr = sym;
         } else {
-            char* sym = malloc(sizeof(char) * (len + 1));
             strncpy(sym, buffer + offset - len, len);
             sym[len] = '\0';
             data.ptr = sym;
@@ -59,16 +61,11 @@ struct Object* read_make_token(int len) {
     return output;
 }
 
-char read_curr() {
-    return buffer[offset];
-}
-
-void read_inc() {
+static void read_inc() {
     if(offset < length - 1) {
         offset ++;
     } else if(file != NULL && !end_of_file) {
         char* next_buffer = buffer == buffer_a ? buffer_b : buffer_a;
-
         int read = fread(next_buffer, sizeof(char), BUFFER_SIZE - 1, file);
         if(read == 0) {
             if(feof(file)) {
@@ -91,12 +88,17 @@ void read_inc() {
     }
 }
 
-struct Object* read_emit_token() {
+static char read_curr() {
+    return buffer[offset];
+}
+
+static struct Object* read_emit_token() {
     char c = read_curr();
     int i = 0;
     if(c == '\0') {
         return NULL;
     } else if(is_special_char(c)) {
+        // special chars
         read_inc();
         i ++;
         if(c == '~' && read_curr() == '@') {
@@ -105,20 +107,24 @@ struct Object* read_emit_token() {
         }
         return read_make_token(i);
     } else if(is_white_space(c)) {
+        // white space
         while(c != '\0' && is_white_space(c)) {
             read_inc();
             c = read_curr();
         }
         return NULL;
     } else if(c == ';') {
+        // comments
         while(c != '\0' && c != '\n') {
             read_inc();
             c = read_curr();
         }
     } else if(c == '"') {
+        // strings
         read_inc();
         c = read_curr();
         i ++;
+        // TODO: implement string quoting
         while(c != '\0' && c != '"') {
             read_inc();
             c = read_curr();
@@ -130,6 +136,7 @@ struct Object* read_emit_token() {
         }
         return read_make_token(i);
     } else {
+        // symbols
         while(c != '\0' && !is_white_space(c) && !is_special_char(c)) {
             read_inc();
             c = read_curr();
@@ -140,21 +147,20 @@ struct Object* read_emit_token() {
     return NULL;
 }
 
-struct Object* read_next_token() {
+static struct Object* read_next_token() {
     struct Object* result;
     while(1) {
         result = read_emit_token();
         if(result != NULL) {
             break;
         } else if(end_of_input) {
-            // printf("end of input string\n");
             return NULL;
         }
     }
     return result;
 }
 
-struct Object* read_make_atom(struct Object* obj) {
+static struct Object* read_make_atom(struct Object* obj) {
     char* dat;
     char chararr[2];
 
@@ -233,9 +239,9 @@ struct Object* read_make_atom(struct Object* obj) {
     return object_init(type, data);
 }
 
-int read_list(struct Object*);
+static int read_list(struct Object*);
 
-int read_form(struct Object* tree) {
+static int read_form(struct Object* tree) {
     struct Object* token = read_next_token();
     if(token == NULL) {
         return 1;
@@ -274,7 +280,7 @@ int read_form(struct Object* tree) {
     }
 }
 
-int read_list(struct Object* tree) {
+static int read_list(struct Object* tree) {
     struct Object* list = list_init();
     while(1) {
         int error = read_form(list);
@@ -301,8 +307,6 @@ struct Object* read_string(char* str) {
 
     struct Object* tree = list_init();
     read_form(tree);
-    // object_print_string(tree);
-    // printf("\n");
     if(length - offset > 1) {
         printf("error: unexpected token(s) %s\n", buffer + offset);
         return NULL;
@@ -334,8 +338,6 @@ struct Object* read_module(char* filename) {
     while(!end_of_input) {
         read_form(tree);
     }
-    // object_print_string(tree);
-    // printf("\n");
 
     fclose(file);
     free(buffer_a);

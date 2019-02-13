@@ -10,14 +10,17 @@
 
 #define MAX_OBJ_COUNT 256
 
-int object_count = 0;
-int max_object_count = MAX_OBJ_COUNT;
-
-struct List* all_objects;
 extern struct Envir* global_env;
 extern struct Envir* user_env;
 
-struct Object** stack_base;
+static int object_count = 0;
+static int max_object_count = MAX_OBJ_COUNT;
+
+static struct List* all_objects;
+
+// pointer to a local variable in main()
+// used for finding pointers on the stack
+static struct Object** stack_base;
 
 void gc_init(void* ptr) {
     all_objects = list_bare_init();
@@ -25,13 +28,25 @@ void gc_init(void* ptr) {
     stack_base = ptr;
 }
 
+void* gc_malloc(size_t size) {
+    void* ptr = malloc(size);
+    if(ptr == NULL) {
+        printf("warning: malloc failed\n");
+        gc_run();
+        ptr = malloc(size);
+        if(ptr == NULL) {
+            printf("fatal: out of memory\n");
+            exit(1);
+        }
+    }
+    return ptr;
+}
+
 void gc_insert_object(struct Object* obj) {
     list_bare_prepend(&all_objects, obj);
     object_count ++;
     if(object_count >= max_object_count) {
         gc_run();
-        // gc_scan_stack();
-        // max_object_count *= 2;
     }
 }
 
@@ -42,7 +57,7 @@ void gc_print(struct Object* obj) {
     printf("\n");
 }
 
-void gc_heap_bounds(struct Object** left, struct Object** right) {
+static void gc_heap_bounds(struct Object** left, struct Object** right) {
     struct Object* max = all_objects->obj;
     struct Object* min = all_objects->obj;
     struct List* list = all_objects->next;
@@ -57,34 +72,23 @@ void gc_heap_bounds(struct Object** left, struct Object** right) {
     *right = max;
 }
 
-void gc_scan_stack() {
+static void gc_scan_stack() {
     struct Object* heap_min = NULL;
     struct Object* heap_max = NULL;
     struct Object** stack_top = &heap_min;
 
+    // knowing heap bounds speeds up object search
     gc_heap_bounds(&heap_min, &heap_max);
-    // printf("hbase: %p\nhtop: %p\n", (void*) heap_min, (void*) heap_max);
-    // printf("sbase: %p\nstop: %p\n", (void*) stack_base, (void*) stack_top);
-    // for(void* ptr = stack_top; ptr < stack_base; ptr = ((char*) ptr) + sizeof(void*)) {
-    for(struct Object** ptr = stack_top;
-            ptr < stack_base;
-            ptr ++) {
 
-        // struct Object* stack_var = *ptr;
+    // TODO: add code for stacks that expand the other way
+    // iterate through the memory of the entire stack
+    for(struct Object** ptr = stack_top; ptr < stack_base; ptr ++) {
         struct Object* obj = *ptr;
         if(heap_min < obj && obj < heap_max) {
-            // printf("%p\n", (void*) *ptr);
+            // mark if data is a pointer to an object
             struct List* list = all_objects;
             while(list != NULL) {
                 if(obj == list->obj) {
-                    // printf("\n");
-                    // gc_print(list->obj);
-                    // printf("\n");
-                    /*
-                    printf("mark %p ", (void*) list->obj);
-                    printf("%d ", list->obj->marked);
-                    printf("%d\n", list->obj->marked);
-                    */
                     object_mark(list->obj);
                     break;
                 }
@@ -96,8 +100,7 @@ void gc_scan_stack() {
 }
 
 void gc_run() {
-    // mark
-    // list_print(all_objects, 0);
+    // mark objects in the environment
     struct Envir* env = global_env;
     while(env != NULL) {
         struct HashMap* map = env->map;
@@ -113,14 +116,8 @@ void gc_run() {
         env = env->inner;
     }
 
+    // mark objects on the stack
     gc_scan_stack();
-    /*
-    struct List* working = working_objects->data.ptr;
-    while(working != NULL) {
-        object_mark(working->obj);
-        working = working->next;
-    }
-    */
 
     // sweep
     struct List* curr = all_objects;
@@ -129,10 +126,6 @@ void gc_run() {
     object_count = 0;
     while(curr != NULL) {
         if(!curr->obj->marked) {
-            // printf("%d\n", curr->obj->marked);
-            // printf("free %p\n", (void*) curr->obj);
-            // object_print_string(curr->obj);
-            // printf("\n");
             object_free(curr->obj);
             if(prev != all_objects) {
                 prev->next = curr->next;
@@ -145,13 +138,13 @@ void gc_run() {
             curr = next;
             stale_count ++;
         } else {
-            // curr->obj->marked = 0;
             object_count ++;
             prev = curr;
             curr = curr->next;
         }
     }
 
+    // unmark all objects
     curr = all_objects;
     while(curr != NULL) {
         curr->obj->marked = 0;
@@ -159,21 +152,7 @@ void gc_run() {
     }
 
     printf("gc: %d stale/%d live objects collected\n", stale_count, object_count);
-    // list_print(all_objects, 0);
     if(object_count >= max_object_count) {
         max_object_count *= 2;
-    }
-}
-
-void gc_delete_everything_yes_im_sure() {
-    hashmap_free_map(global_env->map);
-    hashmap_free_map(user_env->map);
-
-    struct List* node = all_objects;
-    while(node != NULL) {
-        object_free(node->obj);
-        struct List* next = node->next;
-        free(node);
-        node = next;
     }
 }

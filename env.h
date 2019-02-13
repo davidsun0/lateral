@@ -10,11 +10,13 @@ struct Envir {
 struct Envir* envir_init(int size);
 void envir_free(struct Envir*);
 
-void envir_push(struct Envir*, struct Envir*);
-struct Envir* envir_pop(struct Envir*);
-
+// inserts a key value pair into environment hashmap
 void envir_set(struct Envir*, char*, struct Object*);
+
+// searches environment with char key
 struct Object* envir_get(struct Envir*, char*);
+
+// recursively searches outer environments with char key
 struct Object* envir_search(struct Envir*, char*);
 
 #endif

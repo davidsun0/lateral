@@ -9,15 +9,7 @@
 #include "object.h"
 
 struct Object* object_init(enum object_type type, union Data data) {
-    struct Object* obj = malloc(sizeof(struct Object));
-    if(obj == NULL) {
-        gc_run();
-        obj = malloc(sizeof(struct Object));
-        if(obj == NULL) {
-            perror("fatal: out of memory\n");
-            exit(1);
-        }
-    }
+    struct Object* obj = gc_malloc(sizeof(struct Object));
     obj->type = type;
     obj->data = data;
     obj->marked = 1;
@@ -315,9 +307,7 @@ void object_print_debug(struct Object* obj, int indent) {
             break;
         case list_type:
             printf("data:\n");
-            // printf("=====BEGIN LIST=====\n");
             list_print(obj->data.ptr, indent + 1);
-            // printf("=====END LIST=====\n");
             break;
         default:
             printf("data: %p\n", obj->data.ptr);

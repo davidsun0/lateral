@@ -272,8 +272,11 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 return NULL;
             }
             struct Func* fn = malloc(sizeof(struct Func));
-            fn->args = list_copy_struct(args->obj->data.ptr);
-            fn->expr = (struct Object*) (args->next->obj);
+            // fn->args = list_copy_struct(args->obj->data.ptr);
+            struct Object* arg_copy = object_copy(args->obj);
+            fn->args = arg_copy->data.ptr;
+            // fn->expr = (struct Object*) (args->next->obj);
+            fn->expr = object_copy(args->next->obj);
             union Data data;
             data.func = fn;
             if(object_equals_symbol(sp->obj, "fn")) {

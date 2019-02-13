@@ -20,28 +20,6 @@ struct List* list_bare_init() {
     return list;
 }
 
-struct List* list_copy_struct(struct List* source) {
-    struct List* dest = malloc(sizeof(struct List));
-    struct List* dest_node = dest;
-    dest_node->obj = NULL;
-    while(source != NULL) {
-        if(dest_node->obj != NULL) {
-            struct List* dest_cpy = malloc(sizeof(struct List));
-
-            dest_cpy->next = NULL;
-            dest_cpy->obj = source->obj;
-
-            dest_node->next = dest_cpy;
-            dest_node = dest_node->next;
-        } else {
-            dest_node->obj = source->obj;
-            dest_node->next = NULL;
-        }
-        source = source->next;
-    }
-    return dest;
-}
-
 void list_bare_prepend(struct List** list, struct Object* prepend) {
     if((*list)->obj == NULL) {
         (*list)->obj = prepend;
