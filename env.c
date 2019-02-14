@@ -3,12 +3,11 @@
 
 #include "object.h"
 #include "hash.h"
-#include "garbage.h"
 
 #include "env.h"
 
 struct Envir* envir_init(int size) {
-    struct Envir* envir = gc_malloc(sizeof(struct Envir));
+    struct Envir* envir = malloc(sizeof(struct Envir));
     envir->map = hashmap_init(size);
     envir->inner = NULL;
     envir->outer = NULL;

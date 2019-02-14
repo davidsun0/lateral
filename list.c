@@ -1,16 +1,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "list.h"
 #include "object.h"
+#include "garbage.h"
+
+#include "list.h"
 
 struct Object* list_init() {
+    struct Object* output = object_init_type(list_type);
     struct List* list = malloc(sizeof(struct List));
+    output->data.ptr = list;
     list->obj = NULL;
     list->next = NULL;
-    union Data data;
-    data.ptr = list;
-    return object_init(list_type, data);
+    return output;
 }
 
 struct List* list_bare_init() {
@@ -18,6 +20,22 @@ struct List* list_bare_init() {
     list->obj = NULL;
     list->next = NULL;
     return list;
+}
+
+struct List* list_bare_copy(struct Object* obj) {
+    if(obj == NULL || obj->type != list_type) {
+        return NULL;
+    }
+
+    struct List* copy = list_bare_init();
+    struct List* source = obj->data.ptr;
+
+    struct List* curr = copy;
+    while(source != NULL) {
+        curr = list_bare_append(curr, object_copy(source->obj));
+        source = source->next;
+    }
+    return copy;
 }
 
 void list_bare_prepend(struct List** list, struct Object* prepend) {
@@ -44,6 +62,21 @@ void list_prepend_object(struct Object* list_obj, struct Object* prepend) {
         node->next = list;
         list_obj->data.ptr = node;
     }
+}
+
+struct List* list_bare_append(struct List* list, struct Object* append) {
+    while(list->next != NULL) {
+        list = list->next;
+    }
+    if(list->obj == NULL) {
+        list->obj = append;
+    } else {
+        struct List* node = malloc(sizeof(struct List));
+        node->obj = append;
+        node->next = NULL;
+        list->next = node;
+    }
+    return list;
 }
 
 void list_append_object(struct Object* list_obj, struct Object* append) {

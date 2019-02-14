@@ -15,7 +15,7 @@
         (c) == ']' || (c) == '{' || (c) == '}' || (c) == '\'' || c == '`' || \
         (c) == '^' || (c) == '~')
 
-#define BUFFER_SIZE 64
+#define BUFFER_SIZE 256
 
 static FILE* file;
 static char* buffer;
@@ -319,7 +319,7 @@ struct Object* read_string(char* str) {
 struct Object* read_module(char* filename) {
     file = fopen(filename, "r");
     if(file == NULL) {
-        perror("failed to read module: ");
+        perror("failed to open module: ");
         return NULL;
     }
 

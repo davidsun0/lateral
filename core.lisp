@@ -7,3 +7,9 @@
 
 (defn inc (n)
   (+ n 1))
+
+(defn mult (a b)
+  (loop (acc 0 n 0)
+    (if (= n b)
+      acc
+      (recur (+ acc a) (+ n 1)))))

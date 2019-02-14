@@ -28,20 +28,6 @@ void gc_init(void* ptr) {
     stack_base = ptr;
 }
 
-void* gc_malloc(size_t size) {
-    void* ptr = malloc(size);
-    if(ptr == NULL) {
-        printf("warning: malloc failed\n");
-        gc_run();
-        ptr = malloc(size);
-        if(ptr == NULL) {
-            printf("fatal: out of memory\n");
-            exit(1);
-        }
-    }
-    return ptr;
-}
-
 void gc_insert_object(struct Object* obj) {
     list_bare_prepend(&all_objects, obj);
     object_count ++;
@@ -72,6 +58,7 @@ static void gc_heap_bounds(struct Object** left, struct Object** right) {
     *right = max;
 }
 
+/*
 static void gc_scan_stack() {
     struct Object* heap_min = NULL;
     struct Object* heap_max = NULL;
@@ -89,6 +76,7 @@ static void gc_scan_stack() {
             struct List* list = all_objects;
             while(list != NULL) {
                 if(obj == list->obj) {
+                    printf("%p\n", (void*) obj);
                     object_mark(list->obj);
                     break;
                 }
@@ -97,6 +85,24 @@ static void gc_scan_stack() {
         }
     }
     printf("\n");
+}
+*/
+
+static void gc_scan_stack() {
+    void* temp;
+    void* top = &temp;
+
+    for(void* ptr = top; ptr < (void*)stack_base; ptr = ((char*)ptr) + sizeof(void*)) {
+        struct List* list = all_objects;
+        while(list != NULL) {
+            if(*((void**)ptr) == list->obj) {
+                // printf("s %p\n", (void*) list->obj);
+                object_mark(list->obj);
+                break;
+            }
+            list = list->next;
+        }
+    }
 }
 
 void gc_run() {
@@ -126,6 +132,7 @@ void gc_run() {
     object_count = 0;
     while(curr != NULL) {
         if(!curr->obj->marked) {
+            // printf("%p\n", (void *) curr->obj);
             object_free(curr->obj);
             if(prev != all_objects) {
                 prev->next = curr->next;

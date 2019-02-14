@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "garbage.h"
+
 #include "hash.h"
 
 unsigned int hashmap_string_hash(char* str) {

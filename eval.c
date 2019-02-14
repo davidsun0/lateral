@@ -152,6 +152,8 @@ struct Object* eval_macroexpand(struct Envir* env, struct Object* obj) {
 
         struct List* m_args = ((struct Func*) macro->data.ptr)->args;
         struct Object* m_expr = ((struct Func*) macro->data.ptr)->expr;
+        // printf("margs:\n");
+        // list_print(m_args, 0);
 
         int argc = list_length(list->next);
         struct Envir* local = envir_init(argc * 2);
@@ -160,6 +162,7 @@ struct Object* eval_macroexpand(struct Envir* env, struct Object* obj) {
             if(m_args->obj->type != symbol) {
                 printf("error: argument is not symbol\n");
                 object_print_type(m_args->obj->type);
+                printf("\n");
                 envir_free(local);
                 return NULL;
             }
@@ -271,19 +274,33 @@ struct Object* eval_apply(struct Envir* env, struct Object* obj) {
                 printf("expected 2, got %d\n", list_length(args));
                 return NULL;
             }
+
+            struct Object* fargs = args->obj;
+            struct Object* fexpr = args->next->obj;
+            struct Object* output;
+            if(object_equals_symbol(sp->obj, "fn")) {
+                output = object_init_type(func_type);
+            } else {
+                output = object_init_type(macro_type);
+            }
             struct Func* fn = malloc(sizeof(struct Func));
-            // fn->args = list_copy_struct(args->obj->data.ptr);
-            struct Object* arg_copy = object_copy(args->obj);
-            fn->args = arg_copy->data.ptr;
-            // fn->expr = (struct Object*) (args->next->obj);
-            fn->expr = object_copy(args->next->obj);
-            union Data data;
-            data.func = fn;
+            fn->expr = NULL;
+            fn->args = NULL;
+            output->data.ptr = fn;
+            fn->args = list_bare_copy(fargs);
+            // struct Object* arg_copy = object_copy(args->obj);
+            // fn->args = arg_copy->data.ptr;
+            fn->expr = object_copy(fexpr);
+            // printf("args: \n");
+            // list_print(fn->args, 0);
+            /*
             if(object_equals_symbol(sp->obj, "fn")) {
                 return object_init(func_type, data);
             } else {
                 return object_init(macro_type, data);
             }
+            */
+            return output;
         } else if(object_equals_symbol(sp->obj, "def")) {
             if(list_length(sp) != 3 || sp->next->obj->type != symbol) {
                 printf("error: wrong type / number of args to def\n");

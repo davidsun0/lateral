@@ -33,6 +33,7 @@ struct Object {
     int marked;
 };
 
+struct Object* object_init_type(enum object_type);
 struct Object* object_init(enum object_type, union Data);
 struct Object* object_symbol_init(char*);
 struct Object* object_copy(struct Object*);

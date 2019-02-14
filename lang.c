@@ -24,11 +24,12 @@ struct Object* lat_cons(struct List* args) {
     struct Object* output = list_init();
     struct Object* copy = object_copy(args->obj);
     list_append_object(output, copy);
-    struct List* list = args->next->obj->data.ptr;
+    struct Object* list_obj = args->next->obj;
+    struct List* list = list_obj->data.ptr;
     while(list != NULL) {
         if(list->obj != NULL) {
-            copy = object_copy(list->obj);
-            list_append_object(output, copy);
+            struct Object* node = object_copy(list->obj);
+            list_append_object(output, node);
         }
         list = list->next;
     }

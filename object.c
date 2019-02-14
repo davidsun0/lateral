@@ -8,11 +8,19 @@
 
 #include "object.h"
 
+struct Object* object_init_type(enum object_type type) {
+    struct Object* obj = malloc(sizeof(struct Object));
+    obj->type = type;
+    obj->data.ptr = NULL;
+    gc_insert_object(obj);
+    obj->marked = 0;
+    return obj;
+}
+
 struct Object* object_init(enum object_type type, union Data data) {
-    struct Object* obj = gc_malloc(sizeof(struct Object));
+    struct Object* obj = malloc(sizeof(struct Object));
     obj->type = type;
     obj->data = data;
-    obj->marked = 1;
     gc_insert_object(obj);
     obj->marked = 0;
     return obj;
@@ -33,21 +41,23 @@ struct Object* object_copy(struct Object* obj) {
         return obj;
     }
 
-    union Data dat;
-    if(obj->type == char_type || obj->type == int_type || obj->type == c_fn) {
+    struct Object* source = obj;
+    struct Object* output = object_init_type(source->type);
+    if(source->type == char_type || source->type == int_type || source->type == c_fn) {
         // direct copy
-        dat = obj->data;
-    } else if(obj->type == symbol || obj->type == string) {
+        output->data = obj->data;
+    } else if(source->type == symbol || source->type == string) {
         // string copy
-        int length = strlen(obj->data.ptr);
+        int length = strlen(source->data.ptr);
         char* str = malloc(sizeof(char) * (length + 1));
         strcpy(str, obj->data.ptr);
-        dat.ptr = str;
-    } else if(obj->type == list_type) {
+        output->data.ptr = str;
+    } else if(source->type == list_type) {
         struct Object* clone = list_init();
-        struct List* list = obj->data.ptr;
+        struct List* list = source->data.ptr;
         while(list != NULL) {
-            list_append_object(clone, object_copy(list->obj));
+            struct Object* lclone = object_copy(list->obj);
+            list_append_object(clone, lclone);
             list = list->next;
         }
         return clone;
@@ -55,8 +65,7 @@ struct Object* object_copy(struct Object* obj) {
         printf("implement object_copy for functions\n");
         return NULL;
     }
-    // copy structure + recurse for list, func
-    return object_init(obj->type, dat);
+    return output;
 }
 
 int object_equals_char(struct Object* obj, char c) {
@@ -164,22 +173,26 @@ void object_free(struct Object* obj) {
     if(list_type == obj->type) {
         // printf("freeing list\n");
         struct List* list = (struct List*) obj->data.ptr;
-        struct List* next = list->next;
-        while(list != NULL) {
-            free(list);
-            list = next;
-            if(next != NULL)
-                next = next->next;
+        if(list != NULL) {
+            struct List* next = list->next;
+            while(list != NULL) {
+                free(list);
+                list = next;
+                if(next != NULL)
+                    next = next->next;
+            }
         }
     } else if(func_type == obj->type || macro_type == obj->type) {
         printf("freeing function / macro\n");
         struct List* list = ((struct Func*) obj->data.ptr)->args;
-        struct List* next = list->next;
-        while(list != NULL) {
-            free(list);
-            list = next;
-            if(next != NULL)
-                next = next->next;
+        if(list != NULL) {
+            struct List* next = list->next;
+            while(list != NULL) {
+                free(list);
+                list = next;
+                if(next != NULL)
+                    next = next->next;
+            }
         }
         free(obj->data.ptr);
     }
@@ -252,7 +265,9 @@ void object_print_string(struct Object* obj) {
     } else if(c_fn == obj->type) {
         printf("c_fn<%p>", obj->data.ptr);
     } else if(func_type == obj->type) {
-        printf("fn<%p>", obj->data.ptr);
+        printf("fn<%p>\n", obj->data.ptr);
+        struct Func* func = obj->data.ptr;
+        object_print_string(func->expr);
     } else if(macro_type == obj->type) {
         printf("macro<%p>", obj->data.ptr);
     } else if(true_obj == obj) {

@@ -1,10 +1,9 @@
 #ifndef LATERAL_GARBAGE_H
 #define LATERAL_GARBAGE_H
 
-void gc_init();
+#include "object.h"
 
-// checked malloc which runs garbage collection when appropriate
-void* gc_malloc(size_t);
+void gc_init();
 
 // adds object to pool for automatic collection
 void gc_insert_object(struct Object*);

@@ -34,6 +34,7 @@ static int lat_rep() {
     object_print_string(output);
     printf("\n");
     free(input_str);
+    // gc_run();
     return 1;
 }
 
