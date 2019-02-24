@@ -5,7 +5,15 @@
 #include "hash.h"
 #include "env.h"
 
-struct Object* eval_eval(struct Envir*, struct Object*);
-struct Object* eval_apply(struct Envir*, struct Object*);
+struct StackFrame {
+    struct StackFrame* prev;
+    struct Object* fn;
+    struct Object* expr;
+    struct Object* result;
+};
+
+extern struct StackFrame* stack;
+
+struct Object* lat_evaluate(struct Envir*, struct Object*);
 
 #endif

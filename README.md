@@ -9,7 +9,7 @@ Lateral was originally based off of [Make a Lisp](https://github.com/kanaka/mal)
 
 ## Features
 
-- Precise Mark and Sweep garbage collection
+- Conservative mark and sweep garbage collection
 - Tail call recursion
 - Macros
 

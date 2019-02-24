@@ -32,7 +32,7 @@ void gc_insert_object(struct Object* obj) {
     list_bare_prepend(&all_objects, obj);
     object_count ++;
     if(object_count >= max_object_count) {
-        gc_run();
+        // gc_run();
     }
 }
 
@@ -43,6 +43,7 @@ void gc_print(struct Object* obj) {
     printf("\n");
 }
 
+/*
 static void gc_heap_bounds(struct Object** left, struct Object** right) {
     struct Object* max = all_objects->obj;
     struct Object* min = all_objects->obj;
@@ -58,52 +59,25 @@ static void gc_heap_bounds(struct Object** left, struct Object** right) {
     *right = max;
 }
 
-/*
 static void gc_scan_stack() {
-    struct Object* heap_min = NULL;
-    struct Object* heap_max = NULL;
-    struct Object** stack_top = &heap_min;
-
-    // knowing heap bounds speeds up object search
-    gc_heap_bounds(&heap_min, &heap_max);
-
-    // TODO: add code for stacks that expand the other way
-    // iterate through the memory of the entire stack
-    for(struct Object** ptr = stack_top; ptr < stack_base; ptr ++) {
-        struct Object* obj = *ptr;
-        if(heap_min < obj && obj < heap_max) {
-            // mark if data is a pointer to an object
-            struct List* list = all_objects;
-            while(list != NULL) {
-                if(obj == list->obj) {
-                    printf("%p\n", (void*) obj);
-                    object_mark(list->obj);
-                    break;
-                }
-                list = list->next;
-            }
-        }
-    }
-    printf("\n");
-}
-*/
-
-static void gc_scan_stack() {
-    void* temp;
-    void* top = &temp;
+    int count = 0;
+    void* top = &count;
 
     for(void* ptr = top; ptr < (void*)stack_base; ptr = ((char*)ptr) + sizeof(void*)) {
         struct List* list = all_objects;
         while(list != NULL) {
             if(*((void**)ptr) == list->obj) {
                 // printf("s %p\n", (void*) list->obj);
+                count ++;
                 object_mark(list->obj);
                 break;
             }
             list = list->next;
         }
     }
+    printf("%d ptrs on stack\n", count);
 }
+*/
 
 void gc_run() {
     // mark objects in the environment
@@ -123,7 +97,7 @@ void gc_run() {
     }
 
     // mark objects on the stack
-    gc_scan_stack();
+    // gc_scan_stack();
 
     // sweep
     struct List* curr = all_objects;

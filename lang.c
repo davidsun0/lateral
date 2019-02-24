@@ -135,7 +135,7 @@ struct Object* lat_eval(struct List* args) {
         printf("error: eval expects one argument\n");
         return NULL;
     }
-    struct Object* output = eval_apply(user_env, args->obj);
+    struct Object* output = lat_evaluate(user_env, args->obj);
     return output;
 }
 
@@ -198,15 +198,14 @@ void env_init() {
     envir_insert_cfn(&lat_plus, "+");
     envir_insert_cfn(&lat_equals, "=");
 
+    /*
     struct Object* tree = read_module("./core.lisp");
-    // printf("tree: %p\n", (void*) tree);
     struct List* exprs = tree->data.ptr;
     while(exprs != NULL) {
-        // object_print_string(exprs->obj);
-        // printf("\n");
-        eval_apply(global_env, exprs->obj);
+        lat_evaluate(global_env, exprs->obj);
         exprs = exprs->next;
     }
+    */
 
     user_env = envir_init(128);
     user_env->outer = global_env;

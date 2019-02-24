@@ -28,13 +28,14 @@ static int lat_rep() {
     }
 
     // EVALUATE
-    struct Object* output = eval_apply(user_env, input);
+    // struct Object* output = eval_apply(user_env, input);
+    struct Object* output = lat_evaluate(user_env, input);
 
     // PRINT
     object_print_string(output);
     printf("\n");
     free(input_str);
-    // gc_run();
+    gc_run();
     return 1;
 }
 

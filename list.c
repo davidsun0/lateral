@@ -128,6 +128,14 @@ int list_length(struct List* list) {
     return length;
 }
 
+int list_is_empty(struct List* list) {
+    if(list->next == NULL && list->obj == NULL) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 void list_print(struct List* list, int indent) {
     while(list != NULL) {
         for(int i = 0; i < indent; i ++) {
