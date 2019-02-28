@@ -20,7 +20,12 @@ void list_append_object(struct Object*, struct Object*);
 void list_append(struct Object*, enum object_type, union Data);
 struct List* list_bare_append(struct List*, struct Object*);
 
-int list_length(struct List*);
+struct Object* list_pop(struct Object*);
+struct Object* list_get(struct Object*, int);
+
+int list_length(struct Object*);
+int list_bare_length(struct List*);
+
 int list_is_empty(struct List*);
 void list_print(struct List*, int);
 

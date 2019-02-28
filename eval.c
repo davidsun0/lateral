@@ -9,127 +9,145 @@
 struct StackFrame* stack;
 struct Envir* curr_env;
 
-void push_stack(struct Object* ast) {
+static void stack_push(struct Object* ast) {
     struct StackFrame* new_frame = malloc(sizeof(struct StackFrame));
     new_frame->prev = stack;
+
     new_frame->fn = NULL;
     new_frame->expr = ast;
-    new_frame->result = NULL;
+    new_frame->working = NULL;
+    new_frame->ret = NULL;
+    
+    // for debugging
+    new_frame->exe_mode = -1;
+    new_frame->eval_index = -1;
+
     stack = new_frame;
 }
 
-struct Object* pop_stack() {
+static void stack_pop() {
     if(stack == NULL) {
-        printf("ERROR: popping an empty stack\n");
-        return NULL;
+        printf("warning: attempting to pop null stack\n");
+        return;
     }
 
-    struct StackFrame* old_frame = stack;
-    struct Object* result = old_frame->result;
-    stack = stack->prev;
-    free(old_frame);
-    return result;
+    if(stack->prev == NULL) {
+        stack->expr = NULL;
+    } else {
+        stack->prev->ret = stack->ret;
+        struct StackFrame* old_frame = stack;
+        stack = stack->prev;
+        free(old_frame);
+    }
 }
 
-void print_stack() {
+void stack_print() {
     struct StackFrame* frame = stack;
 
+    printf("=== STACK ===\n");
     while(frame != NULL) {
-        printf("\n=== STACK FRAME ===\n");
+        printf("=== STACK FRAME ===\n");
         printf("fn:   ");
         object_print_string(frame->fn);
         printf("\nexpr: ");
         object_print_string(frame->expr);
-        printf("\nres:  ");
-        object_print_string(frame->result);
+        printf("\nret:  ");
+        object_print_string(frame->ret);
         printf("\nnext frame: %p\n\n", (void*) frame->prev);
         frame = frame->prev;
     }
+    printf("=== END STACK ===\n\n\n");
 }
 
-static void eval_apply();
-
-static void eval_eval() {
-    struct Object* ast = stack->expr;
-    if(ast == NULL) {
-        stack->result = NULL;
-        return;
-    }
-
-    if(ast->type == list_type) {
-        struct List* sexpr = (struct List*) ast->data.ptr;
-        stack->result = list_init();
-        struct Object* result = stack->result;
-        while(sexpr != NULL) {
-            push_stack(sexpr->obj);
-            eval_apply();
-            struct Object* obj = pop_stack();
-            list_append_object(result, obj);
-            sexpr = sexpr->next;
-        }
-        object_print_string(stack->result);
-        printf("\n");
-    } else if(ast->type == symbol) {
-       stack->result = envir_search(curr_env, ast->data.ptr);
-       // TODO: error handling
-       if(stack->result == NULL) {
-           printf("error: symbol %s not found\n", (char*) ast->data.ptr);
-       }
-    } else {
-        stack->result = ast;
-    }
-}
-
-static void eval_apply() {
-    struct Object* ast = stack->expr;
-    if(ast == NULL) {
-        stack->result = NULL;
-        return;
-    }
-
-    if(ast->type != list_type) {
-        push_stack(ast);
-        eval_eval();
-        struct Object* result = pop_stack();
-        stack->result = result;
-    } else {
-        struct List* sexpr = (struct List*) ast->data.ptr;
-        if(list_is_empty(sexpr)) {
-            stack->result = nil_obj;
-            return;
+static void eval() {
+    if(stack->working == NULL) {
+        if(list_is_empty(stack->expr->data.ptr)) {
+            // empty list evaluates to itself
+            stack->ret = stack->expr;
+            stack_pop();
         } else {
-            stack->fn = sexpr->obj;
+            // create a evaluated version of stack->expr
+            stack->working = list_init();
+            stack->eval_index = 1;
+            // push next item in the list
+            struct Object* obj = list_get(stack->expr, 0);
+            stack_push(obj);
+        }
+    } else {
+        // append ret onto working
+        list_append_object(stack->working, stack->ret);
+        // push next object onto stack
+        struct Object* obj = list_get(stack->expr, stack->eval_index);
+        stack->eval_index ++;
+        // if end of list, pop result
+        if(obj == NULL) {
+            stack->ret = stack->working;
+            stack_pop();
+        } else {
+            stack_push(obj);
+        }
+    }
+}
+
+static void apply() {
+    if(stack->ret == NULL) {
+        // execute macros here
+        stack_push(stack->expr);
+        stack->exe_mode = eval_type;
+    } else {
+        stack->working = stack->ret;
+        if(stack->working->type != list_type) {
+            printf("error: apply expected list type, but got");
+            object_print_type(stack->working->type);
+            printf("\n");
+            stack_pop();
         }
 
-        push_stack(ast);
-        eval_eval();
-        ast = pop_stack();
-        stack->result = ast;
-
-        // not a list after evaluation
-        // i.e. evaluated by a special form
-        if(ast == NULL || ast->type != list_type) {
-            stack->result = ast;
-            return;
-        }
-
-        sexpr = (struct List*) ast->data.ptr;
-        struct Object* func = sexpr->obj;
-        sexpr = sexpr->next;
+        struct List* args = (struct List*) stack->working->data.ptr;
+        struct Object* func = args->obj;
 
         if(func->type == c_fn) {
-            print_stack();
+            stack->ret = func->data.fn_ptr(args->next);
+            stack_pop();
+        } else {
+            object_print_type(func->type);
+            printf("\nimplement apply exe\n");
+            object_print_string(stack->ret);
+            printf("\n");
+            stack_pop();
         }
     }
 }
 
 struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
     curr_env = envir;
-    push_stack(ast);
-    eval_apply();
-    struct Object* result = pop_stack();
-    if(stack != NULL) {
-        print_stack();
+    stack_push(ast);
+    stack->exe_mode = apply_type;
+    while(!(stack->prev == NULL && stack->expr == NULL)) {
+        struct Object* expr = stack->expr;
+        if(expr->type == symbol) {
+            if(stack->ret != NULL) {
+                printf("warning: stack result is non null while evaluating sym\n");
+            }
+            struct Object* obj = envir_search(curr_env, expr->data.ptr);
+            stack->ret = obj;
+            stack_pop();
+        } else if(expr->type != list_type) {
+            if(stack->ret != NULL) {
+                printf("warning: stack result is non null while evaluating obj\n");
+            }
+            stack->ret = expr;
+            stack_pop();
+        } else {
+            if(stack->exe_mode == eval_type) {
+                eval();
+            } else if(stack->exe_mode == apply_type) {
+                apply();
+            }
+        }
     }
-    return result;
+    struct Object* output = stack->ret;
+    free(stack);
+    stack = NULL;
+    return output;
 }

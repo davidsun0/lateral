@@ -15,7 +15,7 @@ struct Object* true_obj;
 struct Object* nil_obj;
 
 struct Object* lat_cons(struct List* args) {
-    if(list_length(args) != 2
+    if(list_bare_length(args) != 2
             || args->next->obj == NULL
             || args->next->obj->type != list_type) {
         printf("error: cons expects two arguments\n");

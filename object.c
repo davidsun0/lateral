@@ -245,7 +245,7 @@ void object_print_string(struct Object* obj) {
     } else if(list_type == obj->type) {
         printf("(");
         struct List* node = obj->data.ptr;
-        if(node->obj != NULL) {
+        if(node != NULL && node->obj != NULL) {
             while(node != NULL) {
                 object_print_string(node->obj);
                 node = node->next;

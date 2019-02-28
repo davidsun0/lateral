@@ -119,13 +119,44 @@ void list_append(struct Object* list_obj, enum object_type type,
     }
 }
 
-int list_length(struct List* list) {
+struct Object* list_pop(struct Object* list_obj) {
+    struct List* list = (struct List*) list_obj->data.ptr;
+    struct Object* output = list->obj;
+    list_obj->data.ptr = list->next;
+    free(list);
+    return output;
+}
+
+struct Object* list_get(struct Object* list_obj, int index) {
+    struct List* list = (struct List*) list_obj->data.ptr;
+    for(int i = 0; i < index; i ++) {
+        list = list->next;
+        if(list == NULL) {
+            return NULL;
+        }
+    }
+    return list->obj;
+}
+
+int list_bare_length(struct List* list) {
+    if(list == NULL || list->obj == NULL) {
+        return 0;
+    }
+
     int length = 0;
     while(list != NULL) {
         list = list->next;
         length ++;
     }
     return length;
+}
+
+int list_length(struct Object* obj) {
+    if(obj->type != list_type) {
+        return -1;
+    } else {
+        return list_bare_length(obj->data.ptr);
+    }
 }
 
 int list_is_empty(struct List* list) {
