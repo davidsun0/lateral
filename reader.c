@@ -122,11 +122,16 @@ static struct Object* read_emit_token() {
     } else if(c == '"') {
         // strings
         read_inc();
+        char prev = c;
+        // read first " character
         c = read_curr();
         i ++;
-        // TODO: implement string quoting
-        while(c != '\0' && c != '"') {
+        while(c != '\0') {
+            if(c == '"' && prev != '\\') {
+                break;
+            }
             read_inc();
+            prev = c;
             c = read_curr();
             i ++;
         }
@@ -190,6 +195,9 @@ static struct Object* read_make_atom(struct Object* obj) {
                         break;
                     case 'n':
                         str[j] = '\n';
+                        break;
+                    case 't':
+                        str[j] = '\t';
                         break;
                     default:
                         //TODO: abort syntax tree building

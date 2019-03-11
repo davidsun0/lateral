@@ -46,8 +46,7 @@ static void initialize_readline(){
 
 int main(){
     initialize_readline();
-    int gc_base;
-    gc_init(&gc_base);
+    gc_init();
     env_init();
 
     while(lat_rep()){
