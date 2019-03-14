@@ -68,6 +68,10 @@ struct Object* object_copy(struct Object* obj) {
     return output;
 }
 
+void object_copy2(struct Object** dest, struct Object* obj) {
+
+}
+
 int object_equals_char(struct Object* obj, char c) {
     if(obj != NULL && obj->type == char_type && obj->data.char_type == c) {
         return 1;
@@ -140,11 +144,7 @@ void object_mark(struct Object* obj) {
         }
     } else if(obj->type == func_type || obj->type == macro_type) {
         struct Func* func = (struct Func*)obj->data.ptr;
-        struct List* args = func->args;
-        while(args != NULL) {
-            object_mark(args->obj);
-            args = args->next;
-        }
+        object_mark(func->args);
         object_mark(func->expr);
     }
 }
@@ -184,6 +184,7 @@ void object_free(struct Object* obj) {
         }
     } else if(func_type == obj->type || macro_type == obj->type) {
         printf("freeing function / macro\n");
+        /*
         struct List* list = ((struct Func*) obj->data.ptr)->args;
         if(list != NULL) {
             struct List* next = list->next;
@@ -194,6 +195,7 @@ void object_free(struct Object* obj) {
                     next = next->next;
             }
         }
+        */
         free(obj->data.ptr);
     }
     free(obj);
@@ -241,7 +243,7 @@ void object_print_type(enum object_type type) {
 
 void object_print_string(struct Object* obj) {
     if(obj == NULL) {
-        printf("[null object]");
+        printf("[null]");
     } else if(list_type == obj->type) {
         printf("(");
         struct List* node = obj->data.ptr;
@@ -265,9 +267,7 @@ void object_print_string(struct Object* obj) {
     } else if(c_fn == obj->type) {
         printf("c_fn<%p>", obj->data.ptr);
     } else if(func_type == obj->type) {
-        printf("fn<%p>\n", obj->data.ptr);
-        struct Func* func = obj->data.ptr;
-        object_print_string(func->expr);
+        printf("fn<%p>", obj->data.ptr);
     } else if(macro_type == obj->type) {
         printf("macro<%p>", obj->data.ptr);
     } else if(true_obj == obj) {

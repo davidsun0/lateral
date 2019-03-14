@@ -37,7 +37,7 @@ static struct Object* read_make_token(int len) {
         } else {
             // char exists in old buffer
             char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
-            // remember that old_buffer[BUFFER_SIZE] == '\0'
+            // remember that old_buffer[BUFFER_SIZE - 1] == '\0'
             data.char_type = old_buffer[BUFFER_SIZE - 2];
         }
     } else {
@@ -49,6 +49,8 @@ static struct Object* read_make_token(int len) {
             char* old_buffer = buffer == buffer_a ? buffer_b : buffer_a;
             strncpy(sym, old_buffer + BUFFER_SIZE + runover - 1, -runover);
             strncpy(sym - runover, buffer, offset);
+            // TODO: verify this index of len + 1
+            printf("%s \n", sym);
             sym[len + 1] = '\0';
             data.ptr = sym;
         } else {

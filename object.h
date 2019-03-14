@@ -15,7 +15,7 @@ enum object_type {
 };
 
 struct Func {
-    struct List* args;
+    struct Object* args;
     struct Object* expr;
 };
 

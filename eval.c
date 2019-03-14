@@ -54,6 +54,7 @@ void stack_print() {
     printf("=== STACK ===\n");
     while(frame != NULL) {
         printf("=== STACK FRAME ===\n");
+        printf("exe:  %d\n", frame->exe_mode);
         printf("fn:   ");
         object_print_string(frame->fn);
         printf("\nexpr: ");
@@ -68,7 +69,7 @@ void stack_print() {
 
 static void envir_push_bindings(struct List* syms, struct List* vals) {
     int size = list_bare_length(syms);
-    struct Envir* local = envir_init(size);
+    struct Envir* local = envir_init(size * 2);
     local->outer = curr_env;
     curr_env = local->inner;
 
@@ -90,7 +91,7 @@ static void envir_pop() {
 }
 
 static int special_form() {
-    printf("evaluating special form\n");
+    // printf("evaluating special form\n");
     struct List* expr = stack->expr->data.ptr;
     struct Object* form = expr->obj;
     expr = expr->next;
@@ -102,9 +103,30 @@ static int special_form() {
     // let
     // do, loop / recur
     // quasiquote
-    if(object_equals_symbol(form, "quote")) {
-        // TODO: check arg count
-        stack->expr = expr->obj;
+    if (object_equals_symbol(form, "def")) {
+        if(stack->ret == NULL) {
+            stack_push(expr->next->obj);
+            stack->exe_mode = apply_type;
+        } else {
+            struct Object* sym = expr->obj;
+            struct Object* val = stack->ret;
+            envir_set(curr_env, sym->data.ptr, val);
+            stack_pop();
+        }
+    } else if(object_equals_symbol(form, "fn") ||
+            object_equals_symbol(form, "macro")) {
+        struct Object* output;
+        if(object_equals_symbol(form, "fn")) {
+            output = object_init_type(func_type);
+        } else {
+            output = object_init_type(macro_type);
+        }
+        stack->ret = output;
+        struct Func* fn = malloc(sizeof(struct Func));
+        output->data.ptr = fn;
+        fn->args = object_copy(expr->obj);
+        fn->expr = object_copy(expr->next->obj);
+        stack_pop();
     } else {
         return 0;
     }
@@ -121,9 +143,10 @@ static void eval() {
             // create a evaluated version of stack->expr
             stack->working = list_init();
             stack->eval_index = 1;
-            // push next item in the list
+            // push first item in the list
             struct Object* obj = list_get(stack->expr, 0);
             stack_push(obj);
+            stack->exe_mode = apply_type;
         }
     } else {
         // append ret onto working
@@ -143,35 +166,44 @@ static void eval() {
 }
 
 static void apply() {
+    // execute macros here
+    if(special_form()) {
+        return;
+    }
+
     if(stack->ret == NULL) {
-        // execute macros here
-        if(special_form()) {
-            stack->ret = stack->expr;
-            stack_pop();
-        } else {
-            stack_push(stack->expr);
-            stack->exe_mode = eval_type;
-        }
+        stack_push(stack->expr);
+        stack->exe_mode = eval_type;
     } else {
-        stack->working = stack->ret;
-        if(stack->working->type != list_type) {
-            printf("error: apply expected list type, but got");
-            object_print_type(stack->working->type);
+        if(stack->ret->type != list_type) {
+            printf("error: apply expected list type, but got ");
+            object_print_type(stack->ret->type);
             printf("\n");
             stack_pop();
         }
 
-        struct List* args = (struct List*) stack->working->data.ptr;
+        struct List* args = (struct List*) stack->ret->data.ptr;
         struct Object* func = args->obj;
 
         if(func->type == c_fn) {
             stack->ret = func->data.fn_ptr(args->next);
             stack_pop();
+        } else if(func->type == func_type) {
+            if(stack->working == NULL) {
+                struct List* syms = ((struct Func*) func->data.ptr)->args->data.ptr;
+                struct List* vals = args->next;
+                envir_push_bindings(syms, vals);
+                stack_push(((struct Func*) func->data.ptr)->expr);
+                stack->exe_mode = eval_type;
+            } else {
+                stack->ret = stack->working;
+                envir_pop();
+                stack_pop();
+            }
         } else {
-            object_print_type(func->type);
-            printf("\nimplement apply exe\n");
-            object_print_string(stack->ret);
-            printf("\n");
+            printf("error: symbol ");
+            object_print_string(func);
+            printf(" is not a function\n");
             stack_destroy();
         }
     }
@@ -202,7 +234,7 @@ struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
             } else if(stack->exe_mode == apply_type) {
                 apply();
             } else {
-                printf("fatal: unknown execution mode\n");
+                printf("fatal: unknown execution mode %d\n", stack->exe_mode);
                 stack_print();
                 stack_destroy();
                 break;
