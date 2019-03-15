@@ -19,7 +19,7 @@ static void stack_push(struct Object* ast) {
     new_frame->ret = NULL;
     
     // for debugging
-    new_frame->exe_mode = -1;
+    new_frame->exe_mode = unknown;
     new_frame->eval_index = -1;
 
     stack = new_frame;
@@ -106,7 +106,7 @@ static int special_form() {
     if (object_equals_symbol(form, "def")) {
         if(stack->ret == NULL) {
             stack_push(expr->next->obj);
-            stack->exe_mode = apply_type;
+            stack->exe_mode = apply_exe;
         } else {
             struct Object* sym = expr->obj;
             struct Object* val = stack->ret;
@@ -146,9 +146,22 @@ static void eval() {
             // push first item in the list
             struct Object* obj = list_get(stack->expr, 0);
             stack_push(obj);
-            stack->exe_mode = apply_type;
+            stack->exe_mode = apply_exe;
         }
     } else {
+        if(stack->eval_index == 1) {
+            stack->fn = stack->ret;
+        }
+
+        if(stack->fn != NULL && stack->fn->type == macro_type) {
+            struct List* syms = ((struct Func*) stack->ret->data.ptr)->args->data.ptr;
+            struct List* vals = ((struct List*) stack->expr->data.ptr)->next;
+            envir_push_bindings(syms, vals);
+            stack->exe_mode = macro_exe;
+            stack_push(((struct Func*) stack->fn->data.ptr)->expr);
+            stack->exe_mode = eval_exe;
+            return;
+        }
         // append ret onto working
         list_append_object(stack->working, stack->ret);
         // push next object onto stack
@@ -160,26 +173,28 @@ static void eval() {
             stack_pop();
         } else {
             stack_push(obj);
-            stack->exe_mode = apply_type;
+            stack->exe_mode = apply_exe;
         }
     }
 }
 
 static void apply() {
-    // execute macros here
     if(special_form()) {
         return;
     }
 
     if(stack->ret == NULL) {
         stack_push(stack->expr);
-        stack->exe_mode = eval_type;
+        stack->exe_mode = eval_exe;
     } else {
         if(stack->ret->type != list_type) {
+            /*
             printf("error: apply expected list type, but got ");
             object_print_type(stack->ret->type);
             printf("\n");
+            */
             stack_pop();
+            return;
         }
 
         struct List* args = (struct List*) stack->ret->data.ptr;
@@ -194,7 +209,7 @@ static void apply() {
                 struct List* vals = args->next;
                 envir_push_bindings(syms, vals);
                 stack_push(((struct Func*) func->data.ptr)->expr);
-                stack->exe_mode = eval_type;
+                stack->exe_mode = eval_exe;
             } else {
                 stack->ret = stack->working;
                 envir_pop();
@@ -212,27 +227,35 @@ static void apply() {
 struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
     curr_env = envir;
     stack_push(ast);
-    stack->exe_mode = apply_type;
+    stack->exe_mode = apply_exe;
     while(!(stack->prev == NULL && stack->expr == NULL)) {
-        struct Object* expr = stack->expr;
-        if(expr->type == symbol) {
+        if(stack->expr->type == symbol) {
             if(stack->ret != NULL) {
                 printf("warning: stack result is non null while evaluating sym\n");
             }
-            struct Object* obj = envir_search(curr_env, expr->data.ptr);
-            stack->ret = obj;
+            stack->ret = envir_search(curr_env, stack->expr->data.ptr);
+            if(stack->ret == NULL) {
+                printf("error: symbol ");
+                object_print_string(stack->expr);
+                printf(" not found\n");
+                stack_destroy();
+            }
             stack_pop();
-        } else if(expr->type != list_type) {
+        } else if(stack->expr->type != list_type) {
             if(stack->ret != NULL) {
                 printf("warning: stack result is non null while evaluating obj\n");
             }
-            stack->ret = expr;
+            stack->ret = stack->expr;
             stack_pop();
         } else {
-            if(stack->exe_mode == eval_type) {
+            if(stack->exe_mode == eval_exe) {
                 eval();
-            } else if(stack->exe_mode == apply_type) {
+            } else if(stack->exe_mode == apply_exe) {
                 apply();
+            } else if(stack->exe_mode == macro_exe) {
+                // stack_print();
+                stack_pop();
+                stack_pop();
             } else {
                 printf("fatal: unknown execution mode %d\n", stack->exe_mode);
                 stack_print();

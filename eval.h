@@ -5,8 +5,12 @@
 #include "hash.h"
 #include "env.h"
 
-#define eval_type 0
-#define apply_type 1
+enum mode {
+    eval_exe,
+    apply_exe,
+    macro_exe,
+    unknown
+};
 
 struct StackFrame {
     struct StackFrame* prev;
@@ -14,7 +18,7 @@ struct StackFrame {
     struct Object* expr;
     struct Object* working;
     struct Object* ret;
-    int exe_mode;
+    enum mode exe_mode;
     int eval_index;
 };
 
