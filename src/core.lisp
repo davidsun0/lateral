@@ -2,6 +2,8 @@
   (macro (name args expr)
     `(def ~name (macro ~args ~expr))))
 
+(defmacro quote (x))
+
 (defmacro defn (a b c)
   `(def ~a (fn ~b ~c)))
 

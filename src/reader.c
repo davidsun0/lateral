@@ -26,6 +26,12 @@ static int length;
 static int end_of_input;
 static int end_of_file;
 
+/**
+ * Creates a token containing the last len characters of the read buffer.
+ *
+ * @param len   number of chars to make a symbol from
+ * @return      an object of char_type or string containing a copy of its data
+ */
 static struct Object* read_make_token(int len) {
     enum object_type type;
     union Data data;
@@ -63,6 +69,11 @@ static struct Object* read_make_token(int len) {
     return output;
 }
 
+/**
+ * Increments the char pointer in the buffer.
+ * Reads from file and swaps buffers if necessary and sets end_of_input to 1
+ * upon EOF.
+ */
 static void read_inc() {
     if(offset < length - 1) {
         offset ++;
@@ -90,70 +101,77 @@ static void read_inc() {
     }
 }
 
-static char read_curr() {
-    return buffer[offset];
-}
-
+/**
+ * Creates the next token from the input buffer.
+ *
+ * @return  object containing token or NULL when whitespace or comments are read
+ */
 static struct Object* read_emit_token() {
-    char c = read_curr();
-    int i = 0;
+    char c = buffer[offset];
+    int chars_read = 0;
     if(c == '\0') {
         return NULL;
     } else if(is_special_char(c)) {
         // special chars
         read_inc();
-        i ++;
-        if(c == '~' && read_curr() == '@') {
+        chars_read ++;
+        if(c == '~' && buffer[offset] == '@') {
             read_inc();
-            i ++;
+            chars_read ++;
         }
-        return read_make_token(i);
+        return read_make_token(chars_read);
     } else if(is_white_space(c)) {
         // white space
         while(c != '\0' && is_white_space(c)) {
             read_inc();
-            c = read_curr();
+            c = buffer[offset];
         }
         return NULL;
     } else if(c == ';') {
         // comments
         while(c != '\0' && c != '\n') {
             read_inc();
-            c = read_curr();
+            c = buffer[offset];
         }
+        return NULL;
     } else if(c == '"') {
         // strings
         read_inc();
         char prev = c;
         // read first " character
-        c = read_curr();
-        i ++;
+        c = buffer[offset];
+        chars_read ++;
         while(c != '\0') {
             if(c == '"' && prev != '\\') {
                 break;
             }
             read_inc();
             prev = c;
-            c = read_curr();
-            i ++;
+            c = buffer[offset];
+            chars_read ++;
         }
         if(c == '"'){
-            i ++;
+            chars_read ++;
             read_inc();
         }
-        return read_make_token(i);
+        return read_make_token(chars_read);
     } else {
         // symbols
         while(c != '\0' && !is_white_space(c) && !is_special_char(c)) {
             read_inc();
-            c = read_curr();
-            i ++;
+            c = buffer[offset];
+            chars_read ++;
         }
-        return read_make_token(i);
+        return read_make_token(chars_read);
     }
-    return NULL;
 }
 
+/**
+ * Reads the next valid token in the buffer.
+ * Returns NULL when EOF is met and there are no more tokens to be read.
+ *
+ * @return  a char_type or string object with a seperate copy of its contents
+ */
 static struct Object* read_next_token() {
     struct Object* result;
     while(1) {
@@ -167,6 +185,11 @@ static struct Object* read_next_token() {
     return result;
 }
 
+/**
+ * Creates a new object from a token parsed as the appropriate datatype.
+ *
+ * @return  the parsed version of the input token
+ */
 static struct Object* read_make_atom(struct Object* obj) {
     char* dat;
     char chararr[2];
@@ -249,8 +272,15 @@ static struct Object* read_make_atom(struct Object* obj) {
     return object_init(type, data);
 }
 
-static int read_list(struct Object*);
+static int read_list(struct Object* tree);
 
+/**
+ * Reads the next object from input and appends it to the syntax tree.
+ * Mutually recursive with read_list.
+ *
+ * @param tree  working syntax tree
+ * @return      1 upon EOF; ')' upon end of list; 0 otherwise
+ */
 static int read_form(struct Object* tree) {
     struct Object* token = read_next_token();
     if(token == NULL) {
@@ -290,6 +320,13 @@ static int read_form(struct Object* tree) {
     }
 }
 
+/**
+ * Reads the next list from input and appends it to the syntax tree.
+ * Mutually recursive with read_form
+ *
+ * @param tree  working syntax tree
+ * @return      1 on EOF; 0 on success
+ */
 static int read_list(struct Object* tree) {
     struct Object* list = list_init();
     while(1) {
@@ -305,6 +342,12 @@ static int read_list(struct Object* tree) {
     return 0;
 }
 
+/**
+ * Builds a syntax tree from the input string.
+ *
+ * @param str   null terminated ASCII to parse
+ * @return      corresponding lisp syntax tree
+ */
 struct Object* read_string(char* str) {
     if(str == NULL || str[0] == '\0') {
         return NULL;
@@ -326,6 +369,12 @@ struct Object* read_string(char* str) {
     return tree_list->obj;
 }
 
+/**
+ * Builds a syntax tree from text file.
+ *
+ * @param filename  path to a plain text file containing lisp code
+ * @return          corresponding lisp syntax tree
+ */
 struct Object* read_module(char* filename) {
     file = fopen(filename, "r");
     if(file == NULL) {
@@ -333,25 +382,27 @@ struct Object* read_module(char* filename) {
         return NULL;
     }
 
-    end_of_input = 0;
-
+    // allocate temporary buffers
     buffer_a = malloc(sizeof(char) * BUFFER_SIZE);
     buffer_b = malloc(sizeof(char) * BUFFER_SIZE);
+
+    // set up global variables for parsing
     buffer = buffer_a;
     end_of_file = 0;
+    end_of_input = 0;
 
+    // initial read from file
     length = fread(buffer, sizeof(char), BUFFER_SIZE - 1, file);
     buffer[length] = '\0';
 
     struct Object* tree = list_init();
-    gc_insert_object(tree);
     while(!end_of_input) {
         read_form(tree);
     }
 
-    fclose(file);
     free(buffer_a);
     free(buffer_b);
+    fclose(file);
     file = NULL;
     return tree;
 }

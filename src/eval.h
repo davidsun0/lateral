@@ -9,6 +9,7 @@ enum mode {
     eval_exe,
     apply_exe,
     macro_exe,
+    result_exe,
     unknown
 };
 
@@ -23,6 +24,7 @@ struct StackFrame {
 };
 
 extern struct StackFrame* stack;
+struct Envir* test;
 
 void stack_print();
 struct Object* lat_evaluate(struct Envir*, struct Object*);

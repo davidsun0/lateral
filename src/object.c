@@ -160,7 +160,7 @@ void object_free(struct Object* obj) {
             break;
 
         case c_fn:
-            // printf("warning: freeing function defined in c\n");
+            printf("warning: freeing function defined in c\n");
             break;
         case nil:
         case true:
@@ -184,18 +184,6 @@ void object_free(struct Object* obj) {
         }
     } else if(func_type == obj->type || macro_type == obj->type) {
         printf("freeing function / macro\n");
-        /*
-        struct List* list = ((struct Func*) obj->data.ptr)->args;
-        if(list != NULL) {
-            struct List* next = list->next;
-            while(list != NULL) {
-                free(list);
-                list = next;
-                if(next != NULL)
-                    next = next->next;
-            }
-        }
-        */
         free(obj->data.ptr);
     }
     free(obj);
@@ -257,6 +245,10 @@ void object_print_string(struct Object* obj) {
             }
         }
         printf(")");
+    } else if(true_obj == obj) {
+        printf("t");
+    } else if(nil_obj == obj) {
+        printf("nil");
     } else if(string == obj->type || symbol == obj->type) {
         // string based types
         printf("%s", (char*) obj->data.ptr);
@@ -270,10 +262,6 @@ void object_print_string(struct Object* obj) {
         printf("fn<%p>", obj->data.ptr);
     } else if(macro_type == obj->type) {
         printf("macro<%p>", obj->data.ptr);
-    } else if(true_obj == obj) {
-        printf("true");
-    } else if(nil_obj == obj) {
-        printf("nil");
     } else {
         printf("%p", obj->data.ptr);
     }

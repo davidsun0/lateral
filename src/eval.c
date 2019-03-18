@@ -3,6 +3,7 @@
 
 #include "lang.h"
 #include "list.h"
+#include "env.h"
 
 #include "eval.h"
 
@@ -31,14 +32,12 @@ static void stack_pop() {
         return;
     }
 
-    if(stack->prev == NULL) {
-        stack->expr = NULL;
-    } else {
+    if(stack->prev != NULL) {
         stack->prev->ret = stack->ret;
-        struct StackFrame* old_frame = stack;
-        stack = stack->prev;
-        free(old_frame);
     }
+    struct StackFrame* old_frame = stack;
+    stack = stack->prev;
+    free(old_frame);
 }
 
 static void stack_destroy() {
@@ -136,8 +135,10 @@ static int special_form() {
 static void eval() {
     if(stack->working == NULL) {
         if(list_is_empty(stack->expr->data.ptr)) {
-            // empty list evaluates to itself
-            stack->ret = stack->expr;
+            // empty list evaluates to nil
+            stack->ret = nil_obj;
+            stack_pop();
+            // pop underlying apply stack frame
             stack_pop();
         } else {
             // create a evaluated version of stack->expr
@@ -188,11 +189,9 @@ static void apply() {
         stack->exe_mode = eval_exe;
     } else {
         if(stack->ret->type != list_type) {
-            /*
-            printf("error: apply expected list type, but got ");
+            printf("warning: apply expected list type, but got ");
             object_print_type(stack->ret->type);
             printf("\n");
-            */
             stack_pop();
             return;
         }
@@ -226,9 +225,13 @@ static void apply() {
 
 struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
     curr_env = envir;
+    // stack frame to collect the result
+    stack_push(NULL);
+    stack->exe_mode = result_exe;
+    // stack frame with starting expression
     stack_push(ast);
     stack->exe_mode = apply_exe;
-    while(!(stack->prev == NULL && stack->expr == NULL)) {
+    while(!(stack->exe_mode == result_exe && stack->ret != NULL)) {
         if(stack->expr->type == symbol) {
             if(stack->ret != NULL) {
                 printf("warning: stack result is non null while evaluating sym\n");
@@ -253,8 +256,12 @@ struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
             } else if(stack->exe_mode == apply_exe) {
                 apply();
             } else if(stack->exe_mode == macro_exe) {
-                // stack_print();
+                // macro execution begins in eval
+                // pop macro's temporary environment
+                envir_pop();
+                // pop eval turned macro stack frame
                 stack_pop();
+                // pop underlying apply stack frame
                 stack_pop();
             } else {
                 printf("fatal: unknown execution mode %d\n", stack->exe_mode);
@@ -265,7 +272,6 @@ struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
         }
     }
     struct Object* output = stack->ret;
-    free(stack);
-    stack = NULL;
+    stack_pop();
     return output;
 }

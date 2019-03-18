@@ -10,6 +10,7 @@
 
 struct Envir* global_env;
 struct Envir* user_env;
+extern struct Envir* curr_env;
 
 struct Object* true_obj;
 struct Object* nil_obj;
@@ -100,15 +101,31 @@ struct Object* lat_list(struct List* args) {
     return output;
 }
 
+struct Object* lat_equals_value(struct List* args) {
+    if(args == NULL || args->obj == NULL) {
+        return nil_obj;
+    } else {
+        struct Object* first = args->obj;
+        while(args != NULL) {
+            if(object_equals_value(first, args->obj)) {
+                args = args->next;
+            } else {
+                return nil_obj;
+            }
+        }
+        return true_obj;
+    }
+}
+
 struct Object* lat_equals(struct List* args) {
     if(args == NULL || args->obj == NULL) {
         return nil_obj;
     } else {
         struct Object* first = args->obj;
-        struct List* node = args->next;
-        while(node != NULL) {
-            if(object_equals_value(first, node->obj)) {
-                node = node->next;
+        args = args->next;
+        while(args != NULL) {
+            if(args->obj == first) {
+                args = args->next;
             } else {
                 return nil_obj;
             }
@@ -135,7 +152,7 @@ struct Object* lat_eval(struct List* args) {
         printf("error: eval expects one argument\n");
         return NULL;
     }
-    struct Object* output = lat_evaluate(user_env, args->obj);
+    struct Object* output = lat_evaluate(curr_env, args->obj);
     return output;
 }
 
@@ -170,6 +187,7 @@ struct Object* lat_plus(struct List* args) {
     data.int_type = value;
     return object_init(int_type, data);
 }
+
 void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
     union Data data;
     data.fn_ptr = fn_ptr;
@@ -182,8 +200,12 @@ void env_init() {
 
     union Data temp;
     temp.ptr = NULL;
+    /*
     true_obj = object_init(true, temp);
     nil_obj = object_init(nil, temp);
+    */
+    true_obj = object_init(symbol, temp);
+    nil_obj = object_init(symbol, temp);
     envir_set(global_env, "t", true_obj);
     envir_set(global_env, "nil", nil_obj);
 
@@ -196,7 +218,8 @@ void env_init() {
     envir_insert_cfn(&lat_print, "print");
 
     envir_insert_cfn(&lat_plus, "+");
-    envir_insert_cfn(&lat_equals, "=");
+    envir_insert_cfn(&lat_equals, "eq");
+    envir_insert_cfn(&lat_equals_value, "=");
 
     /*
     struct Object* tree = read_module("./core.lisp");
