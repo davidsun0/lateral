@@ -4,6 +4,7 @@
 #include "lang.h"
 #include "list.h"
 #include "env.h"
+#include "error.h"
 
 #include "eval.h"
 
@@ -238,10 +239,7 @@ struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
             }
             stack->ret = envir_search(curr_env, stack->expr->data.ptr);
             if(stack->ret == NULL) {
-                printf("error: symbol ");
-                object_print_string(stack->expr);
-                printf(" not found\n");
-                stack_destroy();
+                stack->ret = error_init();
             }
             stack_pop();
         } else if(stack->expr->type != list_type) {

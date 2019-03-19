@@ -5,13 +5,13 @@ struct List;
 
 enum object_type {
     symbol,
-    nil, true,
     char_type, string,
     int_type, float_type,
     list_type,
     c_fn,                           // pointer to function defined in C
     func_type,                      // lisp function
-    macro_type
+    macro_type,
+    error_type
 };
 
 struct Func {
@@ -25,6 +25,7 @@ union Data {
     struct Object* (*fn_ptr)(struct List*);
     char char_type;
     int int_type;
+    float float_type;
 };
 
 struct Object {

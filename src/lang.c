@@ -7,6 +7,7 @@
 #include "reader.h"
 #include "env.h"
 #include "eval.h"
+#include "error.h"
 
 struct Envir* global_env;
 struct Envir* user_env;
@@ -141,6 +142,7 @@ struct Object* lat_read(struct List* args) {
     }
     struct Object* output = read_string(args->obj->data.ptr);
     if(output == NULL) {
+        printf("lat_read should not return NULL pointer\n");
         return nil_obj;
     } else {
         return output;
@@ -169,24 +171,83 @@ struct Object* lat_print(struct List* args) {
 }
 
 struct Object* lat_plus(struct List* args) {
-    if(args->obj == NULL) {
+    if(args == NULL) {
         printf("error: wrong number of arguments to +\n");
-        // TODO: error checking
-        return NULL;
+        return error_init();
     }
     int value = 0;
+    float fvalue = 0;
+    int is_float = 0;
     while(args != NULL) {
-        if(args->obj != NULL && args->obj->type != int_type) {
+        if(args->obj != NULL &&
+                args->obj->type != int_type &&
+                args->obj->type != float_type) {
             printf("error: wrong type of argument to +, expected int\n");
-            return NULL;
+            return error_init();
+        } else if(args->obj->type == float_type && !is_float) {
+            is_float = 1;
+            fvalue = value;
         }
-        value += args->obj->data.int_type;
+
+        if(is_float) {
+            if(args->obj->type == float_type)
+                fvalue += args->obj->data.float_type;
+            else
+                fvalue += args->obj->data.int_type;
+        } else {
+            value += args->obj->data.int_type;
+        }
         args = args->next;
     }
     union Data data;
-    data.int_type = value;
-    return object_init(int_type, data);
+    if(is_float) {
+        data.float_type = fvalue;
+        return object_init(float_type, data);
+    } else {
+        data.int_type = value;
+        return object_init(int_type, data);
+    }
 }
+
+struct Object* lat_mult(struct List* args) {
+    if(args == NULL) {
+        printf("error: wrong number of arguments to *\n");
+        return error_init();
+    }
+    int value = 1;
+    float fvalue = 0;
+    int is_float = 0;
+    while(args != NULL) {
+        if(args->obj != NULL &&
+                args->obj->type != int_type &&
+                args->obj->type != float_type) {
+            printf("error: wrong type of argument to *, expected int\n");
+            return error_init();
+        } else if(args->obj->type == float_type && !is_float) {
+            is_float = 1;
+            fvalue = value;
+        }
+
+        if(is_float) {
+            if(args->obj->type == float_type)
+                fvalue *= args->obj->data.float_type;
+            else
+                fvalue *= args->obj->data.int_type;
+        } else {
+            value *= args->obj->data.int_type;
+        }
+        args = args->next;
+    }
+    union Data data;
+    if(is_float) {
+        data.float_type = fvalue;
+        return object_init(float_type, data);
+    } else {
+        data.int_type = value;
+        return object_init(int_type, data);
+    }
+}
+
 
 void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
     union Data data;
@@ -200,10 +261,6 @@ void env_init() {
 
     union Data temp;
     temp.ptr = NULL;
-    /*
-    true_obj = object_init(true, temp);
-    nil_obj = object_init(nil, temp);
-    */
     true_obj = object_init(symbol, temp);
     nil_obj = object_init(symbol, temp);
     envir_set(global_env, "t", true_obj);
@@ -218,6 +275,7 @@ void env_init() {
     envir_insert_cfn(&lat_print, "print");
 
     envir_insert_cfn(&lat_plus, "+");
+    envir_insert_cfn(&lat_mult, "*");
     envir_insert_cfn(&lat_equals, "eq");
     envir_insert_cfn(&lat_equals_value, "=");
 

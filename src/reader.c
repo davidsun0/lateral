@@ -5,6 +5,7 @@
 #include "object.h"
 #include "list.h"
 #include "garbage.h"
+#include "error.h"
 
 #include "reader.h"
 
@@ -75,7 +76,7 @@ static struct Object* read_make_token(int len) {
  * upon EOF.
  */
 static void read_inc() {
-    if(offset < length - 1) {
+    if(offset < length - 2) {
         offset ++;
     } else if(file != NULL && !end_of_file) {
         char* next_buffer = buffer == buffer_a ? buffer_b : buffer_a;
@@ -185,6 +186,59 @@ static struct Object* read_next_token() {
     return result;
 }
 
+struct Object* parse_number(struct Object* str) {
+    if(str->type == char_type) {
+        union Data data;
+        data.int_type = str->data.char_type - '0';
+        return object_init(int_type, data);
+    } else if(str->type != string) {
+        printf("error: can only parse number from char or string\n");
+        return error_init();
+    }
+
+    char* dat = str->data.ptr;
+    union Data data;
+    // parse integer
+    int int_value = 0;
+    int negative = 0;
+    if(dat[0] == '-') {
+        negative = 1;
+        dat ++;
+    }
+    while(*dat != '\0') {
+        if(*dat == '.') {
+            float float_value = int_value;
+            dat ++;
+            float power = 0.1;
+            while('0' <= *dat && *dat <= '9') {
+                float_value += power * (*dat - '0');
+                dat ++;
+                power = power / 10.0;
+            }
+            if(*dat != '\0') {
+                printf("error: failed to parse number\n");
+                return error_init();
+            }
+            if(negative)
+                float_value *= -1;
+            data.float_type = float_value;
+            return object_init(float_type, data);
+        } else if(*dat < '0' || '9' < *dat) {
+            printf("error: failed to parse integer\n");
+            return error_init();
+        }
+
+        int_value *= 10;
+        int_value += *dat - '0';
+        dat ++;
+    }
+
+    if(negative)
+        int_value *= -1;
+    data.int_type = int_value;
+    return object_init(int_type, data);
+}
+
 /**
  * Creates a new object from a token parsed as the appropriate datatype.
  *
@@ -238,29 +292,7 @@ static struct Object* read_make_atom(struct Object* obj) {
         type = string;
         data.ptr = str;
     } else if (dat[0] == '-' || ('0' <= dat[0] && dat[0] <= '9')) {
-        // parse integer
-        // TODO: float parsing
-        int value = 0;
-        int negative = 0;
-        if(dat[0] == '-') {
-            negative = 1;
-            dat ++;
-        }
-        while(*dat != '\0') {
-            if(*dat < '0' || '9' < *dat) {
-                //TODO: abort syntax tree building
-                printf("error: failed to parse integer\n");
-                break;
-            }
-            value *= 10;
-            value += *dat - '0';
-            dat ++;
-        }
-        if(negative) {
-            value = -1 * value;
-        }
-        type = int_type;
-        data.int_type = value;
+        return parse_number(obj);
     } else {
         // parse symbols
         int length = strlen(dat);
@@ -362,7 +394,7 @@ struct Object* read_string(char* str) {
     read_form(tree);
     if(length - offset > 1) {
         printf("error: unexpected token(s) %s\n", buffer + offset);
-        return NULL;
+        return error_init();
     }
     struct List* tree_list = (struct List*) tree->data.ptr;
 

@@ -9,6 +9,9 @@ enum error_type {
 struct Error {
     char* message;
     enum error_type type;
+    int freeable;
 };
+
+struct Object* error_init();
 
 #endif

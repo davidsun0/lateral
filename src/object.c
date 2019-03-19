@@ -43,7 +43,10 @@ struct Object* object_copy(struct Object* obj) {
 
     struct Object* source = obj;
     struct Object* output = object_init_type(source->type);
-    if(source->type == char_type || source->type == int_type || source->type == c_fn) {
+    if(source->type == char_type ||
+            source->type == float_type ||
+            source->type == int_type ||
+            source->type == c_fn) {
         // direct copy
         output->data = obj->data;
     } else if(source->type == symbol || source->type == string) {
@@ -68,8 +71,32 @@ struct Object* object_copy(struct Object* obj) {
     return output;
 }
 
-void object_copy2(struct Object** dest, struct Object* obj) {
+void object_copy2(struct Object** dest, struct Object* src) {
+    if(src == NULL) {
+        *dest = NULL;
+    } else if(src == true_obj || src == nil_obj) {
+        *dest = src;
+    }
 
+    *dest = object_init_type(src->type);
+    if(src->type == char_type || src->type == int_type || src->type == c_fn) {
+        (*dest)->data = src->data;
+    } else if(src->type == symbol || src->type == string) {
+        int length = strlen(src->data.ptr);
+        char* str = malloc(sizeof(char) * (length + 1));
+        strcpy(str, src->data.ptr);
+        (*dest)->data.ptr = str;
+    } else if(src->type == list_type) {
+        (*dest)->data.ptr = list_bare_init();
+        struct List* dest_lst = (*dest)->data.ptr;
+        struct List* src_lst = src->data.ptr;
+        while(src_lst != NULL) {
+            dest_lst = list_bare_append(dest_lst, src_lst->obj);
+            src_lst = src_lst->next;
+        }
+    } else if(src->type == func_type || src->type == macro_type) {
+        printf("implement object_copy for functions\n");
+    }
 }
 
 int object_equals_char(struct Object* obj, char c) {
@@ -120,6 +147,8 @@ int object_equals_value(struct Object* a, struct Object* b) {
 
     if(int_type == a->type) {
         return a->data.int_type == b->data.int_type ? 1 : 0;
+    } else if(float_type == a->type) {
+        return a->data.float_type == b->data.float_type ? 1 : 0;
     } else if(char_type == a->type) {
         return a->data.char_type == b->data.char_type ? 1 : 0;
     } else if(symbol == a->type || string == a->type) {
@@ -161,10 +190,6 @@ void object_free(struct Object* obj) {
 
         case c_fn:
             printf("warning: freeing function defined in c\n");
-            break;
-        case nil:
-        case true:
-            printf("warning: freeing language critical object\n");
             break;
         default:
             break;
@@ -218,12 +243,6 @@ void object_print_type(enum object_type type) {
         case macro_type:
             printf("macro");
             break;
-        case nil:
-            printf("nil");
-            break;
-        case true:
-            printf("true");
-            break;
         default:
             printf("unknown type");
     }
@@ -256,12 +275,16 @@ void object_print_string(struct Object* obj) {
         printf("%c", obj->data.char_type);
     } else if(int_type == obj->type) {
         printf("%d", obj->data.int_type);
+    } else if(float_type == obj->type) {
+        printf("%f", obj->data.float_type);
     } else if(c_fn == obj->type) {
         printf("c_fn<%p>", obj->data.ptr);
     } else if(func_type == obj->type) {
         printf("fn<%p>", obj->data.ptr);
     } else if(macro_type == obj->type) {
         printf("macro<%p>", obj->data.ptr);
+    } else if(error_type == obj->type) {
+        printf("error");
     } else {
         printf("%p", obj->data.ptr);
     }

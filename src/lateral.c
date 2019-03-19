@@ -25,7 +25,7 @@ static void lat_repl() {
         struct Object* input = read_string(input_str);
         free(input_str);
         // error parsing; read again
-        if(input == NULL) {
+        if(input == NULL || input->type == error_type) {
             continue;
         }
 
