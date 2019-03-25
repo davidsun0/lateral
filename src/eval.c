@@ -127,6 +127,19 @@ static int special_form() {
         fn->args = object_copy(expr->obj);
         fn->expr = object_copy(expr->next->obj);
         stack_pop();
+    } else if(object_equals_symbol(form, "if")) {
+        if(stack->ret == NULL) {
+            stack_push(expr->obj);
+            stack->exe_mode = apply_exe;
+        } else {
+            if(stack->ret != nil_obj) {
+                stack->expr = expr->next->obj;
+            } else {
+                stack->expr = expr->next->next->obj;
+            }
+            stack->exe_mode = apply_exe;
+            stack->ret = NULL;
+        }
     } else {
         return 0;
     }
@@ -219,7 +232,7 @@ static void apply() {
             printf("error: symbol ");
             object_print_string(func);
             printf(" is not a function\n");
-            stack_destroy();
+            stack->ret = error_init();
         }
     }
 }

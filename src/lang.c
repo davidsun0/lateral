@@ -103,10 +103,11 @@ struct Object* lat_list(struct List* args) {
 }
 
 struct Object* lat_equals_value(struct List* args) {
-    if(args == NULL || args->obj == NULL) {
-        return nil_obj;
+    if(args == NULL || args->next == NULL) {
+        return error_init();
     } else {
         struct Object* first = args->obj;
+        args = args->next;
         while(args != NULL) {
             if(object_equals_value(first, args->obj)) {
                 args = args->next;
@@ -119,8 +120,8 @@ struct Object* lat_equals_value(struct List* args) {
 }
 
 struct Object* lat_equals(struct List* args) {
-    if(args == NULL || args->obj == NULL) {
-        return nil_obj;
+    if(args == NULL || args->next == NULL) {
+        return error_init();
     } else {
         struct Object* first = args->obj;
         args = args->next;
@@ -160,7 +161,7 @@ struct Object* lat_eval(struct List* args) {
 
 struct Object* lat_print(struct List* args) {
     while(args != NULL) {
-        object_print_string(args->obj);
+        object_print_pretty(args->obj);
         args = args->next;
         if(args != NULL) {
             printf(" ");

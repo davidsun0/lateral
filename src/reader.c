@@ -187,7 +187,7 @@ static struct Object* read_next_token() {
 }
 
 struct Object* parse_number(struct Object* str) {
-    if(str->type == char_type) {
+    if(str->type == char_type && str->data.char_type != '.') {
         union Data data;
         data.int_type = str->data.char_type - '0';
         return object_init(int_type, data);
@@ -291,7 +291,8 @@ static struct Object* read_make_atom(struct Object* obj) {
         str[j] = '\0';
         type = string;
         data.ptr = str;
-    } else if (dat[0] == '-' || ('0' <= dat[0] && dat[0] <= '9')) {
+    } else if (dat[0] == '-' || dat[0] == '.' ||
+            ('0' <= dat[0] && dat[0] <= '9')) {
         return parse_number(obj);
     } else {
         // parse symbols

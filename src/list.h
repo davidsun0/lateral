@@ -27,6 +27,5 @@ int list_length(struct Object*);
 int list_bare_length(struct List*);
 
 int list_is_empty(struct List*);
-void list_print(struct List*, int);
 
 #endif

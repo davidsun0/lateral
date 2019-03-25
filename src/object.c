@@ -243,9 +243,32 @@ void object_print_type(enum object_type type) {
         case macro_type:
             printf("macro");
             break;
+        case error_type:
+            printf("error");
+            break;
         default:
             printf("unknown type");
     }
+}
+
+static void print_literal(struct Object* obj) {
+    char* str = (char*) obj->data.ptr;
+    if(obj->type == string)
+        printf("\"");
+    while(*str != '\0') {
+        if(*str == '\n') {
+            printf("\\n");
+        } else if( *str == '\t') {
+            printf("\\t");
+        } else if(*str == '\r') {
+            printf("\\r");
+        } else {
+            printf("%c", *str);
+        }
+        str ++;
+    }
+    if(obj->type == string)
+        printf("\"");
 }
 
 void object_print_string(struct Object* obj) {
@@ -270,7 +293,8 @@ void object_print_string(struct Object* obj) {
         printf("nil");
     } else if(string == obj->type || symbol == obj->type) {
         // string based types
-        printf("%s", (char*) obj->data.ptr);
+        // printf("\"%s\"", (char*) obj->data.ptr);
+        print_literal(obj);
     } else if(char_type == obj->type) {
         printf("%c", obj->data.char_type);
     } else if(int_type == obj->type) {
@@ -290,7 +314,15 @@ void object_print_string(struct Object* obj) {
     }
 }
 
-void object_print_debug(struct Object* obj, int indent) {
+void object_print_pretty(struct Object* obj) {
+    if(obj->type != string) {
+        object_print_string(obj);
+    } else {
+        printf("%s", (char*) obj->data.ptr);
+    }
+}
+
+static void object_print_debug(struct Object* obj, int indent) {
     for(int i = 0; i < indent; i ++) {
         printf("  ");
     }
@@ -333,7 +365,17 @@ void object_print_debug(struct Object* obj, int indent) {
             break;
         case list_type:
             printf("data:\n");
-            list_print(obj->data.ptr, indent + 1);
+            object_print_debug(obj->data.ptr, indent + 1);
+            indent ++;
+            struct List* list = (struct List*) obj->data.ptr;
+            while(list != NULL) {
+                for(int i = 0; i < indent; i ++) {
+                    printf("  ");
+                }
+                printf("node addr: %p\n", (void *) list);
+                object_print_debug(list->obj, indent + 1);
+                list = list->next;
+            }
             break;
         default:
             printf("data: %p\n", obj->data.ptr);
