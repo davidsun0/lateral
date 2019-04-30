@@ -188,12 +188,12 @@ static struct Object* read_next_token() {
 
 struct Object* parse_number(struct Object* str) {
     if(str->type == char_type && str->data.char_type != '.') {
-        union Data data;
-        data.int_type = str->data.char_type - '0';
+        // single digit numbers
+        union Data data = { .int_type = str->data.char_type - '0' };
         return object_init(int_type, data);
     } else if(str->type != string) {
         printf("error: can only parse number from char or string\n");
-        return error_init();
+        return error_init_bare();
     }
 
     char* dat = str->data.ptr;
@@ -217,7 +217,7 @@ struct Object* parse_number(struct Object* str) {
             }
             if(*dat != '\0') {
                 printf("error: failed to parse number\n");
-                return error_init();
+                return error_init_bare();
             }
             if(negative)
                 float_value *= -1;
@@ -225,7 +225,7 @@ struct Object* parse_number(struct Object* str) {
             return object_init(float_type, data);
         } else if(*dat < '0' || '9' < *dat) {
             printf("error: failed to parse integer\n");
-            return error_init();
+            return error_init_bare();
         }
 
         int_value *= 10;
@@ -339,8 +339,7 @@ static int read_form(struct Object* tree) {
         } else {
             strcpy(sym_str, "unquote-splicing");
         }
-        union Data data;
-        data.ptr = sym_str;
+        union Data data = { .ptr = sym_str };
         list_append(list, symbol, data);
 
         read_form(list);
@@ -395,7 +394,7 @@ struct Object* read_string(char* str) {
     read_form(tree);
     if(length - offset > 1) {
         printf("error: unexpected token(s) %s\n", buffer + offset);
-        return error_init();
+        return error_init_bare();
     }
     struct List* tree_list = (struct List*) tree->data.ptr;
 

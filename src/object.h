@@ -50,6 +50,7 @@ void object_free(struct Object*);
 void object_print_type(enum object_type);
 void object_print_string(struct Object*);
 void object_print_pretty(struct Object*);
+void object_print_debug(struct Object*, int);
 void object_debug(struct Object*);
 
 void object_mark(struct Object*);

@@ -104,7 +104,7 @@ struct Object* lat_list(struct List* args) {
 
 struct Object* lat_equals_value(struct List* args) {
     if(args == NULL || args->next == NULL) {
-        return error_init();
+        return error_init(arg_err, "function requires at least two arguments");
     } else {
         struct Object* first = args->obj;
         args = args->next;
@@ -121,7 +121,7 @@ struct Object* lat_equals_value(struct List* args) {
 
 struct Object* lat_equals(struct List* args) {
     if(args == NULL || args->next == NULL) {
-        return error_init();
+        return error_init(arg_err, "function requires at least two arguments");
     } else {
         struct Object* first = args->obj;
         args = args->next;
@@ -174,7 +174,7 @@ struct Object* lat_print(struct List* args) {
 struct Object* lat_plus(struct List* args) {
     if(args == NULL) {
         printf("error: wrong number of arguments to +\n");
-        return error_init();
+        return error_init(arg_err, "function requires at least one argument");
     }
     int value = 0;
     float fvalue = 0;
@@ -184,7 +184,7 @@ struct Object* lat_plus(struct List* args) {
                 args->obj->type != int_type &&
                 args->obj->type != float_type) {
             printf("error: wrong type of argument to +, expected int\n");
-            return error_init();
+            return error_init(type_err, "function expects numeric arguments");
         } else if(args->obj->type == float_type && !is_float) {
             is_float = 1;
             fvalue = value;
@@ -213,7 +213,7 @@ struct Object* lat_plus(struct List* args) {
 struct Object* lat_mult(struct List* args) {
     if(args == NULL) {
         printf("error: wrong number of arguments to *\n");
-        return error_init();
+        return error_init_bare();
     }
     int value = 1;
     float fvalue = 0;
@@ -223,7 +223,7 @@ struct Object* lat_mult(struct List* args) {
                 args->obj->type != int_type &&
                 args->obj->type != float_type) {
             printf("error: wrong type of argument to *, expected int\n");
-            return error_init();
+            return error_init_bare();
         } else if(args->obj->type == float_type && !is_float) {
             is_float = 1;
             fvalue = value;
@@ -251,8 +251,7 @@ struct Object* lat_mult(struct List* args) {
 
 
 void envir_insert_cfn(struct Object* (*fn_ptr)(struct List*), char* name) {
-    union Data data;
-    data.fn_ptr = fn_ptr;
+    union Data data = { .fn_ptr = fn_ptr };
     struct Object* fn = object_init(c_fn, data);
     envir_set(global_env, name, fn);
 }

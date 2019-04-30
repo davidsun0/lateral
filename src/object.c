@@ -5,6 +5,7 @@
 #include "list.h"
 #include "lang.h"
 #include "garbage.h"
+#include "error.h"
 
 #include "object.h"
 
@@ -12,8 +13,8 @@ struct Object* object_init_type(enum object_type type) {
     struct Object* obj = malloc(sizeof(struct Object));
     obj->type = type;
     obj->data.ptr = NULL;
-    gc_insert_object(obj);
     obj->marked = 0;
+    gc_insert_object(obj);
     return obj;
 }
 
@@ -21,16 +22,15 @@ struct Object* object_init(enum object_type type, union Data data) {
     struct Object* obj = malloc(sizeof(struct Object));
     obj->type = type;
     obj->data = data;
-    gc_insert_object(obj);
     obj->marked = 0;
+    gc_insert_object(obj);
     return obj;
 }
 
 struct Object* object_symbol_init(char* str) {
     char* str_copy = malloc(sizeof(char) * (strlen(str) + 1));
     strcpy(str_copy, str);
-    union Data data;
-    data.ptr = str_copy;
+    union Data data = { .ptr = str_copy };
     return object_init(symbol, data);
 }
 
@@ -308,7 +308,8 @@ void object_print_string(struct Object* obj) {
     } else if(macro_type == obj->type) {
         printf("macro<%p>", obj->data.ptr);
     } else if(error_type == obj->type) {
-        printf("error");
+        struct Error* err = obj->data.ptr;
+        printf("%d error: %s", err->type, err->message);
     } else {
         printf("%p", obj->data.ptr);
     }
@@ -322,7 +323,7 @@ void object_print_pretty(struct Object* obj) {
     }
 }
 
-static void object_print_debug(struct Object* obj, int indent) {
+void object_print_debug(struct Object* obj, int indent) {
     for(int i = 0; i < indent; i ++) {
         printf("  ");
     }

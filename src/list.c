@@ -166,3 +166,26 @@ int list_is_empty(struct List* list) {
         return 0;
     }
 }
+
+void list_debug0(struct List* list, int indent) {
+    while(list != NULL) {
+        for(int i = 0; i < indent; i ++) {
+            printf("  ");
+        }
+
+        printf("node addr: %p\n", (void *) list);
+        if(list->obj != NULL) {
+            object_print_debug(list->obj, indent + 1);
+        } else {
+            for(int i = 0; i < indent; i ++) {
+                printf("  ");
+            }
+            printf("node has null object");
+        }
+        list = list->next;
+    }
+}
+
+void list_debug(struct List* list) {
+    list_debug0(list, 0);
+}
