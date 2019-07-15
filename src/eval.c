@@ -171,6 +171,16 @@ static int special_form() {
             envir_set(curr_env, sym->data.ptr, val);
             stack_pop();
         }
+    } else if(object_equals_symbol(form, "do")) {
+        if(list_bare_length(expr) == stack->eval_index && stack->ret != NULL) {
+            stack_pop();
+        } else {
+            if(stack->eval_index < 0) {
+                stack->eval_index = 0;
+            }
+            stack->eval_index ++;
+            stack_push(list_get(stack->expr, stack->eval_index), apply_exe);
+        }
     } else if(object_equals_symbol(form, "fn") ||
             object_equals_symbol(form, "macro")) {
         // create a fn/macro object with the given args / ast
@@ -201,6 +211,7 @@ static int special_form() {
             stack->ret = NULL;
         }
     } else if(object_equals_symbol(form, "let")) {
+        // TODO: evaluate values, insert bindings one at a time
         // push bindings
         // evaludate body
         if(stack->ret == NULL) {
@@ -229,11 +240,11 @@ static int special_form() {
         }
     } else if(object_equals_symbol(form, "loop")) {
         // store loop body on stack
+    } else if(object_equals_symbol(form, "quasiquote")) {
+
     } else if(object_equals_symbol(form, "recur")) {
         // scan stack until loop or result frame
         // rebind and execute loop body
-    } else if(object_equals_symbol(form, "quasiquote")) {
-
     } else {
         return 0;
     }

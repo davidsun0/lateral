@@ -17,45 +17,45 @@ struct Object* true_obj;
 struct Object* nil_obj;
 
 struct Object* lat_cons(struct List* args) {
-    if(list_bare_length(args) != 2
-            || args->next->obj == NULL
-            || args->next->obj->type != list_type) {
+    if(list_bare_length(args) != 2) {
         printf("error: cons expects two arguments\n");
-        return NULL;
+        return error_init(arg_err, "cons expects two arguments");
+    } else if(args->next->obj != nil_obj &&
+            args->next->obj->type != list_type) {
+        printf("error: the second argument of cons must be a list\n");
+        return error_init(type_err, "the second argument of cons must be a list");
     }
-    struct Object* output = list_init();
-    struct Object* copy = object_copy(args->obj);
-    list_append_object(output, copy);
-    struct Object* list_obj = args->next->obj;
-    struct List* list = list_obj->data.ptr;
-    while(list != NULL) {
-        if(list->obj != NULL) {
-            struct Object* node = object_copy(list->obj);
-            list_append_object(output, node);
-        }
-        list = list->next;
+
+    struct Object* output;
+    // TODO: check for empty list?
+    if(args->next->obj == nil_obj) {
+        output = list_init();
+    } else {
+        output = object_copy(args->next->obj);
     }
+
+    list_prepend_object(output, args->obj);
     return output;
 }
 
 struct Object* lat_first(struct List* args) {
-    if(args->obj == NULL || args->next != NULL) {
+    if(args->obj == NULL || args->next != NULL ||
+            args->obj->type != list_type) {
         printf("error in 'first'\n");
-        return NULL;
+        return error_init_bare();
     }
+    /*
     struct Object* obj = args->obj;
-    if(obj->type == list_type) {
-        struct List* list = obj->data.ptr;
-        return list->obj;
-    } else {
-        return nil_obj;
-    }
+    struct List* list = obj->data.ptr;
+    return list->obj;
+    */
+    return ((struct List*)args->obj->data.ptr)->obj;
 }
 
 struct Object* lat_rest(struct List* args) {
     if(args->obj == NULL || args->next != NULL) {
         printf("error in 'rest'\n");
-        return NULL;
+        return error_init_bare();
     }
     struct Object* obj = args->obj;
     if(obj->type == list_type) {
@@ -139,7 +139,7 @@ struct Object* lat_equals(struct List* args) {
 struct Object* lat_read(struct List* args) {
     if(args->obj == NULL || args->obj->type != string || args->next != NULL) {
         printf("error: read expects one string argument\n");
-        return NULL;
+        return error_init_bare();
     }
     struct Object* output = read_string(args->obj->data.ptr);
     if(output == NULL) {
@@ -153,7 +153,7 @@ struct Object* lat_read(struct List* args) {
 struct Object* lat_eval(struct List* args) {
     if(args->obj == NULL || args->next != NULL) {
         printf("error: eval expects one argument\n");
-        return NULL;
+        return error_init_bare();
     }
     struct Object* output = lat_evaluate(curr_env, args->obj);
     return output;
@@ -269,6 +269,8 @@ void env_init() {
     envir_insert_cfn(&lat_cons, "cons");
     envir_insert_cfn(&lat_concat, "concat");
     envir_insert_cfn(&lat_list, "list");
+    envir_insert_cfn(&lat_first, "first");
+    envir_insert_cfn(&lat_rest, "rest");
 
     envir_insert_cfn(&lat_read, "read");
     envir_insert_cfn(&lat_eval, "eval");

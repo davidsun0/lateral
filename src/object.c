@@ -189,7 +189,7 @@ void object_free(struct Object* obj) {
             break;
 
         case c_fn:
-            printf("warning: freeing function defined in c\n");
+            printf("warning: attemtped to free function defined in c\n");
             break;
         default:
             break;
