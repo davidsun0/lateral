@@ -6,19 +6,43 @@
 
 #include "core.h"
 
-Object *sum(List *list) {
+Object *la_sum(List *list) {
     int sum = 0;
     while(list != NULL) {
         Object *obj = list->obj;
         if(obj->type == intt) {
             sum += obj->data.int_val;
         } else {
-            // error
+            return err_init("type error");
         }
         list = list->next;
     }
     union Data dat = { .int_val = sum };
     return obj_init(intt, dat);
+}
+
+Object *la_is_nil(List *list) {
+    if(list->obj == nil_obj) {
+        return tru_obj;
+    } else {
+        return nil_obj;
+    }
+}
+
+Object *la_list(List *list) {
+    List *lista = list_init();
+    List *listb = lista;
+    while(list != NULL) {
+        listb = list_append(listb, list->obj);
+        list = list->next;
+    }
+    union Data dat = { .ptr = lista };
+    return obj_init(listt, dat);
+}
+
+Object *la_debug(List *list) {
+    obj_debug(list->obj);
+    return nil_obj;
 }
 
 void insert_function(char *name, Object *(fn_ptr)(List *)) {
@@ -31,5 +55,15 @@ void insert_function(char *name, Object *(fn_ptr)(List *)) {
 }
 
 void lang_init() {
-    insert_function("+", sum);
+    union Data dat = { .int_val = 0 };
+    tru_obj = obj_init(intt, dat);
+    nil_obj = obj_init(intt, dat);
+
+    envir_set_str(curr_envir, "t", tru_obj);
+    envir_set_str(curr_envir, "nil", nil_obj);
+
+    insert_function("+", la_sum);
+    insert_function("nil?", la_is_nil);
+    insert_function("list", la_list);
+    insert_function("debug", la_debug);
 }

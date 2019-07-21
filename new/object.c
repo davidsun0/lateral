@@ -5,6 +5,7 @@
 #include "list.h"
 #include "hash.h"
 #include "reader.h"
+#include "core.h"
 
 #include "object.h"
 
@@ -99,6 +100,14 @@ int obj_eq_sym(Object *obj, char *str) {
 }
 
 void obj_print(Object *obj) {
+    if(obj == nil_obj) {
+        printf("nil");
+        return;
+    } else if(obj == tru_obj) {
+        printf("t");
+        return;
+    }
+
     switch(obj->type) {
         case symt:
         case strt:
@@ -128,8 +137,20 @@ void obj_print(Object *obj) {
         case fnt:
             printf("fn<%p>", obj->data.ptr);
             break;
+        case macrot:
+            printf("macro<%p>", obj->data.ptr);
+            break;
         default:
             printf("object@<%p>", (void *)obj);
+    }
+}
+
+void obj_debug0(Object *obj, int indt);
+
+void list_debug0(List *list, int indt) {
+    while(list != NULL) {
+        obj_debug0(list->obj, indt);
+        list = list->next;
     }
 }
 
@@ -138,31 +159,49 @@ void obj_debug0(Object *obj, int indt) {
         printf("  ");
     }
 
-    if(obj == NULL) {
+    if(obj == nil_obj) {
+        printf("nil");
+        return;
+    } else if(obj == tru_obj) {
+        printf("t");
+        return;
+    } else if(obj == NULL) {
         printf("NULL\n");
     } else {
         switch(obj->type) {
             case symt:
+                printf("sym: %s\n", (char *)obj->data.ptr);
+                break;
             case strt:
+                printf("str: %s\n", (char *)obj->data.ptr);
+                break;
             case errt:
-                printf("%s\n", (char *)obj->data.ptr);
+                printf("err: %s\n", (char *)obj->data.ptr);
                 break;
             case intt:
-                printf("%d\n", obj->data.int_val);
+                printf("int: %d\n", obj->data.int_val);
                 break;
             case listt:
                 printf("list<%p>\n", obj->data.ptr);
                 List *list = obj->data.ptr;
+                /*
                 while(list != NULL) {
                     obj_debug0(list->obj, indt + 1);
                     list = list->next;
                 }
+                */
+                list_debug0(list, indt + 1);
                 break;
             case natfnt:
                 printf("natfn<%p>\n", obj->data.ptr);
                 break;
             case fnt:
                 printf("fn<%p>\n", obj->data.ptr);
+                break;
+            case macrot:
+                printf("macro<%p>:\n", obj->data.ptr);
+                list_debug0(obj->data.func.args, indt + 1);
+                obj_debug0(obj->data.func.expr, indt + 1);
                 break;
             default:
                 printf("unimplemented\n");

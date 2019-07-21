@@ -39,11 +39,15 @@ int main() {
         }
 
         // eval
-        Object *result = evaluate(NULL, ast);
+        Object *result = evaluate(curr_envir, ast);
 
         // print
-        obj_print(result);
-        printf("\n");
+        if(result == NULL) {
+            printf("NULL RESULT\n");
+        } else {
+            obj_print(result);
+            printf("\n");
+        }
     }
 
     printf("\ngoodbye! ('u' )/\n");

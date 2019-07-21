@@ -44,6 +44,16 @@ List *list_append(List *list, Object *obj) {
     }
 }
 
+List *list_copy(List *list) {
+    List *new = list_init();
+    List *new2 = new;
+    while(list != NULL) {
+        new2 = list_append(new2, list->obj);
+        list = list->next;
+    }
+    return new;
+}
+
 void list_print(List *list) {
     while(list != NULL) {
         printf("%s\n", (char *)list->obj->data.ptr);

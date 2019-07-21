@@ -2,217 +2,152 @@
 #include <stdio.h>
 
 #include "object.h"
-#include "reader.h"
-#include "hash.h"
+#include "list.h"
+#include "core.h"
 
 #include "eval.h"
 
-void stack_push(Object *ast, enum mode exe) {
-    StackFrame *frame = malloc(sizeof(StackFrame));
-    frame->prev = stack;
-    frame->fn = NULL;
-    frame->in = ast;
-    frame->in_list = NULL;
-    frame->out = NULL;
-    frame->out_list = NULL;
-    frame->ret = NULL;
-    frame->exe_mode = exe;
-
-    stack = frame;
-}
-
-void stack_pop() {
-    if(stack->prev == NULL) {
-        free(stack);
-        stack = NULL;
-    } else {
-        stack->prev->ret = stack->ret;
-        StackFrame *frame = stack;
-        stack = stack->prev;
-        free(frame);
+Envir *envir_push(Envir *envir, List *args, List *vals) {
+    int sizea = list_length(args);
+    int sizeb = list_length(vals);
+    if(sizea != sizeb) {
+        printf("expected %d arguments, but got %d\n", sizea, sizeb);
+        return NULL;
     }
-}
 
-int envir_push(List *bindings, List *vals) {
-    int size = list_length(bindings);
-    int size_v = list_length(vals);
-    if(size != size_v) {
-        printf("error: wrong number of vals for bindings\n");
-        return -1;
-    }
-    Envir *envir = envir_init(size);
-    for(int i = 0; i < size; i ++) {
-        envir_set(envir, bindings->obj, vals->obj);
-        bindings = bindings->next;
+    Envir *inner = envir_init(sizea * 2);
+    for(int i = 0; i < sizea; i ++) {
+        envir_set(inner, args->obj, vals->obj);
+        args = args->next;
         vals = vals->next;
     }
-    envir->outer = curr_envir;
-    curr_envir = envir;
+    envir->inner = inner;
+    inner->outer = envir;
+    return inner;
+}
+
+Envir *envir_pop(Envir *envir) {
+    Envir *outer = envir->outer;
+    envir_free(envir);
+    return outer;
+}
+
+int is_macro(Envir *envir, Object *ast) {
+    if(ast->type == listt) {
+        Object *fn = ((List *)ast->data.ptr)->obj;
+        if(fn->type == symt && envir_search(envir, fn) != NULL) {
+            return 1;
+        }
+    }
     return 0;
 }
 
-void envir_pop() {
-    Envir *envir = curr_envir;
-    curr_envir = curr_envir->outer;
-    envir_free(envir);
+Object *macro_expand(Envir *envir, Object *ast) {
+    while(is_macro(envir, ast)) {
+        Object *macro = envir_search(envir, ((List *)ast->data.ptr)->obj);
+        List *vals = ((List *)ast->data.ptr)->next;
+        List *args = macro->data.func.args;
+        Envir *inner = envir_push(envir, args, vals);
+        Object *expr = macro->data.func.expr;
+        ast = evaluate(inner, expr);
+        envir_pop(inner);
+    }
+    return ast;
 }
 
-void eval() {
-    Object *expr = stack->in;
-    if(expr->type == symt) {
-        // search for symbols in the environment
-        stack->ret = envir_search(curr_envir, expr);
-        if(stack->ret == NULL) {
-            char *err = la_strdup("symbol not found");
-            union Data dat = { .ptr = err };
-            stack->ret = obj_init(errt, dat);
+Object *eval_ast(Envir *envir, Object *ast) {
+    if(ast->type == symt) {
+        Object *ret = envir_search(envir, ast);
+        if(ret == NULL) {
+            ret = err_init("symbol not found in envir");
         }
-        stack_pop();
-    } else if(expr->type == listt) {
-        // return (map apply expr)
-        if(stack->out == NULL) {
-            // initialize output list
-            List *list = list_init();
-            union Data dat = { .ptr = list };
-            stack->out = obj_init(listt, dat);
-            stack->out_list = list;
-            stack->in_list = expr->data.ptr;
-            stack_push(stack->in_list->obj, apply_exe);
-            // advance working list pointer
-            // careful! just pushed a new stack frame
-            stack->prev->in_list = stack->prev->in_list->next;
-        } else {
-            // iterate across expr
-            stack->out_list = list_append(stack->out_list, stack->ret);
-            if(stack->in_list != NULL) {
-                stack_push(stack->in_list->obj, apply_exe);
-                stack->prev->in_list = stack->prev->in_list->next;
-            } else {
-                stack->ret = stack->out;
-                stack_pop();
-            }
+        return ret;
+    } else if(ast->type == listt) {
+        List *list = list_init();
+        List *list2 = list;
+        List *vals = ast->data.ptr;
+        while(vals != NULL) {
+            Object *obj = evaluate(envir, vals->obj);
+            list2 = list_append(list2, obj);
+            vals = vals->next;
         }
+        union Data dat = { .ptr = list };
+        return obj_init(listt, dat);
     } else {
-        // all other types evaluate to themselves
-        stack->ret = expr;
-        stack_pop();
-    }
-}
-
-int special_form() {
-    List *list = stack->in->data.ptr;
-    if(stack->in->type != listt || list->obj == NULL) {
-        return 0;
-    }
-
-    if(obj_eq_sym(list->obj, "fn")) {
-        list = list->next;
-        if(list->obj->type != listt) {
-            stack->ret = err_init("fn expects a list as its first arg\n");
-            stack_pop();
-            return 1;
-        }
-        List *arg_list = list->obj->data.ptr;
-        // duplicate list into function structure
-        List *args = list_init();
-        List *arg0 = args;
-        while(arg_list != NULL) {
-            arg0 = list_append(arg0, arg_list->obj);
-            arg_list = arg_list->next;
-        }
-
-        Object *expr = list->next->obj;
-        struct Func func = { .args = args, .expr = expr };
-        union Data dat = { .func = func };
-        stack->ret = obj_init(fnt, dat);
-        stack_pop();
-        /*
-    } else if(obj_eq_sym(list->obj, "if")) {
-        if(stack->out == NULL) {
-            stack->in_list = list->next;
-            stack->out = list->obj;
-            stack_push(list->obj, apply_exe);
-        } else {
-            // the actual if statement
-            if(stack->ret != nil_obj) {
-                stack->in = stack->in_list->obj;
-                return 0;
-            } else if(stack->in_list->next != NULL) {
-                stack->in = stack->in_list->next->obj;
-                return 0;
-            } else {
-                stack->ret = nil_obj;
-                stack_pop();
-            }
-        }
-        */
-    } else {
-        return 0;
-    }
-    return 1;
-}
-
-void apply() {
-    if(obj_is_empty_list(stack->in)) {
-        stack->ret = stack->in;
-        stack_pop();
-        return;
-    }
-
-    if(special_form())
-        return;
-
-    if(stack->ret == NULL) {
-        stack_push(stack->in, eval_exe);
-    } else {
-        if(stack->ret->type != listt) {
-            // eval returned a symbol
-            stack_pop();
-            return;
-        }
-        
-        if(stack->out != NULL) {
-            // only occurs after evaluating lisp function
-            envir_pop();
-            stack_pop();
-        } else if(stack->ret->type == listt) {
-            stack->out = stack->ret;
-            stack->out_list = stack->out->data.ptr;
-            Object *fun = stack->out_list->obj;
-            List *args = stack->out_list->next;
-
-            if(fun->type == natfnt) {
-                stack->ret = fun->data.fn_ptr(args);
-                stack_pop();
-            } else if(fun->type == fnt) {
-                int ret = envir_push(fun->data.func.args, args);
-                if(ret < 0) {
-                    stack->ret = err_init("wrong number of args for function\n");
-                    stack_pop();
-                }
-                stack_push(fun->data.func.expr, apply_exe);
-            } else {
-                stack->ret = err_init("object is not a function\n");
-                stack_pop();
-            }
-        }
+        return ast;
     }
 }
 
 Object *evaluate(Envir *envir, Object *ast) {
-    stack_push(NULL, result_exe);
-    stack_push(ast, apply_exe);
-    while(stack->exe_mode != result_exe) {
-        if(stack->exe_mode == eval_exe) {
-            eval();
-        } else if(stack->exe_mode == apply_exe) {
-            apply();
-        } else if(stack->exe_mode == unknown) {
-            printf("error: unknown execution mode\n");
-            return NULL;
-        }
+    if(ast->type == listt && ((List *)ast->data.ptr)->obj == NULL) {
+        return ast;
     }
-    Object *ret = stack->ret;
-    stack_pop();
-    return ret;
+
+    ast = macro_expand(envir, ast);
+
+    if(ast->type == listt) {
+        List *list = ast->data.ptr;
+        if(obj_eq_sym(list->obj, "def")) {
+            Object *sym = list->next->obj;
+            Object *val = evaluate(envir, list->next->next->obj);
+            envir_set(envir, sym, val);
+            return sym;
+        } else if(obj_eq_sym(list->obj, "defmacro")) {
+            list = list->next;
+            Object *name = list->obj;
+            list = list->next;
+            Object *args = list->obj;
+            list = list->next;
+            Object *expr = list->obj;
+
+            List *arg_list = list_copy(args->data.ptr);
+            union Data dat = { .func = { .args = arg_list, .expr = expr }};
+            Object *macro = obj_init(macrot, dat);
+            envir_set(envir, name, macro);
+            return name;
+        } else if(obj_eq_sym(list->obj, "fn")) {
+            Object *args = list->next->obj;
+            Object *expr = list->next->next->obj;
+            List *arg_list = list_copy(args->data.ptr);
+            union Data dat = { .func = { .args = arg_list, .expr = expr }};
+            return obj_init(fnt, dat);
+        } else if(obj_eq_sym(list->obj, "if")) {
+            list = list->next;
+            Object *pred = evaluate(envir, list->obj);
+            list = list->next;
+            Object *btrue = list->obj;
+            Object *bfalse = list->next == NULL ? nil_obj : list->next->obj;
+            if(pred != nil_obj) {
+                return btrue;
+            } else {
+                return bfalse;
+            }
+        } else if(obj_eq_sym(list->obj, "quote")) {
+            return list->next->obj;
+        }
+
+        Object *funcall = eval_ast(envir, ast);
+        if(funcall->type != listt) {
+            return err_init("error: epected list in fun eval");
+        }
+        // funcall
+        list = funcall->data.ptr;
+        Object *fn = list->obj;
+        if(fn->type == natfnt) {
+            Object *ret = fn->data.fn_ptr(list->next);
+            return ret;
+        } else if(fn->type == fnt) {
+            List *vals = list->next;
+            List *args = fn->data.func.args;
+            envir = envir_push(envir, args, vals);
+            Object *ret = evaluate(envir, fn->data.func.expr);
+            envir = envir_pop(envir);
+            return ret;
+        } else {
+            obj_debug(fn);
+            return err_init("error: object is not a function");
+        }
+    } else {
+        return eval_ast(envir, ast);
+    }
 }

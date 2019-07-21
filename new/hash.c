@@ -3,6 +3,7 @@
 
 #include "object.h"
 #include "list.h"
+#include "reader.h"
 
 #include "hash.h"
 
@@ -17,6 +18,8 @@ unsigned int str_hash(char *str) {
 }
 
 HashMap *hashmap_init(int size) {
+    if(size < 1)
+        size = 1;
     HashMap *map = malloc(sizeof(HashMap));
     map->capacity = size;
     map->load = 0;
@@ -42,6 +45,7 @@ void hashmap_free(HashMap *map) {
 #define list_value(list) (((List *)((list)->obj->data.ptr))->next->obj)
 
 void hashmap_resize(HashMap *map) {
+    printf("warning: hashmap_resize has not been tested\n");
     HashMap *newmap = hashmap_init(map->capacity * 2);
     for(int i = 0; i < map->capacity; i ++) {
         List *list = map->buckets + i;
@@ -85,14 +89,16 @@ void hashmap_set(HashMap *map, Object *key, Object *value) {
         map->buckets[hash].obj = keyval_obj;
     } else {
         List *list = map->buckets + hash;
+        List *listb = list;
         while(list != NULL) {
             if(obj_equals(key, list_key(list))) {
                 list_value(list) = value;
                 return;
             }
+            list = list->next;
         }
 
-        list_append(list, keyval_obj);
+        list_append(listb, keyval_obj);
         map->load ++;
     }
 }
@@ -102,7 +108,7 @@ Object *hashmap_get(HashMap *map, Object *key) {
     if(map->buckets[hash].obj == NULL) {
         return NULL;
     } else {
-        List *list = &(map->buckets[hash]);
+        List *list = map->buckets + hash;
         while(list != NULL) {
             if(list->obj->type != listt) {
                 printf("error: hashmap corrupted\n");
@@ -142,6 +148,13 @@ void envir_free(Envir *envir) {
 
 void envir_set(Envir *envir, Object *key, Object *value) {
     hashmap_set(envir->map, key, value);
+}
+
+void envir_set_str(Envir *envir, char *key, Object *value) {
+    char *key_str = la_strdup(key);
+    union Data dat = { .ptr = key_str };
+    Object *key_obj = obj_init(symt, dat);
+    hashmap_set(envir->map, key_obj, value);
 }
 
 Object *envir_get(Envir *envir, Object *key) {

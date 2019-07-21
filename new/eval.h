@@ -8,6 +8,7 @@
 enum mode {
     eval_exe,
     apply_exe,
+    macro_exe,
     result_exe,
     unknown
 };

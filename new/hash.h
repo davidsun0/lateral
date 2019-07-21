@@ -28,6 +28,7 @@ Envir *envir_init(int size);
 void envir_free(Envir *);
 
 void envir_set(Envir *, Object *key, Object *value);
+void envir_set_str(Envir *, char *key, Object *value);
 Object *envir_get(Envir *, Object *key);
 Object *envir_search(Envir *, Object *key);
 

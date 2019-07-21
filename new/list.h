@@ -8,6 +8,7 @@ void list_free(List *);
 
 int list_length(List *list);
 List *list_append(List *, Object *);
+List *list_copy(List *);
 void list_print(List *);
 
 #endif
