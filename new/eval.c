@@ -35,8 +35,10 @@ Envir *envir_pop(Envir *envir) {
 int is_macro(Envir *envir, Object *ast) {
     if(ast->type == listt) {
         Object *fn = ((List *)ast->data.ptr)->obj;
-        if(fn->type == symt && envir_search(envir, fn) != NULL) {
-            return 1;
+        if(fn->type == symt) {
+            fn = envir_search(envir, fn);
+            if(fn != NULL && fn->type == macrot)
+                return 1;
         }
     }
     return 0;
@@ -91,7 +93,7 @@ Object *evaluate(Envir *envir, Object *ast) {
             Object *sym = list->next->obj;
             Object *val = evaluate(envir, list->next->next->obj);
             envir_set(envir, sym, val);
-            return sym;
+            return val;
         } else if(obj_eq_sym(list->obj, "defmacro")) {
             list = list->next;
             Object *name = list->obj;
