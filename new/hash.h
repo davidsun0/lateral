@@ -18,6 +18,8 @@ void hashmap_resize(HashMap *);
 void hashmap_set(HashMap *, Object *key, Object *value);
 Object *hashmap_get(HashMap *, Object *key);
 
+void hashmap_debug(HashMap *);
+
 typedef struct Envir {
     HashMap *map;
     struct Envir *inner;

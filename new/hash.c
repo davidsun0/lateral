@@ -133,6 +133,25 @@ Object *hashmap_get(HashMap *map, Object *key) {
     return NULL;
 }
 
+void hashmap_debug(HashMap *map) {
+    for(int i = 0; i < map->capacity; i ++) {
+        List *list = map->buckets + i;
+        if(list->obj != NULL) {
+            while(list != NULL) {
+                Object *key = list_key(list);
+                Object *value = list_value(list);
+                printf("===\n");
+                printf("key: ");
+                obj_debug(key);
+                printf("value: ");
+                obj_debug(value);
+
+                list = list->next;
+            }
+        }
+    }
+}
+
 Envir *envir_init(int size) {
     Envir *envir = malloc(sizeof(Envir));
     envir->map = hashmap_init(size);

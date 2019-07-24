@@ -126,6 +126,13 @@ Object *evaluate(Envir *envir, Object *ast) {
             }
         } else if(obj_eq_sym(list->obj, "quote")) {
             return list->next->obj;
+        } else if(obj_eq_sym(list->obj, "progn")) {
+            list = list->next;
+            while(list->next != NULL) {
+                evaluate(envir, list->obj);
+                list = list->next;
+            }
+            return evaluate(envir, list->obj);
         }
 
         Object *funcall = eval_ast(envir, ast);

@@ -40,6 +40,18 @@ Object *la_list(List *list) {
     return obj_init(listt, dat);
 }
 
+Object *la_print(List *list) {
+    obj_print(list->obj, 0);
+    printf("\n");
+    return nil_obj;
+}
+
+Object *la_pprint(List *list) {
+    obj_print(list->obj, 1);
+    printf("\n");
+    return nil_obj;
+}
+
 Object *la_debug(List *list) {
     obj_debug(list->obj);
     return nil_obj;
@@ -48,7 +60,6 @@ Object *la_debug(List *list) {
 void insert_function(char *name, Object *(fn_ptr)(List *)) {
     union Data dat = { .fn_ptr = fn_ptr };
     Object *fn = obj_init(natfnt, dat);
-    // dat = { .symt = name };
     dat.ptr = la_strdup(name);
     Object *sym = obj_init(symt, dat);
     envir_set(curr_envir, sym, fn);
@@ -65,5 +76,7 @@ void lang_init() {
     insert_function("+", la_sum);
     insert_function("nil?", la_is_nil);
     insert_function("list", la_list);
+    insert_function("print", la_print);
+    insert_function("pprint", la_pprint);
     insert_function("debug", la_debug);
 }

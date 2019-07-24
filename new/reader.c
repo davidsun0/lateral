@@ -16,6 +16,7 @@
 int read_token(char **buf, Object **obj) {
     char *start = *buf;
 
+    // consume white space and comments
     while(*start != '\0') {
         if(is_white_space(*start)) {
             while(is_white_space(*start)) {
@@ -31,8 +32,17 @@ int read_token(char **buf, Object **obj) {
     }
 
     char *end = start;
-
     if(is_special_char(*end)) {
+        end ++;
+    } else if(*end == '"') {
+        end ++;
+        while(*end != '"') {
+            end ++;
+            if(*end == '\0') {
+                printf("error: unmatched quotation mark\n");
+                return -1;
+            }
+        }
         end ++;
     } else {
         while(*end != '\0' && !is_white_space(*end) && !is_special_char(*end)) {
@@ -73,6 +83,7 @@ char *la_strdup(char *str) {
 Object *read_atom(Object *obj) {
     if(obj->type != strt) {
         printf("error: trying to parse non-string to atom\n");
+        obj_debug(obj);
         return NULL;
     }
 
@@ -92,6 +103,19 @@ Object *read_atom(Object *obj) {
         }
         union Data dat = { .int_val = sum };
         return obj_init(intt, dat);
+    } else if (str[0] == '"') {
+        char *nstr = la_strdup(str + 1);
+        int i = 0;
+        while(nstr[i] != '\0') {
+            i ++;
+        }
+        nstr[i - 1] = '\0';
+        union Data dat = { .ptr = nstr };
+        return obj_init(strt, dat);
+    } else if (str[0] == ':') {
+        char *nstr = la_strdup(str);
+        union Data dat = { .ptr = nstr };
+        return obj_init(keywordt, dat);
     } else {
         char *nstr = la_strdup(str);
         union Data dat = { .ptr = nstr };
@@ -153,17 +177,19 @@ Object* read_string(char *str) {
 
     // convert token into abstract syntax tree
     Object *ast = NULL;
-   
     curr = tokens;
     int ret = read_form(&curr, &ast);
-
-    while(tokens != NULL) {
-        obj_free(tokens->obj);
-        List *prev = tokens;
-        tokens = tokens->next;
-        free(prev);
+    if(curr != NULL) {
+        printf("error: unexpected tokens: ");
+        while(curr != NULL) {
+            obj_print(curr->obj, 0);
+            printf(" ");
+            curr = curr->next;
+        }
+        printf("\n");
     }
-        
+
+    list_free(tokens);
     if(ret >= 0) {
         // obj_debug(ast);
         return ast;

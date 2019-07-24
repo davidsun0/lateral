@@ -3,6 +3,7 @@ lateral
 
 # c files
 *.o
+a.out
 
 # vim temporary files
 *.swp

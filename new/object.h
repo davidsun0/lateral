@@ -4,6 +4,7 @@
 typedef enum {
     symt,
     strt,
+    keywordt,
     intt,
     floatt,
     listt,
@@ -40,13 +41,15 @@ typedef struct Object {
 Object *obj_init(obj_type, union Data);
 void obj_free(Object *);
 Object *err_init(char *);
+void obj_mark();
 
 unsigned int obj_hash(Object *);
 int obj_equals(Object *, Object *);
 int obj_eq_sym(Object *, char *);
 int obj_is_empty_list(Object *);
 
-void obj_print(Object *);
+void obj_print(Object *, int pretty);
+void list_debug0(List *, int);
 void obj_debug(Object *);
 
 #endif

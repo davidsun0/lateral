@@ -6,6 +6,7 @@
 #include "hash.h"
 #include "reader.h"
 #include "core.h"
+#include "garbage.h"
 
 #include "object.h"
 
@@ -17,6 +18,8 @@ Object *obj_init(obj_type type, union Data data) {
     }
     obj->type = type;
     obj->data = data;
+
+    garbage_insert(obj);
     return obj;
 }
 
@@ -27,6 +30,7 @@ void obj_free(Object *obj) {
     switch(obj->type) {
         case symt:
         case strt:
+        case keywordt:
         case errt:
             free(obj->data.ptr);
             break;
@@ -45,10 +49,36 @@ Object *err_init(char *str) {
     return obj_init(errt, dat);
 }
 
+void obj_mark(Object *obj) {
+    if(obj->marked)
+        return;
+
+    obj->marked = 1;
+    if(obj->type == listt) {
+        List *list = obj->data.ptr;
+        if(list->obj != NULL) {
+            while(list != NULL) {
+                obj_mark(list->obj);
+                list = list->next;
+            }
+        }
+    } else if(obj->type == fnt || obj->type == macrot) {
+        List *list = obj->data.func.args;
+        if(list->obj != NULL) {
+            while(list != NULL) {
+                obj_mark(list->obj);
+                list = list->next;
+            }
+        }
+        obj_mark(obj->data.func.expr);
+    }
+}
+
 unsigned int obj_hash(Object *obj) {
     switch(obj->type) {
         case symt:
         case strt:
+        case keywordt:
         case errt:
             return str_hash(obj->data.ptr);
         default:
@@ -67,6 +97,7 @@ int obj_equals(Object *a, Object *b) {
     switch(a->type) {
         case symt:
         case strt:
+        case keywordt:
         case errt:
             return strcmp(a->data.ptr, b->data.ptr) == 0;
         case intt:
@@ -99,7 +130,7 @@ int obj_eq_sym(Object *obj, char *str) {
     return strcmp(ostr, str) == 0;
 }
 
-void obj_print(Object *obj) {
+void obj_print(Object *obj, int pretty) {
     if(obj == nil_obj) {
         printf("nil");
         return;
@@ -109,8 +140,15 @@ void obj_print(Object *obj) {
     }
 
     switch(obj->type) {
-        case symt:
         case strt:
+            if(pretty) {
+                printf("%s", (char *)obj->data.ptr);
+            } else {
+                printf("\"%s\"", (char *)obj->data.ptr);
+            }
+            break;
+        case symt:
+        case keywordt:
         case errt:
             printf("%s", (char *)obj->data.ptr);
             break;
@@ -122,7 +160,7 @@ void obj_print(Object *obj) {
             List *list = obj->data.ptr;
             while(list != NULL) {
                 if(list->obj != NULL) {
-                    obj_print(list->obj);
+                    obj_print(list->obj, pretty);
                 }
                 if(list->next != NULL) {
                     printf(" ");
@@ -160,10 +198,10 @@ void obj_debug0(Object *obj, int indt) {
     }
 
     if(obj == nil_obj) {
-        printf("nil");
+        printf("nil_obj\n");
         return;
     } else if(obj == tru_obj) {
-        printf("t");
+        printf("t_obj\n");
         return;
     } else if(obj == NULL) {
         printf("NULL\n");
@@ -174,6 +212,9 @@ void obj_debug0(Object *obj, int indt) {
                 break;
             case strt:
                 printf("str: %s\n", (char *)obj->data.ptr);
+                break;
+            case keywordt:
+                printf("key: %s\n", (char *)obj->data.ptr);
                 break;
             case errt:
                 printf("err: %s\n", (char *)obj->data.ptr);
