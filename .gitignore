@@ -1,9 +1,11 @@
 # compiled output
 lateral
+a.out
 
 # c files
 *.o
-a.out
 
 # vim temporary files
 *.swp
+
+old/*

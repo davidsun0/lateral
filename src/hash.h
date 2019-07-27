@@ -1,30 +1,37 @@
-#ifndef LATERAL_HASH_H
-#define LATERAL_HASH_H
+#ifndef LA_HASH_H
+#define LA_HASH_H
 
 #include "object.h"
 
-struct KeyValueList {
-    char* key;
-    struct Object* value;
-    struct KeyValueList* next;
-};
+unsigned int str_hash(char *);
 
-struct HashMap {
-    int size;
+typedef struct {
+    Object *buckets;
+    int capacity;
     int load;
-    struct KeyValueList** pairs;
-};
+} HashMap;
 
-struct KeyValueList* hashmap_kvlist_init(char*, struct Object*);
+HashMap *hashmap_init(int size);
+void hashmap_free(HashMap *);
+void hashmap_resize(HashMap *);
 
-// DJB2 string hash
-unsigned int hashmap_string_hash(char*);
-struct HashMap* hashmap_init(int size);
+void hashmap_set(HashMap *, Object *key, Object *value);
+Object *hashmap_get(HashMap *, Object *key);
 
-void hashmap_set(struct HashMap*, char* key, struct Object* value);
-struct Object* hashmap_get(struct HashMap*, char* key);
+void hashmap_debug(HashMap *);
 
-void hashmap_free_map(struct HashMap*);
+typedef struct Envir {
+    HashMap *map;
+    struct Envir *inner;
+    struct Envir *outer;
+} Envir;
 
-void hashmap_debug(struct HashMap*);
+Envir *envir_init(int size);
+void envir_free(Envir *);
+
+void envir_set(Envir *, Object *key, Object *value);
+void envir_set_str(Envir *, char *key, Object *value);
+Object *envir_get(Envir *, Object *key);
+Object *envir_search(Envir *, Object *key);
+
 #endif

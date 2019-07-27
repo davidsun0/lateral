@@ -1,388 +1,171 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "lang.h"
-#include "list.h"
-#include "env.h"
-#include "error.h"
+#include "object.h"
 
 #include "eval.h"
 
-struct StackFrame* stack;
-struct Envir* curr_env;
+Envir *envir_push(Envir *envir, Object *args, Object *vals) {
+    Object *lena = list_length(args);
+    Object *lenb = list_length(vals);
 
-/**
- * Pushes an S expression to the stack and sets the evaluation mode.
- * A new stack frame is allocated and must be deallocated with stack_pop.
- *
- * @param ast       the abstract syntax tree to be evaluated
- * @param exe_mode  how the ast will be evaluated (i.e. apply, eval)
- */
-static void stack_push(struct Object* ast, int exe_mode) {
-    struct StackFrame* new_frame = malloc(sizeof(struct StackFrame));
-    new_frame->prev = stack;
+    int sizea = lena->data.int_val;
+    int sizeb = lenb->data.int_val;
 
-    new_frame->fn = NULL;
-    new_frame->expr = ast;
-    new_frame->working = NULL;
-    new_frame->ret = NULL;
-    
-    new_frame->exe_mode = exe_mode;
-    // for debugging
-    new_frame->eval_index = -1;
-
-    stack = new_frame;
-}
-
-/**
- * Pops the current stack frame and passes on the current return value.
- * Frees the stack frame.
- */
-static void stack_pop() {
-    if(stack == NULL) {
-        printf("error: attempting to pop null stack\n");
-        return;
+    if(sizea != sizeb) {
+        printf("expected %d arguments, but got %d\n", sizea, sizeb);
+        return NULL;
     }
 
-    if(stack->prev != NULL) {
-        stack->prev->ret = stack->ret;
+    Envir *inner = envir_init(sizea * 2);
+    for(int i = 0; i < sizea; i ++) {
+        envir_set(inner, CAR(args), CAR(vals));
+        args = CDR(args);
+        vals = CDR(vals);
     }
-    struct StackFrame* old_frame = stack;
-    stack = stack->prev;
-    free(old_frame);
+    envir->inner = inner;
+    inner->outer = envir;
+    return inner;
 }
 
-/**
- * Destroys the entire program stack.
- * Used only for debugging.
- * Causes undefined behavior.
- */
-static void stack_destroy() {
-    while(stack->prev != NULL) {
-        stack_pop();
-    }
-    stack->expr = NULL;
+Envir *envir_pop(Envir *envir) {
+    Envir *outer = envir->outer;
+    envir_free(envir);
+    return outer;
 }
 
-/**
- * Prints debug information for all stack frames and all pointers on the stack.
- */
-void stack_print() {
-    struct StackFrame* frame = stack;
-
-    printf("=== STACK ===\n");
-    while(frame != NULL) {
-        printf("=== STACK FRAME ===\n");
-        printf("exe:  %d\n", frame->exe_mode);
-        printf("fn:   ");
-        object_print_string(frame->fn);
-        printf("\nexpr: ");
-        object_print_string(frame->expr);
-        printf("\nret:  ");
-        object_print_string(frame->ret);
-        printf("\nnext frame: %p\n\n", (void*) frame->prev);
-        frame = frame->prev;
-    }
-    printf("=== END STACK ===\n\n\n");
-}
-
-/**
- * Non destructively creates an enironment and pushes it to the enivronment
- * list. Does not perform any error checking.
- *
- * @param syms  list of symbols to bind
- * @param vals  list of matching values for the symbols
- */
-static void envir_push_bindings(struct List* syms, struct List* vals) {
-    int size = list_bare_length(syms);
-    struct Envir* local = envir_init(size * 2);
-    local->outer = curr_env;
-    curr_env->inner = local;
-
-    for(int i = 0; i < size; i ++) {
-        envir_set(local, syms->obj->data.ptr, vals->obj);
-        syms = syms->next;
-        vals = vals->next;
-    }
-
-    curr_env = local;
-}
-
-/**
- * Non destructively creates an environment and pushes it to the environment
- * list. Does not perform any error checking.
- *
- * @param binds list of alternating symbols and values to insert into the new
- * enrironment
- */
-static void envir_push_binding_list(struct List* binds) {
-    int size = list_bare_length(binds) / 2;
-    struct Envir* local = envir_init(size * 2);
-    local->outer = curr_env;
-    curr_env->inner = local;
-
-    for(int i = 0; i < size; i ++) {
-        envir_set(local, binds->obj->data.ptr, binds->next->obj);
-        binds = binds->next->next;
-    }
-
-    curr_env = local;
-}
-
-/**
- * Sets the current environment to curr_env->outer and frees the old
- * environment.
- */
-static void envir_pop() {
-    struct Envir* old = curr_env;
-    curr_env = old->outer;
-    curr_env->inner = NULL;
-
-    envir_free(old);
-}
-
-/**
- * Evaluates special forms on the stack.
- *
- * @return  0 if the stack's current expression is not a special form or if an
- * error occurs. 1 if otherwise, skipping the effects of apply()
- */
-static int special_form() {
-    // printf("evaluating special form\n");
-    struct List* expr = stack->expr->data.ptr;
-    struct Object* form = expr->obj;
-    expr = expr->next;
-
-    // or, and
-    // fn, macro
-    // def
-    // if, cond
-    // let
-    // do, loop / recur
-    // quasiquote
-    if (object_equals_symbol(form, "def")) {
-        // push object to environment
-        // TODO: error checking on args
-        if(stack->ret == NULL) {
-            stack_push(expr->next->obj, apply_exe);
-        } else {
-            struct Object* sym = expr->obj;
-            struct Object* val = stack->ret;
-            envir_set(curr_env, sym->data.ptr, val);
-            stack_pop();
+int is_macro(Envir *envir, Object *ast) {
+    if(ast->type == listt) {
+        // Object *fn = ast->data.cell.car;
+        Object *fn = CAR(ast);
+        if(fn->type == symt) {
+            fn = envir_search(envir, fn);
+            if(fn != NULL && fn->type == macrot)
+                return 1;
         }
-    } else if(object_equals_symbol(form, "do")) {
-        if(list_bare_length(expr) == stack->eval_index && stack->ret != NULL) {
-            stack_pop();
-        } else {
-            if(stack->eval_index < 0) {
-                stack->eval_index = 0;
-            }
-            stack->eval_index ++;
-            stack_push(list_get(stack->expr, stack->eval_index), apply_exe);
-        }
-    } else if(object_equals_symbol(form, "fn") ||
-            object_equals_symbol(form, "macro")) {
-        // create a fn/macro object with the given args / ast
-        struct Object* output;
-        if(object_equals_symbol(form, "fn")) {
-            output = object_init_type(func_type);
-        } else {
-            output = object_init_type(macro_type);
-        }
-        stack->ret = output;
-        struct Func* fn = malloc(sizeof(struct Func));
-        output->data.ptr = fn;
-        // TODO: error checking on args
-        fn->args = object_copy(expr->obj);
-        fn->expr = object_copy(expr->next->obj);
-        stack_pop();
-    } else if(object_equals_symbol(form, "if")) {
-        if(stack->ret == NULL) {
-            stack_push(expr->obj, apply_exe);
-        } else {
-            // TODO: error checking on args
-            if(stack->ret != nil_obj) {
-                stack->expr = expr->next->obj;
-            } else {
-                stack->expr = expr->next->next->obj;
-            }
-            stack->exe_mode = apply_exe;
-            stack->ret = NULL;
-        }
-    } else if(object_equals_symbol(form, "let")) {
-        // TODO: evaluate values, insert bindings one at a time
-        // push bindings
-        // evaludate body
-        if(stack->ret == NULL) {
-            // error checking
-            if(expr->obj->type != list_type) {
-                printf("let expects a list of bindings\n");
-                stack->ret = error_init_bare();
-                return 0;
-            } else if(list_length(expr->obj) % 2 != 0) {
-                printf("let expects an even number of bindings\n");
-                stack->ret = error_init_bare();
-                return 0;
-            } else if(expr->next->next != NULL) {
-                printf("let expects only one body expression\n");
-                stack->ret = error_init_bare();
-                return 0;
-            }
-            // TODO: check that bindings are symbols
-            envir_push_binding_list(expr->obj->data.ptr);
-            // object_debug(expr->next->obj);
-            stack_push(expr->next->obj, apply_exe);
-        } else {
-            // pop bindings
-            envir_pop();
-            stack_pop();
-        }
-    } else if(object_equals_symbol(form, "loop")) {
-        // store loop body on stack
-    } else if(object_equals_symbol(form, "quasiquote")) {
+    }
+    return 0;
+}
 
-    } else if(object_equals_symbol(form, "recur")) {
-        // scan stack until loop or result frame
-        // rebind and execute loop body
+Object *macro_expand(Envir *envir, Object *ast) {
+    while(is_macro(envir, ast)) {
+        Object *macro = envir_search(envir, CAR(ast));
+        Object *vals = CDR(ast);
+
+        Object *args = macro->data.func.args;
+        Envir *inner = envir_push(envir, args, vals);
+        Object *expr = macro->data.func.expr;
+        ast = evaluate(inner, expr);
+        envir_pop(inner);
+    }
+    return ast;
+}
+
+Object *eval_ast(Envir *envir, Object *ast) {
+    if(ast->type == symt) {
+        Object *ret = envir_search(envir, ast);
+        if(ret == NULL) {
+            ret = err_init("symbol not found in envir");
+        }
+        return ret;
+    } else if(ast->type == listt) {
+        Object *list = cell_init();
+        Object *listb = list;
+        while(ast != nil_obj) {
+            Object *obj = evaluate(envir, CAR(ast));
+            listb = list_append(listb, obj);
+            ast = CDR(ast);
+        }
+        return list;
     } else {
-        return 0;
+        return ast;
     }
-    return 1;
 }
 
-static void eval() {
-    if(stack->working == NULL) {
-        if(list_is_empty(stack->expr->data.ptr)) {
-            // empty list evaluates to nil
-            stack->ret = nil_obj;
-            stack_pop();
-            // pop underlying apply stack frame
-            stack_pop();
+Object *evaluate(Envir *envir, Object *ast) {
+    if(CAR(ast) == nil_obj && CDR(ast) == nil_obj) {
+        return ast;
+    }
+
+    ast = macro_expand(envir, ast);
+
+    if(ast->type == listt) {
+        if(obj_eq_sym(CAR(ast), "def")) {
+            Object *sym = CAR(CDR(ast));
+            Object *val = evaluate(envir, CAR(CDR(CDR(ast))));
+            envir_set(envir, sym, val);
+            return val;
+        } else if(obj_eq_sym(CAR(ast), "defmacro")) {
+            Object *name = CAR(CDR(ast));
+            Object *args = CAR(CDR(CDR(ast)));
+            Object *expr = CAR(CDR(CDR(CDR(ast))));
+            if(args->type != listt) {
+                return err_init("macro args must be a list");
+            }
+
+            union Data dat = { .func = { .args = args, .expr = expr }};
+            Object *macro = obj_init(macrot, dat);
+            envir_set(envir, name, macro);
+            return name;
+        } else if(obj_eq_sym(CAR(ast), "fn")) {
+            Object *args = CAR(CDR(ast));
+            Object *expr = CAR(CDR(CDR(ast)));
+            union Data dat = { .func = { .args = args, .expr = expr }};
+            return obj_init(fnt, dat);
+        } else if(obj_eq_sym(CAR(ast), "if")) {
+            Object *pred = evaluate(envir, CAR(CDR(ast)));
+            ast = CDR(CDR(ast));
+            if(pred != nil_obj) {
+                // evaluate true branch
+                return evaluate(envir, CAR(ast));
+            } else {
+                if(CDR(ast) == nil_obj) {
+                    // nil if no false branch
+                    return nil_obj;
+                } else {
+                    // false branch
+                    return evaluate(envir, CAR(CDR(ast)));
+                }
+            }
+        } else if(obj_eq_sym(CAR(ast), "quote")) {
+            return CAR(CDR(ast));
+        } else if(obj_eq_sym(CAR(ast), "progn")) {
+            ast = CDR(ast);
+            while(CDR(ast) != nil_obj) {
+                evaluate(envir, CAR(ast));
+                ast = CDR(ast);
+            }
+            return evaluate(envir, CAR(ast));
+        }
+
+        Object *funcall = eval_ast(envir, ast);
+        if(funcall->type != listt) {
+            return err_init("error: epected list in fun eval");
+        }
+        // funcall
+        Object *fn = CAR(funcall);
+        if(fn->type == natfnt) {
+            return fn->data.fn_ptr(CDR(funcall));
+        } else if(fn->type == fnt) {
+            Object *vals = CDR(funcall);
+            Object *args = fn->data.func.args;
+            envir = envir_push(envir, args, vals);
+            if(envir == NULL) {
+                printf("failed to create envir\n");
+                printf("funcall: \n");
+                obj_debug(funcall);
+                printf("expr: \n");
+                obj_debug(ast);
+                exit(1);
+            }
+            Object *ret = evaluate(envir, fn->data.func.expr);
+            envir = envir_pop(envir);
+            return ret;
         } else {
-            // create a evaluated version of stack->expr
-            stack->working = list_init();
-            stack->eval_index = 1;
-            // push first item in the list
-            struct Object* obj = list_get(stack->expr, 0);
-            stack_push(obj, apply_exe);
+            obj_debug(fn);
+            return err_init("error: object is not a function");
         }
     } else {
-        if(stack->eval_index == 1) {
-            stack->fn = stack->ret;
-        }
-
-        if(stack->fn != NULL && stack->fn->type == macro_type) {
-            struct List* syms = ((struct Func*) stack->ret->data.ptr)->args->data.ptr;
-            struct List* vals = ((struct List*) stack->expr->data.ptr)->next;
-            envir_push_bindings(syms, vals);
-            stack->exe_mode = macro_exe;
-            stack_push(((struct Func*) stack->fn->data.ptr)->expr, eval_exe);
-            return;
-        }
-        // append ret onto working
-        list_append_object(stack->working, stack->ret);
-        // push next object onto stack
-        struct Object* obj = list_get(stack->expr, stack->eval_index);
-        stack->eval_index ++;
-        // if end of list, pop result
-        if(obj == NULL) {
-            stack->ret = stack->working;
-            stack_pop();
-        } else {
-            stack_push(obj, apply_exe);
-        }
+        return eval_ast(envir, ast);
     }
-}
-
-static void apply() {
-    if(special_form()) {
-        return;
-    }
-
-    if(stack->ret == NULL) {
-        stack_push(stack->expr, eval_exe);
-    } else {
-        if(stack->ret->type != list_type) {
-            printf("warning: apply expected list type, but got ");
-            object_print_type(stack->ret->type);
-            printf("\n");
-            stack_pop();
-            return;
-        }
-
-        struct List* args = (struct List*) stack->ret->data.ptr;
-        struct Object* func = args->obj;
-
-        if(func->type == c_fn) {
-            stack->ret = func->data.fn_ptr(args->next);
-            stack_pop();
-        } else if(func->type == func_type) {
-            if(stack->working == NULL) {
-                // TODO: check number of arguments
-                // check for &rest and construct list
-                struct List* syms = ((struct Func*) func->data.ptr)->args->data.ptr;
-                struct List* vals = args->next;
-                envir_push_bindings(syms, vals);
-                stack_push(((struct Func*) func->data.ptr)->expr, eval_exe);
-            } else {
-                stack->ret = stack->working;
-                envir_pop();
-                stack_pop();
-            }
-        } else {
-            printf("error: symbol ");
-            object_print_string(func);
-            printf(" is not a function\n");
-            stack->ret = error_init(type_err, "symbol is not a function");
-        }
-    }
-}
-
-struct Object* lat_evaluate(struct Envir* envir, struct Object* ast) {
-    curr_env = envir;
-    // stack frame to collect the result
-    stack_push(NULL, result_exe);
-    // stack frame with starting expression
-    stack_push(ast, apply_exe);
-    while(!(stack->exe_mode == result_exe && stack->ret != NULL)) {
-        if(stack->expr->type == symbol) {
-            if(stack->ret != NULL) {
-                printf("warning: stack result is non null while evaluating sym\n");
-            }
-            stack->ret = envir_search(curr_env, stack->expr->data.ptr);
-            if(stack->ret == NULL) {
-                stack->ret = error_init(name_err, "symbol not found in environment");
-            }
-            stack_pop();
-        } else if(stack->expr->type != list_type) {
-            if(stack->ret != NULL) {
-                printf("warning: stack result is non null while evaluating obj\n");
-            }
-            stack->ret = stack->expr;
-            stack_pop();
-        } else {
-            if(stack->exe_mode == eval_exe) {
-                eval();
-            } else if(stack->exe_mode == apply_exe) {
-                apply();
-            } else if(stack->exe_mode == macro_exe) {
-                // macro execution begins in eval
-                // pop macro's temporary environment
-                envir_pop();
-                // pop eval turned macro stack frame
-                stack_pop();
-                // pop underlying apply stack frame
-                stack_pop();
-            } else {
-                printf("fatal: unknown execution mode %d\n", stack->exe_mode);
-                stack_print();
-                stack_destroy();
-                break;
-            }
-        }
-    }
-    struct Object* output = stack->ret;
-    stack_pop();
-    return output;
 }

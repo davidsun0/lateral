@@ -1,13 +1,23 @@
-#ifndef LATERAL_GARBAGE_H
-#define LATERAL_GARBAGE_H
+#ifndef LA_GARBAGE_H
+#define LA_GARBAGE_H
 
 #include "object.h"
 
-void gc_init();
+#define BANKSIZE 256
 
-// adds object to pool for automatic collection
-void gc_insert_object(struct Object*);
+// List *all_objects;
 
-void gc_run();
+typedef struct Bank {
+    struct Bank *next;
+    Object objs[BANKSIZE];
+} Bank;
+
+Bank *all_objects;
+
+void garbage_init();
+Object *garbage_alloc();
+// void garbage_insert(Object *);
+void garbage_run();
+void garbage_shutdown();
 
 #endif

@@ -1,138 +1,174 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 
-#include "garbage.h"
+#include "object.h"
+#include "reader.h"
 
 #include "hash.h"
 
-unsigned int hashmap_string_hash(char* str) {
+unsigned int str_hash(char *str) {
     unsigned int hash = 5381;
-    while(*str != '\0') {
-        hash = hash * 33 + *str;
-        str ++;
+    int i = 0;
+    while(str[i] != '\0') {
+        hash += str[i] * 33;
+        i ++;
     }
     return hash;
 }
 
-struct HashMap* hashmap_init(int size) {
-    struct HashMap* map = malloc(sizeof(struct HashMap));
-    map->size = size;
+HashMap *hashmap_init(int size) {
+    if(size < 1)
+        size = 1;
+    HashMap *map = malloc(sizeof(HashMap));
+    map->capacity = size;
     map->load = 0;
-    map->pairs = malloc(sizeof(struct KeyValue*) * size);
+
+    map->buckets = malloc(sizeof(Object) * size);
     for(int i = 0; i < size; i ++) {
-        map->pairs[i] = NULL;
+        (map->buckets + i)->type = listt;
+        CAR(map->buckets + i) = nil_obj;
+        CDR(map->buckets + i) = nil_obj;
     }
     return map;
 }
 
-struct KeyValueList* hashmap_kvlist_init(char* key, struct Object* value) {
-    struct KeyValueList* kvlist = malloc(sizeof(struct KeyValueList));
-    char* key_copy = malloc(sizeof(char) * (strlen(key) + 1));
-    strcpy(key_copy, key);
-    kvlist->next = NULL;
-    kvlist->key = key_copy;
-    kvlist->value = value;
-    return kvlist;
-}
-
-void hashmap_free_map(struct HashMap* map) {
-    for(int i = 0; i < map->size; i ++) {
-        if(map->pairs[i] != NULL) {
-            struct KeyValueList* list = map->pairs[i];
-            struct KeyValueList* prev = list;
-            while(list != NULL) {
-                prev = list;
-                list = list->next;
-                free(prev->key);
-                free(prev);
-            }
-        }
-    }
-    free(map->pairs);
+void hashmap_free(HashMap *map) {
+    free(map->buckets);
     free(map);
 }
 
-void hashmap_double_size(struct HashMap* map) {
-    printf("resizing not implemented");
-    printf("load: %d\tcapacity: %d\n", map->load, map->size);
-    /*
-    // TODO: rewrite to only make new array of lists
-    struct HashMap* new_map = hashmap_init(map->size * 2);
-    for(int i = 0; i < map->size; i ++) {
-        if(map->pairs[i] != NULL) {
-            struct KeyValueList* list = map->pairs[i];
-            while(list != NULL) {
-                hashmap_set(new_map, list->keyValue.key, list->keyValue.value);
-                list = list->next;
-            }
+void hashmap_resize(HashMap *map) {
+    printf("warning: hashmap_resize has not been tested\n");
+    HashMap *newmap = hashmap_init(map->capacity * 2);
+    for(int i = 0; i < map->capacity; i ++) {
+        Object *list = map->buckets + i;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+            Object *key = CAR(keyval);
+            Object *val = CDR(keyval);
+            hashmap_set(newmap, key, val);
+
+            list = CDR(list);
         }
     }
-    hashmap_free_map(map);
-    */
+    free(map->buckets);
+    map->buckets = newmap->buckets;
+    map->capacity = newmap->capacity;
+    free(newmap);
 }
 
-void hashmap_set(struct HashMap* map, char* key, struct Object* value) {
-    unsigned int hash = hashmap_string_hash(key) % map->size;
-    if((float)(map->load + 1)/map->size > 0.7) {
-        printf("resizing hashmap\n");
-        hashmap_double_size(map);
-        hash = hashmap_string_hash(key) % map->size;
+void hashmap_set(HashMap *map, Object *key, Object *value) {
+    if((float)map->load / map->capacity > 0.7) {
+        hashmap_resize(map);
     }
 
-    if(map->pairs[hash] == NULL) {
-        // init new linked list and set object
-        struct KeyValueList* kvlist = hashmap_kvlist_init(key, value);
-        map->pairs[hash] = kvlist;
+    unsigned int hash = obj_hash(key) % map->capacity;
+    if(CAR(map->buckets + hash) == nil_obj) {
+        Object *keyval = cell_init();
+        CAR(keyval) = key;
+        CDR(keyval) = value;
+
+        CAR(map->buckets + hash) = keyval;
         map->load ++;
     } else {
-        struct KeyValueList* list = map->pairs[hash];
-        struct KeyValueList* prev;
-        int replaced = 0;
-        while(list != NULL) {
-            // replace existing value
-            if(strcmp(key, list->key) == 0) {
-                list->value = value;
-                replaced = 1;
-                break;
+        Object *list = map->buckets + hash;
+        while(list != nil_obj) {
+            if(obj_equals(key, CAR(CAR(list)))) {
+                // update value
+                CDR(CAR(list)) = value;
+                return;
+            } else if(CDR(list) == nil_obj) {
+                // append to end of linked list
+                Object *keyval = cell_init();
+                CAR(keyval) = key;
+                CDR(keyval) = value;
+
+                Object *bucket = cell_init();
+                CAR(bucket) = keyval;
+                CDR(list) = bucket;
+                map->load ++;
+                return;
             }
-            prev = list;
-            list = list->next;
-        }
-        // append to list
-        if(!replaced) {
-            prev->next = hashmap_kvlist_init(key, value);
-            map->load ++;
+            list = CDR(list);
         }
     }
 }
 
-struct Object* hashmap_get(struct HashMap* map, char* key) {
-    int hash = hashmap_string_hash(key) % map->size;
-    if(map->pairs[hash] == NULL) {
+Object *hashmap_get(HashMap *map, Object *key) {
+    unsigned int hash = obj_hash(key) % map->capacity;
+    Object *list = map->buckets + hash;
+    if(CAR(list) == nil_obj) {
         return NULL;
     } else {
-        struct KeyValueList* list = map->pairs[hash];
-        while(list != NULL) {
-            if(strcmp(key, list->key) == 0) {
-                return list->value;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+
+            if(obj_equals(key, CAR(keyval))) {
+                Object *val = CDR(keyval);
+                return val;
+            } else {
+                list = CDR(list);
             }
-            list = list->next;
         }
         return NULL;
     }
+    return NULL;
 }
 
-void hashmap_debug(struct HashMap* map) {
-    for(int i = 0; i < map->size; i ++) {
-        if(map->pairs[i] != NULL) {
-            struct KeyValueList* kvlist = map->pairs[i];
-            while(kvlist != NULL) {
-                printf("key: %s\nvalue: ", kvlist->key);
-                object_debug(kvlist->value);
-                printf("\n");
-                kvlist = kvlist->next;
+void hashmap_debug(HashMap *map) {
+    for(int i = 0; i < map->capacity; i ++) {
+        Object *list = map->buckets + i;
+        if(CAR(list) != nil_obj) {
+            while(list != nil_obj) {
+                Object *key = CAR(CAR(list));
+                Object *value = CDR(CAR(list));
+                printf("===\n");
+                printf("key: ");
+                obj_debug(key);
+                printf("value: ");
+                obj_debug(value);
+
+                list = CDR(list);
             }
         }
     }
+}
+
+Envir *envir_init(int size) {
+    Envir *envir = malloc(sizeof(Envir));
+    envir->map = hashmap_init(size);
+    envir->inner = NULL;
+    envir->outer = NULL;
+    return envir;
+}
+
+void envir_free(Envir *envir) {
+    hashmap_free(envir->map);
+    free(envir);
+}
+
+void envir_set(Envir *envir, Object *key, Object *value) {
+    hashmap_set(envir->map, key, value);
+}
+
+void envir_set_str(Envir *envir, char *key, Object *value) {
+    char *key_str = la_strdup(key);
+    union Data dat = { .ptr = key_str };
+    Object *key_obj = obj_init(symt, dat);
+    hashmap_set(envir->map, key_obj, value);
+}
+
+Object *envir_get(Envir *envir, Object *key) {
+    return hashmap_get(envir->map, key);
+}
+
+Object *envir_search(Envir *envir, Object *key) {
+    Object *output;
+    while((output = envir_get(envir, key)) == NULL) {
+        envir = envir->outer;
+        if(envir == NULL) {
+            return NULL;
+        }
+    }
+    return output;
 }

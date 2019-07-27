@@ -9,7 +9,11 @@ all: lateral
 
 .PHONY: clean
 clean:
-	rm lateral *.o
+	rm a.out *.o
+
+.PHONY: test
+test:
+	../test/test.py ./a.out
 
 lateral: $(objects)
-	$(CC) $(CFLAGS) -o lateral $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o a.out $^ $(LDFLAGS)

@@ -1,58 +1,71 @@
-#ifndef LATERAL_OBJECT_H
-#define LATERAL_OBJECT_H
+#ifndef LA_OBJECT_H
+#define LA_OBJECT_H
 
-struct List;
+#define CAR(a) ((a)->data.cell.car)
+#define CDR(a) ((a)->data.cell.cdr)
 
-enum object_type {
-    symbol,
-    char_type, string,
-    int_type, float_type,
-    list_type,
-    c_fn,                           // pointer to function defined in C
-    func_type,                      // lisp function
-    macro_type,
-    error_type
-};
+typedef enum {
+    empty,
+    symt,
+    strt,
+    keywordt,
+    intt,
+    floatt,
+    listt,
+    natfnt,
+    fnt,
+    macrot,
+    errt
+} obj_type;
 
 struct Func {
-    struct Object* args;
-    struct Object* expr;
+    struct Object *args;
+    struct Object *expr;
 };
+
+typedef struct Cell {
+    struct Object *car;
+    struct Object *cdr;
+} Cell;
 
 union Data {
-    void* ptr;
-    struct Func* func;
-    struct Object* (*fn_ptr)(struct List*);
-    char char_type;
-    int int_type;
-    float float_type;
+    void *ptr;
+    char str[16];
+    int int_val;
+    float float_val;
+    struct Func func;
+    Cell cell;
+    struct Object *(*fn_ptr)(struct Object *);
 };
 
-struct Object {
-    enum object_type type;
+typedef struct Object {
+    obj_type type;
     union Data data;
     int marked;
-};
+} Object;
 
-struct Object* object_init_type(enum object_type);
-struct Object* object_init(enum object_type, union Data);
-struct Object* object_symbol_init(char*);
-struct Object* object_copy(struct Object*);
+Object *nil_obj;
+#define NIL (nil_obj)
 
-int object_equals_char(struct Object*, char);
-int object_equals_symbol(struct Object*, char*);
-int object_equals_string(struct Object*, char*);
-int object_equals_value(struct Object*, struct Object*);
-int object_is_nonempty_list(struct Object*);
+Object *obj_init(obj_type, union Data);
+void obj_free(Object *);
+void obj_release(Object *);
+void obj_mark(Object *);
 
-void object_free(struct Object*);
+Object *err_init(char *);
+Object *str_init_len(int len, char *);
+Object *str_init(char *);
+Object *cell_init();
 
-void object_print_type(enum object_type);
-void object_print_string(struct Object*);
-void object_print_pretty(struct Object*);
-void object_print_debug(struct Object*, int);
-void object_debug(struct Object*);
+unsigned int obj_hash(Object *);
+int obj_equals(Object *, Object *);
+int obj_eq_sym(Object *, char *);
 
-void object_mark(struct Object*);
+int obj_is_empty_list(Object *);
+Object *list_length(Object *);
+Object *list_append(Object * list, Object *);
+
+void obj_print(Object *, int pretty);
+void obj_debug(Object *);
 
 #endif

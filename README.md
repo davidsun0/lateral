@@ -2,16 +2,18 @@
 
 Lateral is an interpreter for a basic dialect of Lisp.
 
-I am in the process of rewriting the interpreter. I am much better at C after
-writing the first interpreter and am making big structural changes in the
-second revision. Old project is in src/ while the rewrite is in new/.
-
-My goal with this interpreter is to write an interpreter / compiler in Lateral
-Lisp. The plan is to perform syntax parsing in Lisp and use C as a backend.
+The goal of this project is to write a self-hosting Lisp compiler. It will use
+a C backend. I might compile to JVM Bytecode because it would be like writing
+assembly, but cooler (portable, easier debugging, easier to learn).
 
 ## Current Status
 
-- Rewriting eval to use a new program stack instead of C's call stack
+### 7-27
+
+I consider the interpreter be mostly feature complete. It can read a lisp file
+from disk and interpret it. The most important special forms have been
+implemented, as well as macros. I will definitely need string manipulation
+for compiling to C, but they have yet to be written.
 
 ## Examples
 
@@ -21,29 +23,30 @@ Hello World!
 => nil
 ```
 
-Math
+### Math
 
 ```lisp
 user> (+ 1 2 3 4)
 => 10
 ```
 
-## Features
-
-- Macros
-- Mark and sweep garbage collection
-
 ## Building
 
 Run the provide Makefile.
+The interpreter depends on GNU Readline.
 
 `make all`
 
-### Dependencies
+Python3 is needed to run the tests.
 
-- GNU readline
+`make tests`
 
 ## Resources
 
 - [Make a Lisp](https://github.com/kanaka/mal)
 - [Lateral lisp](https://en.wikipedia.org/wiki/Lisp#Types)
+- [Crafting Interpreters](https://craftinginterpreters.com/contents.html)
+
+## License
+
+This project is released under the GPL v3.0.

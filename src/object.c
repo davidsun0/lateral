@@ -1,389 +1,292 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include "list.h"
-#include "lang.h"
+#include "hash.h"
+#include "reader.h"
 #include "garbage.h"
-#include "error.h"
+#include "core.h"
 
 #include "object.h"
 
-struct Object* object_init_type(enum object_type type) {
-    struct Object* obj = malloc(sizeof(struct Object));
-    obj->type = type;
-    obj->data.ptr = NULL;
-    obj->marked = 0;
-    gc_insert_object(obj);
-    return obj;
-}
-
-struct Object* object_init(enum object_type type, union Data data) {
-    struct Object* obj = malloc(sizeof(struct Object));
+Object *obj_init(obj_type type, union Data data) {
+    Object *obj = garbage_alloc();
     obj->type = type;
     obj->data = data;
     obj->marked = 0;
-    gc_insert_object(obj);
     return obj;
 }
 
-struct Object* object_symbol_init(char* str) {
-    char* str_copy = malloc(sizeof(char) * (strlen(str) + 1));
-    strcpy(str_copy, str);
-    union Data data = { .ptr = str_copy };
-    return object_init(symbol, data);
-}
-
-struct Object* object_copy(struct Object* obj) {
-    if(obj == NULL) {
-        return NULL;
-    } else if(obj == true_obj || obj == nil_obj) {
-        return obj;
-    }
-
-    struct Object* source = obj;
-    struct Object* output = object_init_type(source->type);
-    if(source->type == char_type ||
-            source->type == float_type ||
-            source->type == int_type ||
-            source->type == c_fn) {
-        // direct copy
-        output->data = obj->data;
-    } else if(source->type == symbol || source->type == string) {
-        // string copy
-        int length = strlen(source->data.ptr);
-        char* str = malloc(sizeof(char) * (length + 1));
-        strcpy(str, obj->data.ptr);
-        output->data.ptr = str;
-    } else if(source->type == list_type) {
-        struct Object* clone = list_init();
-        struct List* list = source->data.ptr;
-        while(list != NULL) {
-            struct Object* lclone = object_copy(list->obj);
-            list_append_object(clone, lclone);
-            list = list->next;
-        }
-        return clone;
-    } else if(obj->type == func_type || obj->type == macro_type) {
-        printf("implement object_copy for functions\n");
-        return NULL;
-    }
-    return output;
-}
-
-void object_copy2(struct Object** dest, struct Object* src) {
-    if(src == NULL) {
-        *dest = NULL;
-    } else if(src == true_obj || src == nil_obj) {
-        *dest = src;
-    }
-
-    *dest = object_init_type(src->type);
-    if(src->type == char_type || src->type == int_type || src->type == c_fn) {
-        (*dest)->data = src->data;
-    } else if(src->type == symbol || src->type == string) {
-        int length = strlen(src->data.ptr);
-        char* str = malloc(sizeof(char) * (length + 1));
-        strcpy(str, src->data.ptr);
-        (*dest)->data.ptr = str;
-    } else if(src->type == list_type) {
-        (*dest)->data.ptr = list_bare_init();
-        struct List* dest_lst = (*dest)->data.ptr;
-        struct List* src_lst = src->data.ptr;
-        while(src_lst != NULL) {
-            dest_lst = list_bare_append(dest_lst, src_lst->obj);
-            src_lst = src_lst->next;
-        }
-    } else if(src->type == func_type || src->type == macro_type) {
-        printf("implement object_copy for functions\n");
-    }
-}
-
-int object_equals_char(struct Object* obj, char c) {
-    if(obj != NULL && obj->type == char_type && obj->data.char_type == c) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-int object_equals_symbol(struct Object* obj, char* str) {
-    if(obj != NULL && obj->type == symbol &&
-            strcmp(obj->data.ptr, str) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-int object_equals_string(struct Object* obj, char* str) {
-    if(obj != NULL && obj->type == string &&
-            strcmp(obj->data.ptr, str) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-int object_is_nonempty_list(struct Object* obj) {
-    if(obj != NULL && obj->type == list_type) {
-        struct List* list = obj->data.ptr;
-        if(list->obj != NULL) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int object_equals_value(struct Object* a, struct Object* b) {
-    if(a == b) {
-        // also covers if both a and b are NULL
-        return 1;
-    } else if(a == NULL || b == NULL) {
-        return 0;
-    } else if(a->type != b->type) {
-        return 0;
-    }
-
-    if(int_type == a->type) {
-        return a->data.int_type == b->data.int_type ? 1 : 0;
-    } else if(float_type == a->type) {
-        return a->data.float_type == b->data.float_type ? 1 : 0;
-    } else if(char_type == a->type) {
-        return a->data.char_type == b->data.char_type ? 1 : 0;
-    } else if(symbol == a->type || string == a->type) {
-        return strcmp(a->data.ptr, b->data.ptr) == 0 ? 1 : 0;
-    } else {
-        printf("warning: equality not defined for lists\n");
-        return a->data.ptr == b->data.ptr ? 1 : 0;
-    }
-    // TODO: list comparison
-}
-
-void object_mark(struct Object* obj) {
-    if(obj == NULL || obj->marked)
-        return;
-
-    obj->marked = 1;
-    if(obj->type == list_type) {
-        struct List* list = (struct List*) obj->data.ptr;
-        while(list != NULL) {
-            object_mark(list->obj);
-            list = list->next;
-        }
-    } else if(obj->type == func_type || obj->type == macro_type) {
-        struct Func* func = (struct Func*)obj->data.ptr;
-        object_mark(func->args);
-        object_mark(func->expr);
-    }
-}
-
-void object_free(struct Object* obj) {
+void obj_free(Object *obj) {
     if(obj == NULL)
         return;
 
     switch(obj->type) {
-        case symbol:
-        case string:
+        case symt:
+        case strt:
+        case keywordt:
+        case errt:
             free(obj->data.ptr);
-            break;
-
-        case c_fn:
-            printf("warning: attemtped to free function defined in c\n");
             break;
         default:
             break;
     }
 
-    if(list_type == obj->type) {
-        // printf("freeing list\n");
-        struct List* list = (struct List*) obj->data.ptr;
-        if(list != NULL) {
-            struct List* next = list->next;
-            while(list != NULL) {
-                free(list);
-                list = next;
-                if(next != NULL)
-                    next = next->next;
-            }
-        }
-    } else if(func_type == obj->type || macro_type == obj->type) {
-        printf("freeing function / macro\n");
-        free(obj->data.ptr);
-    }
     free(obj);
 }
 
-void object_print_type(enum object_type type) {
-    switch(type) {
-        case symbol:
-            printf("symbol");
-            break;
-        case string:
-            printf("string");
-            break;
-        case char_type:
-            printf("char");
-            break;
-        case int_type:
-            printf("int");
-            break;
-        case float_type:
-            printf("float");
-            break;
-        case list_type:
-            printf("list");
-            break;
-        case c_fn:
-            printf("c_fn");
-            break;
-        case func_type:
-            printf("func");
-            break;
-        case macro_type:
-            printf("macro");
-            break;
-        case error_type:
-            printf("error");
+// releases data associated with object, but not itself
+void obj_release(Object *obj) {
+    if(obj == NULL)
+        return;
+
+    switch(obj->type) {
+        case symt:
+        case strt:
+        case keywordt:
+        case errt:
+            free(obj->data.ptr);
             break;
         default:
-            printf("unknown type");
+            break;
     }
 }
 
-static void print_literal(struct Object* obj) {
-    char* str = (char*) obj->data.ptr;
-    if(obj->type == string)
-        printf("\"");
-    while(*str != '\0') {
-        if(*str == '\n') {
-            printf("\\n");
-        } else if( *str == '\t') {
-            printf("\\t");
-        } else if(*str == '\r') {
-            printf("\\r");
-        } else {
-            printf("%c", *str);
+
+Object *cell_init() {
+    union Data dat = { .cell = { nil_obj, nil_obj} };
+    return obj_init(listt, dat);
+}
+
+Object *err_init(char *str) {
+    char *err = la_strdup(str);
+    union Data dat = { .ptr = err };
+    return obj_init(errt, dat);
+}
+
+void obj_mark(Object *obj) {
+    if(obj->marked)
+        return;
+
+    obj->marked = 1;
+    if(obj->type == listt) {
+        obj_mark(CAR(obj));
+        obj_mark(CDR(obj));
+    } else if(obj->type == fnt || obj->type == macrot) {
+        obj_mark(obj->data.func.args);
+        obj_mark(obj->data.func.expr);
+    }
+}
+
+unsigned int obj_hash(Object *obj) {
+    switch(obj->type) {
+        case symt:
+        case strt:
+        case keywordt:
+        case errt:
+            return str_hash(obj->data.ptr);
+        default:
+            printf("hash function not implemented for this type\n");
+            return 0;
+    }
+}
+
+int obj_equals(Object *a, Object *b) {
+    if(a == b)
+        return 1;
+
+    if(a->type != b->type) {
+        return 0;
+    }
+
+    switch(a->type) {
+        case symt:
+        case strt:
+        case keywordt:
+        case errt:
+            return strcmp(a->data.ptr, b->data.ptr) == 0;
+        case intt:
+            return a->data.int_val == b->data.int_val;
+        case floatt:
+            return a->data.float_val == b->data.float_val;
+        default:
+            printf("equality not implemented for this type\n");
+            return 0;
+    }
+}
+
+int obj_is_empty_list(Object *obj) {
+    if(obj->type == listt && CAR(obj) == nil_obj && CDR(obj) == NULL) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+Object *list_length(Object *obj) {
+    int len = 0;
+    if(obj->type != listt) {
+        return err_init("type error: object is not a list");
+    }
+
+    if(CAR(obj) == nil_obj) {
+        union Data dat = { .int_val = 0 };
+        return obj_init(intt, dat);
+    }
+
+    while(obj != nil_obj) {
+        if(obj->type != listt) {
+            return err_init("type error: object not proper list");
         }
-        str ++;
+        len ++;
+        obj = CDR(obj); 
     }
-    if(obj->type == string)
-        printf("\"");
+
+    union Data dat = { .int_val = len };
+    return obj_init(intt, dat);
 }
 
-void object_print_string(struct Object* obj) {
-    if(obj == NULL) {
-        printf("[null]");
-    } else if(list_type == obj->type) {
-        printf("(");
-        struct List* node = obj->data.ptr;
-        if(node != NULL && node->obj != NULL) {
-            while(node != NULL) {
-                object_print_string(node->obj);
-                node = node->next;
-                if(node != NULL) {
-                    printf(" ");
-                }
+Object *list_append(Object *list, Object *obj) {
+    if(list->type != listt) {
+        printf("warning: trying to append to object that is not a list\n");
+        return NULL;
+    }
+
+    if(list == nil_obj) {
+        printf("trying to append to nil?\n");
+        return NULL;
+    }
+
+    if(CAR(list) == nil_obj) {
+        CAR(list) = obj;
+        return list;
+    } else {
+        while(CDR(list) != nil_obj) {
+            list = CDR(list);
+            if(list->type != listt) {
+                return err_init("error: object is not a proper list");
             }
         }
-        printf(")");
-    } else if(true_obj == obj) {
-        printf("t");
-    } else if(nil_obj == obj) {
+        Object *newcell = cell_init();
+        CAR(newcell) = obj;
+        CDR(list) = newcell;
+        return newcell;
+    }
+}
+
+int obj_eq_sym(Object *obj, char *str) {
+    if(obj->type != symt) {
+        return 0;
+    }
+
+    char *ostr = (char *)obj->data.ptr;
+    return strcmp(ostr, str) == 0;
+}
+
+void obj_print(Object *obj, int pretty) {
+    if(obj == nil_obj) {
         printf("nil");
-    } else if(string == obj->type || symbol == obj->type) {
-        // string based types
-        // printf("\"%s\"", (char*) obj->data.ptr);
-        print_literal(obj);
-    } else if(char_type == obj->type) {
-        printf("%c", obj->data.char_type);
-    } else if(int_type == obj->type) {
-        printf("%d", obj->data.int_type);
-    } else if(float_type == obj->type) {
-        printf("%f", obj->data.float_type);
-    } else if(c_fn == obj->type) {
-        printf("c_fn<%p>", obj->data.ptr);
-    } else if(func_type == obj->type) {
-        printf("fn<%p>", obj->data.ptr);
-    } else if(macro_type == obj->type) {
-        printf("macro<%p>", obj->data.ptr);
-    } else if(error_type == obj->type) {
-        struct Error* err = obj->data.ptr;
-        printf("%d error: %s", err->type, err->message);
-    } else {
-        printf("%p", obj->data.ptr);
-    }
-}
-
-void object_print_pretty(struct Object* obj) {
-    if(obj->type != string) {
-        object_print_string(obj);
-    } else {
-        printf("%s", (char*) obj->data.ptr);
-    }
-}
-
-void object_print_debug(struct Object* obj, int indent) {
-    for(int i = 0; i < indent; i ++) {
-        printf("  ");
-    }
-    if(obj == NULL) {
-        printf("[ NULL OBJECT ]\n");
+        return;
+    } else if(obj == tru_obj) {
+        printf("t");
         return;
     }
-    printf("adr %p:\n", (void*) obj);
 
-    for(int i = 0; i < indent; i ++) {
-        printf("  ");
-    }
-    object_print_type(obj->type);
-    printf("\n");
-
-    for(int i = 0; i < indent; i ++) {
-        printf("  ");
-    }
-    if(obj->marked) {
-        printf("mark\n");
-    } else {
-        printf("no mark\n");
-    }
-
-    for(int i = 0; i < indent; i ++) {
-        printf("  ");
-    }
     switch(obj->type) {
-        case symbol:
-            printf("data: %s\n", (char*) obj->data.ptr);
-            break;
-        case string:
-            printf("data: %s\n", (char*) obj->data.ptr);
-            break;
-        case char_type:
-            printf("data: %c\n", obj->data.char_type);
-            break;
-        case int_type:
-            printf("data: %d\n", obj->data.int_type);
-            break;
-        case list_type:
-            printf("data:\n");
-            object_print_debug(obj->data.ptr, indent + 1);
-            indent ++;
-            struct List* list = (struct List*) obj->data.ptr;
-            while(list != NULL) {
-                for(int i = 0; i < indent; i ++) {
-                    printf("  ");
-                }
-                printf("node addr: %p\n", (void *) list);
-                object_print_debug(list->obj, indent + 1);
-                list = list->next;
+        case strt:
+            if(pretty) {
+                printf("%s", (char *)obj->data.ptr);
+            } else {
+                printf("\"%s\"", (char *)obj->data.ptr);
             }
             break;
+        case symt:
+        case keywordt:
+        case errt:
+            printf("%s", (char *)obj->data.ptr);
+            break;
+        case intt:
+            printf("%d", obj->data.int_val);
+            break;
+        case listt:
+            printf("(");
+            while(obj != nil_obj) {
+                if(CAR(obj) != nil_obj) {
+                    obj_print(CAR(obj), pretty);
+                }
+                if(CDR(obj) != nil_obj) {
+                    printf(" ");
+                }
+                obj = CDR(obj);
+            }
+            printf(")");
+            break;
+        case natfnt:
+            printf("natfn<%p>", obj->data.ptr);
+            break;
+        case fnt:
+            printf("fn<%p>", obj->data.ptr);
+            break;
+        case macrot:
+            printf("macro<%p>", obj->data.ptr);
+            break;
         default:
-            printf("data: %p\n", obj->data.ptr);
+            printf("object@<%p>", (void *)obj);
     }
 }
 
-void object_debug(struct Object* obj) {
-    object_print_debug(obj, 0);
-    printf("\n");
+void obj_debug0(Object *obj, int indt) {
+    for(int i = 0; i < indt; i ++) {
+        printf("  ");
+    }
+
+    if(obj == nil_obj) {
+        printf("nil_obj\n");
+        return;
+    } else if(obj == tru_obj) {
+        printf("t_obj\n");
+        return;
+    } else if(obj == NULL) {
+        printf("NULL\n");
+    } else {
+        switch(obj->type) {
+            case symt:
+                printf("sym: %s\n", (char *)obj->data.ptr);
+                break;
+            case strt:
+                printf("str: %s\n", (char *)obj->data.ptr);
+                break;
+            case keywordt:
+                printf("key: %s\n", (char *)obj->data.ptr);
+                break;
+            case errt:
+                printf("err: %s\n", (char *)obj->data.ptr);
+                break;
+            case intt:
+                printf("int: %d\n", obj->data.int_val);
+                break;
+            case listt:
+                printf("list<%p>\n", obj->data.ptr);
+                obj_debug0(obj->data.cell.car, indt + 1);
+                obj_debug0(obj->data.cell.cdr, indt);
+                break;
+            case natfnt:
+                printf("natfn<%p>\n", obj->data.ptr);
+                break;
+            case fnt:
+                printf("fn<%p>\n", obj->data.ptr);
+                break;
+            case macrot:
+                printf("macro<%p>:\n", obj->data.ptr);
+                obj_debug0(obj->data.func.args, indt + 1);
+                obj_debug0(obj->data.func.expr, indt + 1);
+                break;
+            default:
+                printf("unimplemented\n");
+        }
+    }
+}
+
+void obj_debug(Object *obj) {
+    obj_debug0(obj, 0);
 }

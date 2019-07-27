@@ -1,17 +1,29 @@
-(def defmacro
-  (macro (name args expr)
-    `(def ~name (macro ~args ~expr))))
+(defmacro defun (name args expr)
+  (list (quote def) 
+        name
+        (list (quote fn) args expr)))
 
-(defmacro quote (x))
+(defun not (p)
+  (if p nil t))
 
-(defmacro defn (a b c)
-  `(def ~a (fn ~b ~c)))
+(print (not nil))
 
-(defn inc (n)
-  (+ n 1))
+(defun inc (n) (+ n 1))
 
-(defn mult (a b)
-  (loop (acc 0 n 0)
-    (if (= n b)
-      acc
-      (recur (+ acc a) (+ n 1)))))
+; (print inc)
+; (print (inc 100))
+
+; (defun print-header ()
+;  (progn
+;    (pprint "#include <stdlib.h>")
+;    (pprint "#include <stdio.h>")
+;    (pprint "int main() {")))
+
+; (defun print-footer ()
+;  (pprint "}"))
+
+;; (defun compile-print (obj)
+;;   (cond
+;;     ((list? obj)
+;;      (join (map string obj))
+;;     (t (printf "printf(\"%s\"\n);" (string obj))

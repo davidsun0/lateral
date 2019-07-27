@@ -1,10 +1,11 @@
-#ifndef LATERAL_READER_H
-#define LATERAL_READER_H
+#ifndef LA_READER_H
+#define LA_READER_H
 
 #include "object.h"
 
-struct Object* read_string(char* str);
-
-struct Object* read_module(char* filename);
+char *la_strdup(char *str);
+int read_token(char **, Object **);
+int read_form(Object**, Object **);
+Object* read_string(char *str);
 
 #endif

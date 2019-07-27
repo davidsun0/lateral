@@ -58,13 +58,20 @@ if __name__ == '__main__':
             ('(+ 1 (+ 1 1))', '3'),
             ]
 
+    function = [
+            ('((fn () 321))', '321'),
+            ('((fn (x) (+ x x x)) 333)', '999'),
+            ('((fn (x) ((fn (y) (+ y 1)) x)) 10)', '11')
+            ]
+ 
     envir = [
             ('(def x (+ 100 200))', '300'),
             ('x', '300'),
             ('(def x 31415)', '31415'),
             ('x', '31415')
             ]
-    
+
     runSuite(arith)
+    runSuite(function)
     runSuite(envir)
     # runTest(['(+ 1 1)'], ['2'])
