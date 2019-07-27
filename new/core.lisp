@@ -3,16 +3,27 @@
         name
         (list (quote fn) args expr)))
 
-(defun print-header ()
-  (progn
-    (pprint "#include <stdlib.h>")
-    (pprint "#include <stdio.h>")
-    (pprint "int main() {")))
+(defun not (p)
+  (if p nil t))
 
-(defun print-footer ()
-  (pprint "}"))
+(print (not nil))
 
-(defun compile-print (obj)
-  (cond
-    ((list? obj) ())
-    (t (printf "printf(\"%s\"\n);" (string obj))
+(defun inc (n) (+ n 1))
+
+; (print inc)
+; (print (inc 100))
+
+; (defun print-header ()
+;  (progn
+;    (pprint "#include <stdlib.h>")
+;    (pprint "#include <stdio.h>")
+;    (pprint "int main() {")))
+
+; (defun print-footer ()
+;  (pprint "}"))
+
+;; (defun compile-print (obj)
+;;   (cond
+;;     ((list? obj)
+;;      (join (map string obj))
+;;     (t (printf "printf(\"%s\"\n);" (string obj))

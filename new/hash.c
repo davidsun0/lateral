@@ -2,7 +2,6 @@
 #include <stdio.h>
 
 #include "object.h"
-#include "list.h"
 #include "reader.h"
 
 #include "hash.h"
@@ -23,50 +22,36 @@ HashMap *hashmap_init(int size) {
     HashMap *map = malloc(sizeof(HashMap));
     map->capacity = size;
     map->load = 0;
-    map->buckets = malloc(sizeof(List) * size);
+
+    map->buckets = malloc(sizeof(Object) * size);
     for(int i = 0; i < size; i ++) {
-        map->buckets[i].obj = NULL;
-        map->buckets[i].next = NULL;
+        (map->buckets + i)->type = listt;
+        CAR(map->buckets + i) = nil_obj;
+        CDR(map->buckets + i) = nil_obj;
     }
     return map;
 }
 
 void hashmap_free(HashMap *map) {
-    for(int i = 0; i < map->capacity; i ++) {
-        if(map->buckets[i].next != NULL) {
-            list_free(map->buckets[i].next);
-        }
-    }
     free(map->buckets);
     free(map);
 }
-
-#define list_key(list) (((List *)((list)->obj->data.ptr))->obj)
-#define list_value(list) (((List *)((list)->obj->data.ptr))->next->obj)
 
 void hashmap_resize(HashMap *map) {
     printf("warning: hashmap_resize has not been tested\n");
     HashMap *newmap = hashmap_init(map->capacity * 2);
     for(int i = 0; i < map->capacity; i ++) {
-        List *list = map->buckets + i;
-        while(list != NULL) {
-            if(list->obj->type != listt) {
-                printf("error: hashmap corrupted\n");
-                exit(1);
-            }
-            List *keyval = (List *)list->obj->data.ptr;
-            if(keyval->obj == NULL || keyval->next == NULL || keyval->next->obj == NULL) {
-                printf("error: hashmap corrupted\n");
-                exit(1);
-            }
-            Object *key = keyval->obj;
-            Object *val = keyval->next->obj;
+        Object *list = map->buckets + i;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+            Object *key = CAR(keyval);
+            Object *val = CDR(keyval);
             hashmap_set(newmap, key, val);
 
-            list = list->next;
+            list = CDR(list);
         }
     }
-    list_free(map->buckets);
+    free(map->buckets);
     map->buckets = newmap->buckets;
     map->capacity = newmap->capacity;
     free(newmap);
@@ -77,55 +62,52 @@ void hashmap_set(HashMap *map, Object *key, Object *value) {
         hashmap_resize(map);
     }
 
-    List *keyval = list_init();
-    keyval->obj = key;
-    keyval->next = list_init();
-    keyval->next->obj = value;
-    union Data dat = { .ptr = keyval };
-    Object *keyval_obj = obj_init(listt, dat);
-
     unsigned int hash = obj_hash(key) % map->capacity;
-    if(map->buckets[hash].obj == NULL) {
-        map->buckets[hash].obj = keyval_obj;
+    if(CAR(map->buckets + hash) == nil_obj) {
+        Object *keyval = cell_init();
+        CAR(keyval) = key;
+        CDR(keyval) = value;
+
+        CAR(map->buckets + hash) = keyval;
+        map->load ++;
     } else {
-        List *list = map->buckets + hash;
-        List *listb = list;
-        while(list != NULL) {
-            if(obj_equals(key, list_key(list))) {
-                list_value(list) = value;
+        Object *list = map->buckets + hash;
+        while(list != nil_obj) {
+            if(obj_equals(key, CAR(CAR(list)))) {
+                // update value
+                CDR(CAR(list)) = value;
+                return;
+            } else if(CDR(list) == nil_obj) {
+                // append to end of linked list
+                Object *keyval = cell_init();
+                CAR(keyval) = key;
+                CDR(keyval) = value;
+
+                Object *bucket = cell_init();
+                CAR(bucket) = keyval;
+                CDR(list) = bucket;
+                map->load ++;
                 return;
             }
-            list = list->next;
+            list = CDR(list);
         }
-
-        list_append(listb, keyval_obj);
-        map->load ++;
     }
 }
 
 Object *hashmap_get(HashMap *map, Object *key) {
     unsigned int hash = obj_hash(key) % map->capacity;
-    if(map->buckets[hash].obj == NULL) {
+    Object *list = map->buckets + hash;
+    if(CAR(list) == nil_obj) {
         return NULL;
     } else {
-        List *list = map->buckets + hash;
-        while(list != NULL) {
-            if(list->obj->type != listt) {
-                printf("error: hashmap corrupted\n");
-                exit(1);
-            }
-            List *keyval = (List *)list->obj->data.ptr;
-            if(keyval->obj == NULL || keyval->next == NULL || keyval->next->obj == NULL) {
-                printf("error: hashmap corrupted\n");
-                exit(1);
-            }
-            Object *tkey = keyval->obj;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
 
-            if(obj_equals(key, tkey)) {
-                Object *val = keyval->next->obj;
+            if(obj_equals(key, CAR(keyval))) {
+                Object *val = CDR(keyval);
                 return val;
             } else {
-                list = list->next;
+                list = CDR(list);
             }
         }
         return NULL;
@@ -135,18 +117,18 @@ Object *hashmap_get(HashMap *map, Object *key) {
 
 void hashmap_debug(HashMap *map) {
     for(int i = 0; i < map->capacity; i ++) {
-        List *list = map->buckets + i;
-        if(list->obj != NULL) {
-            while(list != NULL) {
-                Object *key = list_key(list);
-                Object *value = list_value(list);
+        Object *list = map->buckets + i;
+        if(CAR(list) != nil_obj) {
+            while(list != nil_obj) {
+                Object *key = CAR(CAR(list));
+                Object *value = CDR(CAR(list));
                 printf("===\n");
                 printf("key: ");
                 obj_debug(key);
                 printf("value: ");
                 obj_debug(value);
 
-                list = list->next;
+                list = CDR(list);
             }
         }
     }

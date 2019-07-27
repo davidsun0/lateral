@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "object.h"
-#include "list.h"
 
 #include "reader.h"
 
@@ -123,77 +122,73 @@ Object *read_atom(Object *obj) {
     }
 }
 
-int read_list(List **tokens, Object **tree);
+int read_list(Object **tokens, Object **tree);
 
-int read_form(List **tokens, Object **tree) {
-    if(*tokens == NULL || (*tokens)->obj == NULL) {
+int read_form(Object **tokens, Object **tree) {
+    if(*tokens == nil_obj || CAR(*tokens) == nil_obj) {
+        printf("is this supposed to happend?");
         return -1;
-    } else if(*(char *)(*tokens)->obj->data.ptr == '(') {
+    } else if(*(char *)(CAR(*tokens)->data.ptr) == '(') {
         // consume left paren
-        *tokens = (*tokens)->next;
-
+        *tokens = CDR(*tokens);
         return read_list(tokens, tree);
     } else {
-        /*
-        char *str = la_strdup((char *)(*tokens)->obj->data.ptr);
-        union Data dat = { .ptr = str };
-        Object *obj = obj_init(symt, dat);
-        */
-        *tree = read_atom((*tokens)->obj);
-        *tokens = (*tokens)->next;
+        *tree = read_atom(CAR(*tokens));
+        *tokens = CDR(*tokens);
         return 0;
     }
 }
 
-int read_list(List **tokens, Object **tree) {
-    List *list = list_init();
-    union Data dat = { .ptr = list };
-    *tree = obj_init(listt, dat);
+int read_list(Object **tokens, Object **tree) {
+    *tree = cell_init();
+    Object *listb = *tree;
 
     Object *obj = NULL;
-    while(*tokens != NULL && *(char *)(*tokens)->obj->data.ptr != ')') {
+    while(*tokens != nil_obj && *(char *)(CAR(*tokens)->data.ptr) != ')') {
         read_form(tokens, &obj);
-        list = list_append(list, obj);
+        listb = list_append(listb, obj);
     }
     
-    if(*tokens == NULL) {
+    if(*tokens == nil_obj) {
         fprintf(stderr, "syntax error: unmatched '('\n");
         return -1;
     }
 
     // consume right paren
-    *tokens = (*tokens)->next;
+    *tokens = CDR(*tokens);
     return 0;
 }
 
-Object* read_string(char *str) {
-    // tokenize input string
-    List *tokens = list_init();
+Object *read_string(char *str) {
+    Object *tokens = cell_init();
+    Object *curr = tokens;
     Object *obj = NULL;
-    List *curr = tokens;
     while(read_token(&str, &obj) >= 0) {
         curr = list_append(curr, obj);
     }
 
-    // convert token into abstract syntax tree
     Object *ast = NULL;
     curr = tokens;
     int ret = read_form(&curr, &ast);
-    if(curr != NULL) {
+
+    if(curr != nil_obj) {
         printf("error: unexpected tokens: ");
-        while(curr != NULL) {
-            obj_print(curr->obj, 0);
+        while(curr != nil_obj) {
+            obj_print(CAR(curr), 0);
             printf(" ");
-            curr = curr->next;
+            curr = CDR(curr);
         }
         printf("\n");
     }
 
-    list_free(tokens);
     if(ret >= 0) {
-        // obj_debug(ast);
         return ast;
     } else {
+        printf("read_form error\n");
+        obj_debug(ast);
+        obj_debug(tokens);
         return NULL;
     }
+
+    return tokens;
 }

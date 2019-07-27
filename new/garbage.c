@@ -1,17 +1,52 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "list.h"
 #include "hash.h"
 #include "eval.h"
 #include "object.h"
 
 #include "garbage.h"
 
-void garbage_init() {
-    all_objects = list_init();
+Bank *bank_init() {
+    Bank *bank = malloc(sizeof(Bank));
+    if(bank == NULL) {
+        printf("fatal: failed to allocate object bank\n");
+        exit(1);
+    }
+
+    bank->next = NULL;
+    for(int i = 0; i < BANKSIZE; i ++) {
+        bank->objs[i].type = empty;
+        bank->objs[i].marked = 0;
+    }
+    return bank;
 }
 
+void garbage_init() {
+    // all_objects = list_init();
+    all_objects = bank_init();
+}
+
+Object* garbage_alloc() {
+    Bank *bank = all_objects;
+    while(bank != NULL) {
+        for(int i = 0; i < BANKSIZE; i ++) {
+            if(bank->objs[i].type == empty) {
+                return &bank->objs[i];
+            }
+        }
+
+        if(bank->next == NULL) {
+            bank->next = bank_init();
+        }
+        bank = bank->next;
+    }
+    printf("fatal: failed to allocate object\n");
+    exit(1);
+    return NULL;
+}
+
+/*
 void garbage_insert(Object *obj) {
     obj->marked = 0;
     if(all_objects->obj != NULL) {
@@ -23,11 +58,13 @@ void garbage_insert(Object *obj) {
         all_objects->obj = obj;
     }
 }
+*/
 
 void garbage_run() {
     // loop over all obj in curr_envir
     HashMap *map = curr_envir->map;
     for(int i = 0; i < map->capacity; i ++) {
+        /*
         List *list = map->buckets + i;
         if(list->obj != NULL) {
             while(list != NULL) {
@@ -35,11 +72,15 @@ void garbage_run() {
                 list = list->next;
             }
         }
+        */
+        obj_mark(CAR(map->buckets + i));
+        obj_mark(CDR(map->buckets + i));
     }
 
-    List *objs = all_objects;
-    List *prev = all_objects;
+    // List *objs = all_objects;
+    // List *prev = all_objects;
     
+    /*
     while(objs != NULL) {
         if(!objs->obj->marked) {
             List *old = objs;
@@ -58,4 +99,41 @@ void garbage_run() {
             objs = objs->next;
         }
     }
+    */
+
+    Bank *bank = all_objects;
+    while(bank != NULL) {
+        for(int i = 0; i < BANKSIZE; i ++) {
+            if(!bank->objs[i].marked && bank->objs[i].type != empty) {
+                // obj_debug(&bank->objs[i]);
+                obj_release(&bank->objs[i]);
+                bank->objs[i].type = empty;
+            }
+            bank->objs[i].marked = 0;
+        }
+        bank = bank->next;
+    }
+}
+
+void garbage_shutdown() {
+    Bank *bank = all_objects;
+    int alive = 0;
+    int dead = 0;
+    int banks = 0;
+    while(bank != NULL) {
+        banks ++;
+        for(int i = 0; i < BANKSIZE; i ++) {
+            if(bank->objs[i].type == empty) {
+                dead ++;
+            } else {
+                obj_release(&bank->objs[i]);
+                alive ++;
+            }
+        }
+        Bank *prev = bank;
+        bank = bank->next;
+        free(prev);
+    }
+    printf("== gc stats ==\n");
+    printf("banks in use:%d\nlive objs: %d\ndead objs: %d\n", banks, alive, dead);
 }

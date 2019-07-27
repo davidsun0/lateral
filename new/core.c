@@ -6,58 +6,57 @@
 
 #include "core.h"
 
-Object *la_sum(List *list) {
+Object *la_sum(Object *list) {
     int sum = 0;
-    while(list != NULL) {
-        Object *obj = list->obj;
+    while(list != nil_obj) {
+        Object *obj = CAR(list);
         if(obj->type == intt) {
             sum += obj->data.int_val;
         } else {
             return err_init("type error");
         }
-        list = list->next;
+        list = CDR(list);
     }
     union Data dat = { .int_val = sum };
     return obj_init(intt, dat);
 }
 
-Object *la_is_nil(List *list) {
-    if(list->obj == nil_obj) {
+Object *la_is_nil(Object *list) {
+    if(CAR(list)->type == listt && CAR(CAR(list)) == nil_obj) {
         return tru_obj;
     } else {
         return nil_obj;
     }
 }
 
-Object *la_list(List *list) {
-    List *lista = list_init();
-    List *listb = lista;
-    while(list != NULL) {
-        listb = list_append(listb, list->obj);
-        list = list->next;
+Object *la_list(Object *list) {
+    Object *ret = cell_init();
+    Object *retb = ret;
+    while(list != nil_obj) {
+        retb = list_append(retb, CAR(list));
+        list = CDR(list);
     }
-    union Data dat = { .ptr = lista };
-    return obj_init(listt, dat);
+    return ret;
 }
 
-Object *la_print(List *list) {
-    obj_print(list->obj, 0);
+Object *la_print(Object *list) {
+    obj_print(CAR(list), 0);
     printf("\n");
     return nil_obj;
 }
 
-Object *la_pprint(List *list) {
-    obj_print(list->obj, 1);
+Object *la_pprint(Object *list) {
+    obj_print(CAR(list), 1);
     printf("\n");
     return nil_obj;
 }
 
-Object *la_debug(List *list) {
-    obj_debug(list->obj);
+Object *la_debug(Object *list) {
+    obj_debug(CAR(list));
     return nil_obj;
 }
 
-void insert_function(char *name, Object *(fn_ptr)(List *)) {
+void insert_function(char *name, Object *(fn_ptr)(Object *)) {
     union Data dat = { .fn_ptr = fn_ptr };
     Object *fn = obj_init(natfnt, dat);
     dat.ptr = la_strdup(name);
@@ -66,11 +65,19 @@ void insert_function(char *name, Object *(fn_ptr)(List *)) {
 }
 
 void lang_init() {
+    // printf("size of object: %ld\n", sizeof(Object));
+
     union Data dat = { .int_val = 0 };
     tru_obj = obj_init(intt, dat);
-    nil_obj = obj_init(intt, dat);
-
     envir_set_str(curr_envir, "t", tru_obj);
+
+    // NIL is a list whose CAR and CDR are NIL
+    /*
+    union Data ndat = { .cell = {NULL, NULL}};
+    nil_obj = obj_init(listt, ndat);
+    CAR(nil_obj) = nil_obj;
+    CDR(nil_obj) = nil_obj;
+    */
     envir_set_str(curr_envir, "nil", nil_obj);
 
     insert_function("+", la_sum);

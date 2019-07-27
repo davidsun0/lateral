@@ -2,14 +2,16 @@
 #include <stdio.h>
 
 #include "object.h"
-#include "list.h"
-#include "core.h"
 
 #include "eval.h"
 
-Envir *envir_push(Envir *envir, List *args, List *vals) {
-    int sizea = list_length(args);
-    int sizeb = list_length(vals);
+Envir *envir_push(Envir *envir, Object *args, Object *vals) {
+    Object *lena = list_length(args);
+    Object *lenb = list_length(vals);
+
+    int sizea = lena->data.int_val;
+    int sizeb = lenb->data.int_val;
+
     if(sizea != sizeb) {
         printf("expected %d arguments, but got %d\n", sizea, sizeb);
         return NULL;
@@ -17,9 +19,9 @@ Envir *envir_push(Envir *envir, List *args, List *vals) {
 
     Envir *inner = envir_init(sizea * 2);
     for(int i = 0; i < sizea; i ++) {
-        envir_set(inner, args->obj, vals->obj);
-        args = args->next;
-        vals = vals->next;
+        envir_set(inner, CAR(args), CAR(vals));
+        args = CDR(args);
+        vals = CDR(vals);
     }
     envir->inner = inner;
     inner->outer = envir;
@@ -34,7 +36,8 @@ Envir *envir_pop(Envir *envir) {
 
 int is_macro(Envir *envir, Object *ast) {
     if(ast->type == listt) {
-        Object *fn = ((List *)ast->data.ptr)->obj;
+        // Object *fn = ast->data.cell.car;
+        Object *fn = CAR(ast);
         if(fn->type == symt) {
             fn = envir_search(envir, fn);
             if(fn != NULL && fn->type == macrot)
@@ -46,9 +49,10 @@ int is_macro(Envir *envir, Object *ast) {
 
 Object *macro_expand(Envir *envir, Object *ast) {
     while(is_macro(envir, ast)) {
-        Object *macro = envir_search(envir, ((List *)ast->data.ptr)->obj);
-        List *vals = ((List *)ast->data.ptr)->next;
-        List *args = macro->data.func.args;
+        Object *macro = envir_search(envir, CAR(ast));
+        Object *vals = CDR(ast);
+
+        Object *args = macro->data.func.args;
         Envir *inner = envir_push(envir, args, vals);
         Object *expr = macro->data.func.expr;
         ast = evaluate(inner, expr);
@@ -65,74 +69,73 @@ Object *eval_ast(Envir *envir, Object *ast) {
         }
         return ret;
     } else if(ast->type == listt) {
-        List *list = list_init();
-        List *list2 = list;
-        List *vals = ast->data.ptr;
-        while(vals != NULL) {
-            Object *obj = evaluate(envir, vals->obj);
-            list2 = list_append(list2, obj);
-            vals = vals->next;
+        Object *list = cell_init();
+        Object *listb = list;
+        while(ast != nil_obj) {
+            Object *obj = evaluate(envir, CAR(ast));
+            listb = list_append(listb, obj);
+            ast = CDR(ast);
         }
-        union Data dat = { .ptr = list };
-        return obj_init(listt, dat);
+        return list;
     } else {
         return ast;
     }
 }
 
 Object *evaluate(Envir *envir, Object *ast) {
-    if(ast->type == listt && ((List *)ast->data.ptr)->obj == NULL) {
+    if(CAR(ast) == nil_obj && CDR(ast) == nil_obj) {
         return ast;
     }
 
     ast = macro_expand(envir, ast);
 
     if(ast->type == listt) {
-        List *list = ast->data.ptr;
-        if(obj_eq_sym(list->obj, "def")) {
-            Object *sym = list->next->obj;
-            Object *val = evaluate(envir, list->next->next->obj);
+        if(obj_eq_sym(CAR(ast), "def")) {
+            Object *sym = CAR(CDR(ast));
+            Object *val = evaluate(envir, CAR(CDR(CDR(ast))));
             envir_set(envir, sym, val);
             return val;
-        } else if(obj_eq_sym(list->obj, "defmacro")) {
-            list = list->next;
-            Object *name = list->obj;
-            list = list->next;
-            Object *args = list->obj;
-            list = list->next;
-            Object *expr = list->obj;
+        } else if(obj_eq_sym(CAR(ast), "defmacro")) {
+            Object *name = CAR(CDR(ast));
+            Object *args = CAR(CDR(CDR(ast)));
+            Object *expr = CAR(CDR(CDR(CDR(ast))));
+            if(args->type != listt) {
+                return err_init("macro args must be a list");
+            }
 
-            List *arg_list = list_copy(args->data.ptr);
-            union Data dat = { .func = { .args = arg_list, .expr = expr }};
+            union Data dat = { .func = { .args = args, .expr = expr }};
             Object *macro = obj_init(macrot, dat);
             envir_set(envir, name, macro);
             return name;
-        } else if(obj_eq_sym(list->obj, "fn")) {
-            Object *args = list->next->obj;
-            Object *expr = list->next->next->obj;
-            List *arg_list = list_copy(args->data.ptr);
-            union Data dat = { .func = { .args = arg_list, .expr = expr }};
+        } else if(obj_eq_sym(CAR(ast), "fn")) {
+            Object *args = CAR(CDR(ast));
+            Object *expr = CAR(CDR(CDR(ast)));
+            union Data dat = { .func = { .args = args, .expr = expr }};
             return obj_init(fnt, dat);
-        } else if(obj_eq_sym(list->obj, "if")) {
-            list = list->next;
-            Object *pred = evaluate(envir, list->obj);
-            list = list->next;
-            Object *btrue = list->obj;
-            Object *bfalse = list->next == NULL ? nil_obj : list->next->obj;
+        } else if(obj_eq_sym(CAR(ast), "if")) {
+            Object *pred = evaluate(envir, CAR(CDR(ast)));
+            ast = CDR(CDR(ast));
             if(pred != nil_obj) {
-                return btrue;
+                // evaluate true branch
+                return evaluate(envir, CAR(ast));
             } else {
-                return bfalse;
+                if(CDR(ast) == nil_obj) {
+                    // nil if no false branch
+                    return nil_obj;
+                } else {
+                    // false branch
+                    return evaluate(envir, CAR(CDR(ast)));
+                }
             }
-        } else if(obj_eq_sym(list->obj, "quote")) {
-            return list->next->obj;
-        } else if(obj_eq_sym(list->obj, "progn")) {
-            list = list->next;
-            while(list->next != NULL) {
-                evaluate(envir, list->obj);
-                list = list->next;
+        } else if(obj_eq_sym(CAR(ast), "quote")) {
+            return CAR(CDR(ast));
+        } else if(obj_eq_sym(CAR(ast), "progn")) {
+            ast = CDR(ast);
+            while(CDR(ast) != nil_obj) {
+                evaluate(envir, CAR(ast));
+                ast = CDR(ast);
             }
-            return evaluate(envir, list->obj);
+            return evaluate(envir, CAR(ast));
         }
 
         Object *funcall = eval_ast(envir, ast);
@@ -140,15 +143,21 @@ Object *evaluate(Envir *envir, Object *ast) {
             return err_init("error: epected list in fun eval");
         }
         // funcall
-        list = funcall->data.ptr;
-        Object *fn = list->obj;
+        Object *fn = CAR(funcall);
         if(fn->type == natfnt) {
-            Object *ret = fn->data.fn_ptr(list->next);
-            return ret;
+            return fn->data.fn_ptr(CDR(funcall));
         } else if(fn->type == fnt) {
-            List *vals = list->next;
-            List *args = fn->data.func.args;
+            Object *vals = CDR(funcall);
+            Object *args = fn->data.func.args;
             envir = envir_push(envir, args, vals);
+            if(envir == NULL) {
+                printf("failed to create envir\n");
+                printf("funcall: \n");
+                obj_debug(funcall);
+                printf("expr: \n");
+                obj_debug(ast);
+                exit(1);
+            }
             Object *ret = evaluate(envir, fn->data.func.expr);
             envir = envir_pop(envir);
             return ret;

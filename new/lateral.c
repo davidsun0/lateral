@@ -10,11 +10,15 @@
 #include "core.h"
 #include "garbage.h"
 
-void la_repl() {
-}
-
 int main(int argc, char ** argv) {
     garbage_init();
+
+    // NIL is a cons cell with CAR and CDR as nil
+    union Data ndat = { .cell = {NULL, NULL}};
+    nil_obj = obj_init(listt, ndat);
+    CAR(nil_obj) = nil_obj;
+    CDR(nil_obj) = nil_obj;
+
     curr_envir = envir_init(32);
     lang_init();
 
@@ -36,9 +40,9 @@ int main(int argc, char ** argv) {
             buffer[length] = '\0';
         }
 
-        List *tokens = list_init();
+        Object *tokens = cell_init();
+        Object *curr = tokens;
         Object *obj = NULL;
-        List *curr = tokens;
         char *lbuf = buffer;
         while(read_token(&lbuf, &obj) >= 0) {
             curr = list_append(curr, obj);
@@ -46,19 +50,12 @@ int main(int argc, char ** argv) {
         fclose(f);
         free(buffer);
 
-        union Data dat = { .ptr = tokens };
-        Object *token_wrapper = obj_init(listt, dat);
-        char *prog = la_strdup("*PROG*");
-        union Data dat2 = { .ptr = prog };
-        Object *program = obj_init(symt, dat2);
-        envir_set(curr_envir, program, token_wrapper);
-
         // list_debug0(tokens, 0);
         Object *ast = NULL;
         curr = tokens;
-        while(curr != NULL) {
+        while(curr != nil_obj) {
             read_form(&curr, &ast);
-            Object *ret = evaluate(curr_envir, ast);
+            evaluate(curr_envir, ast);
             garbage_run();
         }
     } else {
@@ -97,5 +94,8 @@ int main(int argc, char ** argv) {
         }
 
         printf("\ngoodbye! ('u' )/\n");
+
+        envir_free(curr_envir);
+        // garbage_shutdown();
     }
 }

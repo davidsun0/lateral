@@ -6,7 +6,7 @@
 unsigned int str_hash(char *);
 
 typedef struct {
-    List *buckets;
+    Object *buckets;
     int capacity;
     int load;
 } HashMap;

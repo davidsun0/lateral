@@ -2,24 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "list.h"
 #include "hash.h"
 #include "reader.h"
-#include "core.h"
 #include "garbage.h"
+#include "core.h"
 
 #include "object.h"
 
 Object *obj_init(obj_type type, union Data data) {
-    Object *obj = malloc(sizeof(Object));
-    if(!obj) {
-        fprintf(stderr, "error: failed to allocate object\n");
-        exit(1);
-    }
+    Object *obj = garbage_alloc();
     obj->type = type;
     obj->data = data;
-
-    garbage_insert(obj);
+    obj->marked = 0;
     return obj;
 }
 
@@ -34,13 +28,34 @@ void obj_free(Object *obj) {
         case errt:
             free(obj->data.ptr);
             break;
-        case listt:
-            list_free(obj->data.ptr);
         default:
             break;
     }
 
     free(obj);
+}
+
+// releases data associated with object, but not itself
+void obj_release(Object *obj) {
+    if(obj == NULL)
+        return;
+
+    switch(obj->type) {
+        case symt:
+        case strt:
+        case keywordt:
+        case errt:
+            free(obj->data.ptr);
+            break;
+        default:
+            break;
+    }
+}
+
+
+Object *cell_init() {
+    union Data dat = { .cell = { nil_obj, nil_obj} };
+    return obj_init(listt, dat);
 }
 
 Object *err_init(char *str) {
@@ -55,21 +70,10 @@ void obj_mark(Object *obj) {
 
     obj->marked = 1;
     if(obj->type == listt) {
-        List *list = obj->data.ptr;
-        if(list->obj != NULL) {
-            while(list != NULL) {
-                obj_mark(list->obj);
-                list = list->next;
-            }
-        }
+        obj_mark(CAR(obj));
+        obj_mark(CDR(obj));
     } else if(obj->type == fnt || obj->type == macrot) {
-        List *list = obj->data.func.args;
-        if(list->obj != NULL) {
-            while(list != NULL) {
-                obj_mark(list->obj);
-                list = list->next;
-            }
-        }
+        obj_mark(obj->data.func.args);
         obj_mark(obj->data.func.expr);
     }
 }
@@ -91,8 +95,9 @@ int obj_equals(Object *a, Object *b) {
     if(a == b)
         return 1;
 
-    if(a->type != b->type)
+    if(a->type != b->type) {
         return 0;
+    }
 
     switch(a->type) {
         case symt:
@@ -111,14 +116,62 @@ int obj_equals(Object *a, Object *b) {
 }
 
 int obj_is_empty_list(Object *obj) {
-    if(obj->type != listt) {
+    if(obj->type == listt && CAR(obj) == nil_obj && CDR(obj) == NULL) {
+        return 1;
+    } else {
         return 0;
     }
-    List *list = obj->data.ptr;
-    if(list->obj == NULL) {
-        return 1;
+}
+
+Object *list_length(Object *obj) {
+    int len = 0;
+    if(obj->type != listt) {
+        return err_init("type error: object is not a list");
     }
-    return 0;
+
+    if(CAR(obj) == nil_obj) {
+        union Data dat = { .int_val = 0 };
+        return obj_init(intt, dat);
+    }
+
+    while(obj != nil_obj) {
+        if(obj->type != listt) {
+            return err_init("type error: object not proper list");
+        }
+        len ++;
+        obj = CDR(obj); 
+    }
+
+    union Data dat = { .int_val = len };
+    return obj_init(intt, dat);
+}
+
+Object *list_append(Object *list, Object *obj) {
+    if(list->type != listt) {
+        printf("warning: trying to append to object that is not a list\n");
+        return NULL;
+    }
+
+    if(list == nil_obj) {
+        printf("trying to append to nil?\n");
+        return NULL;
+    }
+
+    if(CAR(list) == nil_obj) {
+        CAR(list) = obj;
+        return list;
+    } else {
+        while(CDR(list) != nil_obj) {
+            list = CDR(list);
+            if(list->type != listt) {
+                return err_init("error: object is not a proper list");
+            }
+        }
+        Object *newcell = cell_init();
+        CAR(newcell) = obj;
+        CDR(list) = newcell;
+        return newcell;
+    }
 }
 
 int obj_eq_sym(Object *obj, char *str) {
@@ -157,15 +210,14 @@ void obj_print(Object *obj, int pretty) {
             break;
         case listt:
             printf("(");
-            List *list = obj->data.ptr;
-            while(list != NULL) {
-                if(list->obj != NULL) {
-                    obj_print(list->obj, pretty);
+            while(obj != nil_obj) {
+                if(CAR(obj) != nil_obj) {
+                    obj_print(CAR(obj), pretty);
                 }
-                if(list->next != NULL) {
+                if(CDR(obj) != nil_obj) {
                     printf(" ");
                 }
-                list = list->next;
+                obj = CDR(obj);
             }
             printf(")");
             break;
@@ -180,15 +232,6 @@ void obj_print(Object *obj, int pretty) {
             break;
         default:
             printf("object@<%p>", (void *)obj);
-    }
-}
-
-void obj_debug0(Object *obj, int indt);
-
-void list_debug0(List *list, int indt) {
-    while(list != NULL) {
-        obj_debug0(list->obj, indt);
-        list = list->next;
     }
 }
 
@@ -224,14 +267,8 @@ void obj_debug0(Object *obj, int indt) {
                 break;
             case listt:
                 printf("list<%p>\n", obj->data.ptr);
-                List *list = obj->data.ptr;
-                /*
-                while(list != NULL) {
-                    obj_debug0(list->obj, indt + 1);
-                    list = list->next;
-                }
-                */
-                list_debug0(list, indt + 1);
+                obj_debug0(obj->data.cell.car, indt + 1);
+                obj_debug0(obj->data.cell.cdr, indt);
                 break;
             case natfnt:
                 printf("natfn<%p>\n", obj->data.ptr);
@@ -241,7 +278,7 @@ void obj_debug0(Object *obj, int indt) {
                 break;
             case macrot:
                 printf("macro<%p>:\n", obj->data.ptr);
-                list_debug0(obj->data.func.args, indt + 1);
+                obj_debug0(obj->data.func.args, indt + 1);
                 obj_debug0(obj->data.func.expr, indt + 1);
                 break;
             default:
