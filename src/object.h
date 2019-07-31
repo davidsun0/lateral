@@ -4,8 +4,19 @@
 #define CAR(a) ((a)->data.cell.car)
 #define CDR(a) ((a)->data.cell.cdr)
 
+// natural numbers indicating number of bits to shift to get flag
+#define MARK_MASK 1
+#define SSTR_MASK 2
+
+#define SET_MARK(a) ((a)->flags |= (1 << MARK_MASK))
+#define UNSET_MARK(a) ((a)->flags &= ~(1 << MARK_MASK))
+#define GET_MARK(a) ((a)->flags & (1 << MARK_MASK))
+
+#define SET_SSTR(a) ((a)->flags |= (1 << SSTR_MASK))
+#define GET_SSTR(a) ((a)->flags & (1 << SSTR_MASK))
+
 typedef enum {
-    empty,
+    empty = 0,
     symt,
     strt,
     keywordt,
@@ -30,7 +41,8 @@ typedef struct Cell {
 
 union Data {
     void *ptr;
-    char str[16];
+    char *str;
+    char short_str[16];
     int int_val;
     float float_val;
     struct Func func;
@@ -40,15 +52,20 @@ union Data {
 
 typedef struct Object {
     obj_type type;
+    int flags;
     union Data data;
-    int marked;
 } Object;
 
 Object *nil_obj;
 #define NIL (nil_obj)
 
+char *type_to_str(obj_type);
+
+char *obj_string(Object *);
+
 Object *obj_init(obj_type, union Data);
-void obj_free(Object *);
+Object *obj_init_str_len(obj_type, char *str, int len);
+Object *obj_init_str(obj_type, char *str);
 void obj_release(Object *);
 void obj_mark(Object *);
 
@@ -61,7 +78,6 @@ unsigned int obj_hash(Object *);
 int obj_equals(Object *, Object *);
 int obj_eq_sym(Object *, char *);
 
-int obj_is_empty_list(Object *);
 Object *list_length(Object *);
 Object *list_append(Object * list, Object *);
 

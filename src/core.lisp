@@ -1,29 +1,20 @@
 (defmacro defun (name args expr)
   (list (quote def) 
         name
-        (list (quote fn) args expr)))
+        (list (quote lambda) args expr)))
 
-(defun not (p)
-  (if p nil t))
+;; tail recursive map helper function
+(defun map0 (fn list acc)
+  (if (nil? list)
+    acc
+    (map0 fn
+          (cdr list)
+          (cons (fn (car list)) acc))))
 
-(print (not nil))
+(defun map (fn in)
+  (reverse! (map0 fn in ())))
 
-(defun inc (n) (+ n 1))
+(defun inc (x)
+  (+ x 1))
 
-; (print inc)
-; (print (inc 100))
-
-; (defun print-header ()
-;  (progn
-;    (pprint "#include <stdlib.h>")
-;    (pprint "#include <stdio.h>")
-;    (pprint "int main() {")))
-
-; (defun print-footer ()
-;  (pprint "}"))
-
-;; (defun compile-print (obj)
-;;   (cond
-;;     ((list? obj)
-;;      (join (map string obj))
-;;     (t (printf "printf(\"%s\"\n);" (string obj))
+(print (map inc (list 1 2 3)))

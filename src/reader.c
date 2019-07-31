@@ -65,28 +65,14 @@ int read_token(char **buf, Object **obj) {
     }
 }
 
-char *la_strdup(char *str) {
-    int len = 0;
-    while(str[len] != '\0') {
-        len ++;
-    }
-
-    char *new = malloc(sizeof(char) * (len + 1));
-    for(int i = 0; i < len; i ++) {
-        new[i] = str[i];
-    }
-    new[len] = '\0';
-    return new;
-}
-
 Object *read_atom(Object *obj) {
     if(obj->type != strt) {
-        printf("error: trying to parse non-string to atom\n");
+        printf("error: trying to parse %s as atom\n", type_to_str(obj->type));
         obj_debug(obj);
         return NULL;
     }
 
-    char *str = (char *)obj->data.ptr;
+    char *str = obj_string(obj);
     if('0' <= str[0] && str[0] <= '9') {
         // try to parse as number
         int sum = 0;
@@ -103,22 +89,12 @@ Object *read_atom(Object *obj) {
         union Data dat = { .int_val = sum };
         return obj_init(intt, dat);
     } else if (str[0] == '"') {
-        char *nstr = la_strdup(str + 1);
-        int i = 0;
-        while(nstr[i] != '\0') {
-            i ++;
-        }
-        nstr[i - 1] = '\0';
-        union Data dat = { .ptr = nstr };
-        return obj_init(strt, dat);
+        // remove beginning and ending quotation marks
+        return obj_init_str_len(strt, str + 1, strlen(str) - 2);
     } else if (str[0] == ':') {
-        char *nstr = la_strdup(str);
-        union Data dat = { .ptr = nstr };
-        return obj_init(keywordt, dat);
+        return obj_init_str(keywordt, str);
     } else {
-        char *nstr = la_strdup(str);
-        union Data dat = { .ptr = nstr };
-        return obj_init(symt, dat);
+        return obj_init_str(symt, str);
     }
 }
 
@@ -126,9 +102,8 @@ int read_list(Object **tokens, Object **tree);
 
 int read_form(Object **tokens, Object **tree) {
     if(*tokens == nil_obj || CAR(*tokens) == nil_obj) {
-        printf("is this supposed to happend?");
         return -1;
-    } else if(*(char *)(CAR(*tokens)->data.ptr) == '(') {
+    } else if(strcmp(obj_string(CAR(*tokens)), "(") == 0) {
         // consume left paren
         *tokens = CDR(*tokens);
         return read_list(tokens, tree);
@@ -140,18 +115,25 @@ int read_form(Object **tokens, Object **tree) {
 }
 
 int read_list(Object **tokens, Object **tree) {
-    *tree = cell_init();
+    *tree = NULL;
     Object *listb = *tree;
 
     Object *obj = NULL;
-    while(*tokens != nil_obj && *(char *)(CAR(*tokens)->data.ptr) != ')') {
+    while(*tokens != nil_obj && strcmp(obj_string(CAR(*tokens)), ")") != 0) {
         read_form(tokens, &obj);
         listb = list_append(listb, obj);
+        if(*tree == NULL) {
+            *tree = listb;
+        }
     }
-    
+
     if(*tokens == nil_obj) {
         fprintf(stderr, "syntax error: unmatched '('\n");
         return -1;
+    }
+
+    if(*tree == NULL) {
+        *tree = cell_init();
     }
 
     // consume right paren
@@ -160,11 +142,14 @@ int read_list(Object **tokens, Object **tree) {
 }
 
 Object *read_string(char *str) {
-    Object *tokens = cell_init();
+    Object *tokens = NULL;
     Object *curr = tokens;
     Object *obj = NULL;
     while(read_token(&str, &obj) >= 0) {
         curr = list_append(curr, obj);
+        if(tokens == NULL) {
+            tokens = curr;
+        }
     }
 
     Object *ast = NULL;
@@ -186,7 +171,6 @@ Object *read_string(char *str) {
     } else {
         printf("read_form error\n");
         obj_debug(ast);
-        obj_debug(tokens);
         return NULL;
     }
 

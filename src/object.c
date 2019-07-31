@@ -9,66 +9,83 @@
 
 #include "object.h"
 
+char *obj_string(Object *o) {
+    if(GET_SSTR(o)) {
+        return o->data.short_str;
+    } else {
+        return o->data.str;
+    }
+}
+
+char *type_to_str(obj_type type) {
+    switch(type) {
+        case empty:     return "empty";
+        case symt:      return "symt";
+        case strt:      return "strt";
+        case keywordt:  return "keywordt";
+        case intt:      return "intt";
+        case floatt:    return "floatt";
+        case listt:     return "listt";
+        case natfnt:    return "natfnt";
+        case macrot:    return "macrot";
+        case errt:      return "errt";
+        default:        return "corrupted";
+    }
+}
+
+
 Object *obj_init(obj_type type, union Data data) {
     Object *obj = garbage_alloc();
     obj->type = type;
     obj->data = data;
-    obj->marked = 0;
+    obj->flags = 0;
     return obj;
 }
-
-void obj_free(Object *obj) {
-    if(obj == NULL)
-        return;
-
-    switch(obj->type) {
-        case symt:
-        case strt:
-        case keywordt:
-        case errt:
-            free(obj->data.ptr);
-            break;
-        default:
-            break;
-    }
-
-    free(obj);
-}
-
-// releases data associated with object, but not itself
-void obj_release(Object *obj) {
-    if(obj == NULL)
-        return;
-
-    switch(obj->type) {
-        case symt:
-        case strt:
-        case keywordt:
-        case errt:
-            free(obj->data.ptr);
-            break;
-        default:
-            break;
-    }
-}
-
 
 Object *cell_init() {
     union Data dat = { .cell = { nil_obj, nil_obj} };
     return obj_init(listt, dat);
 }
 
+Object *obj_init_str_len(obj_type type, char *str, int len) {
+    if(len < 16) {
+        // store short strings within the data struct
+        union Data dat;
+        strncpy(dat.short_str, str, len);
+        dat.short_str[len] = '\0';
+        Object *o = obj_init(type, dat);
+        SET_SSTR(o);
+        return o;
+    } else {
+        char *newstr = malloc(len + 1);
+        strncpy(newstr, str, len);
+        newstr[len] = '\0';
+        union Data dat = { .str = newstr };
+        return obj_init(type, dat);
+    }
+}
+
+Object *obj_init_str(obj_type type, char *str) {
+    return obj_init_str_len(type, str, strlen(str));
+}
+
 Object *err_init(char *str) {
-    char *err = la_strdup(str);
-    union Data dat = { .ptr = err };
-    return obj_init(errt, dat);
+    return obj_init_str(errt, str);
+}
+
+// releases data associated with object, but not itself
+void obj_release(Object *obj) {
+    if(!GET_SSTR(obj) && (obj->type == symt || obj->type == strt
+                || obj->type == keywordt || obj->type == errt)) {
+        free(obj->data.str);
+    }
 }
 
 void obj_mark(Object *obj) {
-    if(obj->marked)
+    if(GET_MARK(obj))
         return;
 
-    obj->marked = 1;
+    SET_MARK(obj);
     if(obj->type == listt) {
         obj_mark(CAR(obj));
         obj_mark(CDR(obj));
@@ -79,15 +96,13 @@ void obj_mark(Object *obj) {
 }
 
 unsigned int obj_hash(Object *obj) {
-    switch(obj->type) {
-        case symt:
-        case strt:
-        case keywordt:
-        case errt:
-            return str_hash(obj->data.ptr);
-        default:
-            printf("hash function not implemented for this type\n");
-            return 0;
+    if(obj->type == symt || obj->type == strt || obj->type == keywordt
+            || obj->type == errt) {
+        return str_hash(obj_string(obj));
+    } else {
+        printf("hash function not implemented for %s type\n",
+                type_to_str(obj->type));
+        return 0;
     }
 }
 
@@ -104,22 +119,16 @@ int obj_equals(Object *a, Object *b) {
         case strt:
         case keywordt:
         case errt:
-            return strcmp(a->data.ptr, b->data.ptr) == 0;
+            return strcmp(obj_string(a), obj_string(b)) == 0;
         case intt:
             return a->data.int_val == b->data.int_val;
         case floatt:
             return a->data.float_val == b->data.float_val;
         default:
-            printf("equality not implemented for this type\n");
+            // printf("equality not implemented for this type\n");
+            printf("equality not implemented for %s type\n",
+                    type_to_str(a->type));
             return 0;
-    }
-}
-
-int obj_is_empty_list(Object *obj) {
-    if(obj->type == listt && CAR(obj) == nil_obj && CDR(obj) == NULL) {
-        return 1;
-    } else {
-        return 0;
     }
 }
 
@@ -129,7 +138,7 @@ Object *list_length(Object *obj) {
         return err_init("type error: object is not a list");
     }
 
-    if(CAR(obj) == nil_obj) {
+    if(CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
         union Data dat = { .int_val = 0 };
         return obj_init(intt, dat);
     }
@@ -147,6 +156,13 @@ Object *list_length(Object *obj) {
 }
 
 Object *list_append(Object *list, Object *obj) {
+    if(list == NULL) {
+        Object *ret = cell_init();
+        CAR(ret) = obj;
+        CDR(ret) = nil_obj;
+        return ret;
+    }
+
     if(list->type != listt) {
         printf("warning: trying to append to object that is not a list\n");
         return NULL;
@@ -157,21 +173,16 @@ Object *list_append(Object *list, Object *obj) {
         return NULL;
     }
 
-    if(CAR(list) == nil_obj) {
-        CAR(list) = obj;
-        return list;
-    } else {
-        while(CDR(list) != nil_obj) {
-            list = CDR(list);
-            if(list->type != listt) {
-                return err_init("error: object is not a proper list");
-            }
+    while(CDR(list) != nil_obj) {
+        list = CDR(list);
+        if(list->type != listt) {
+            return err_init("error: object is not a proper list");
         }
-        Object *newcell = cell_init();
-        CAR(newcell) = obj;
-        CDR(list) = newcell;
-        return newcell;
     }
+    Object *newcell = cell_init();
+    CAR(newcell) = obj;
+    CDR(list) = newcell;
+    return newcell;
 }
 
 int obj_eq_sym(Object *obj, char *str) {
@@ -179,7 +190,7 @@ int obj_eq_sym(Object *obj, char *str) {
         return 0;
     }
 
-    char *ostr = (char *)obj->data.ptr;
+    char *ostr = obj_string(obj);
     return strcmp(ostr, str) == 0;
 }
 
@@ -195,15 +206,15 @@ void obj_print(Object *obj, int pretty) {
     switch(obj->type) {
         case strt:
             if(pretty) {
-                printf("%s", (char *)obj->data.ptr);
+                printf("%s", obj_string(obj));
             } else {
-                printf("\"%s\"", (char *)obj->data.ptr);
+                printf("\"%s\"", obj_string(obj));
             }
             break;
         case symt:
         case keywordt:
         case errt:
-            printf("%s", (char *)obj->data.ptr);
+            printf("%s", obj_string(obj));
             break;
         case intt:
             printf("%d", obj->data.int_val);
@@ -236,10 +247,15 @@ void obj_print(Object *obj, int pretty) {
 }
 
 void obj_debug0(Object *obj, int indt) {
+    if(obj == NULL) {
+        return;
+    }
+
     for(int i = 0; i < indt; i ++) {
         printf("  ");
     }
 
+    printf("flags: %d\n", obj->flags);
     if(obj == nil_obj) {
         printf("nil_obj\n");
         return;
@@ -251,24 +267,28 @@ void obj_debug0(Object *obj, int indt) {
     } else {
         switch(obj->type) {
             case symt:
-                printf("sym: %s\n", (char *)obj->data.ptr);
+                printf("sym: %s\n", obj_string(obj));
                 break;
             case strt:
-                printf("str: %s\n", (char *)obj->data.ptr);
+                printf("str: %s\n", obj_string(obj));
                 break;
             case keywordt:
-                printf("key: %s\n", (char *)obj->data.ptr);
+                printf("key: %s\n", obj_string(obj));
                 break;
             case errt:
-                printf("err: %s\n", (char *)obj->data.ptr);
+                printf("err: %s\n", obj_string(obj));
                 break;
             case intt:
                 printf("int: %d\n", obj->data.int_val);
                 break;
             case listt:
                 printf("list<%p>\n", obj->data.ptr);
-                obj_debug0(obj->data.cell.car, indt + 1);
-                obj_debug0(obj->data.cell.cdr, indt);
+                // obj_debug0(obj->data.cell.car, indt + 1);
+                // obj_debug0(obj->data.cell.cdr, indt);
+                while(obj != nil_obj) {
+                    obj_debug0(obj->data.cell.car, indt + 1);
+                    obj = obj->data.cell.cdr;
+                }
                 break;
             case natfnt:
                 printf("natfn<%p>\n", obj->data.ptr);

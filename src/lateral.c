@@ -38,23 +38,39 @@ int main(int argc, char ** argv) {
             }
             fread(buffer, 1, length, f);
             buffer[length] = '\0';
+        } else {
+            printf("failed to open file %s\n", argv[1]);
+            exit(1);
         }
 
-        Object *tokens = cell_init();
+        Object *tokens = NULL; 
         Object *curr = tokens;
         Object *obj = NULL;
         char *lbuf = buffer;
         while(read_token(&lbuf, &obj) >= 0) {
             curr = list_append(curr, obj);
+            if(tokens == NULL) {
+                tokens = curr;
+            }
         }
         fclose(f);
         free(buffer);
 
+        obj_print(tokens, 0);
+        printf("\n");
+        // insert program into environment to avoid garbage collection
+        Object *prog = obj_init_str(strt, "*PROG*");
+        envir_set(curr_envir, prog, tokens);
+
         // list_debug0(tokens, 0);
         Object *ast = NULL;
         curr = tokens;
+        // obj_print(tokens, 0);
+        // printf("\n");
         while(curr != nil_obj) {
             read_form(&curr, &ast);
+            // obj_print(ast, 0);
+            // printf("\n");
             evaluate(curr_envir, ast);
             garbage_run();
         }

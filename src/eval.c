@@ -13,6 +13,10 @@ Envir *envir_push(Envir *envir, Object *args, Object *vals) {
     int sizeb = lenb->data.int_val;
 
     if(sizea != sizeb) {
+        obj_print(args, 0);
+        printf("\n");
+        obj_print(vals, 0);
+        printf("\n");
         printf("expected %d arguments, but got %d\n", sizea, sizeb);
         return NULL;
     }
@@ -65,15 +69,24 @@ Object *eval_ast(Envir *envir, Object *ast) {
     if(ast->type == symt) {
         Object *ret = envir_search(envir, ast);
         if(ret == NULL) {
+            obj_debug(ast);
             ret = err_init("symbol not found in envir");
         }
         return ret;
     } else if(ast->type == listt) {
-        Object *list = cell_init();
+        // Object *list = cell_init();
+        Object *list = NULL;
         Object *listb = list;
         while(ast != nil_obj) {
             Object *obj = evaluate(envir, CAR(ast));
+            if(obj->type == errt) {
+                obj_print(obj, 0);
+                exit(1);
+            }
             listb = list_append(listb, obj);
+            if(list == NULL) {
+                list = listb;
+            }
             ast = CDR(ast);
         }
         return list;
@@ -107,7 +120,7 @@ Object *evaluate(Envir *envir, Object *ast) {
             Object *macro = obj_init(macrot, dat);
             envir_set(envir, name, macro);
             return name;
-        } else if(obj_eq_sym(CAR(ast), "fn")) {
+        } else if(obj_eq_sym(CAR(ast), "lambda")) {
             Object *args = CAR(CDR(ast));
             Object *expr = CAR(CDR(CDR(ast)));
             union Data dat = { .func = { .args = args, .expr = expr }};
@@ -153,9 +166,12 @@ Object *evaluate(Envir *envir, Object *ast) {
             if(envir == NULL) {
                 printf("failed to create envir\n");
                 printf("funcall: \n");
-                obj_debug(funcall);
-                printf("expr: \n");
-                obj_debug(ast);
+                // obj_debug(funcall);
+                obj_print(funcall, 0);
+                printf("\nexpr: \n");
+                // obj_debug(ast);
+                obj_print(ast, 0);
+                printf("\n");
                 exit(1);
             }
             Object *ret = evaluate(envir, fn->data.func.expr);

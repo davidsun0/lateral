@@ -152,9 +152,7 @@ void envir_set(Envir *envir, Object *key, Object *value) {
 }
 
 void envir_set_str(Envir *envir, char *key, Object *value) {
-    char *key_str = la_strdup(key);
-    union Data dat = { .ptr = key_str };
-    Object *key_obj = obj_init(symt, dat);
+    Object *key_obj = obj_init_str(symt, key);
     hashmap_set(envir->map, key_obj, value);
 }
 

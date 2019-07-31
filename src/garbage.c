@@ -17,13 +17,12 @@ Bank *bank_init() {
     bank->next = NULL;
     for(int i = 0; i < BANKSIZE; i ++) {
         bank->objs[i].type = empty;
-        bank->objs[i].marked = 0;
+        SET_MARK(&bank->objs[i]);
     }
     return bank;
 }
 
 void garbage_init() {
-    // all_objects = list_init();
     all_objects = bank_init();
 }
 
@@ -46,70 +45,24 @@ Object* garbage_alloc() {
     return NULL;
 }
 
-/*
-void garbage_insert(Object *obj) {
-    obj->marked = 0;
-    if(all_objects->obj != NULL) {
-        List *head = list_init();
-        head->next = all_objects;
-        head->obj = obj;
-        all_objects = head;
-    } else {
-        all_objects->obj = obj;
-    }
-}
-*/
-
 void garbage_run() {
     // loop over all obj in curr_envir
     HashMap *map = curr_envir->map;
     for(int i = 0; i < map->capacity; i ++) {
-        /*
-        List *list = map->buckets + i;
-        if(list->obj != NULL) {
-            while(list != NULL) {
-                obj_mark(list->obj);
-                list = list->next;
-            }
-        }
-        */
         obj_mark(CAR(map->buckets + i));
         obj_mark(CDR(map->buckets + i));
     }
 
-    // List *objs = all_objects;
-    // List *prev = all_objects;
-    
-    /*
-    while(objs != NULL) {
-        if(!objs->obj->marked) {
-            List *old = objs;
-            if(old != all_objects) {
-                prev->next = old->next;
-            } else {
-                all_objects = old->next;
-                prev = all_objects;
-            }
-            objs = objs->next;
-            obj_free(old->obj);
-            free(old);
-        } else {
-            objs->obj->marked = 0;
-            prev = objs;
-            objs = objs->next;
-        }
-    }
-    */
-
+    // free dead objects and unmark everything
     Bank *bank = all_objects;
     while(bank != NULL) {
         for(int i = 0; i < BANKSIZE; i ++) {
-            if(!bank->objs[i].marked && bank->objs[i].type != empty) {
-                // obj_debug(&bank->objs[i]);
+            if(!GET_MARK(&bank->objs[i]) && bank->objs[i].type != empty) {
                 obj_release(&bank->objs[i]);
                 bank->objs[i].type = empty;
+                bank->objs[i].flags = 0;
             }
-            bank->objs[i].marked = 0;
+            UNSET_MARK(&bank->objs[i]);
         }
         bank = bank->next;
     }
