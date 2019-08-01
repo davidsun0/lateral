@@ -138,11 +138,6 @@ Object *list_length(Object *obj) {
         return err_init("type error: object is not a list");
     }
 
-    if(CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
-        union Data dat = { .int_val = 0 };
-        return obj_init(intt, dat);
-    }
-
     while(obj != nil_obj) {
         if(obj->type != listt) {
             return err_init("type error: object not proper list");
@@ -222,9 +217,7 @@ void obj_print(Object *obj, int pretty) {
         case listt:
             printf("(");
             while(obj != nil_obj) {
-                if(CAR(obj) != nil_obj) {
-                    obj_print(CAR(obj), pretty);
-                }
+                obj_print(CAR(obj), pretty);
                 if(CDR(obj) != nil_obj) {
                     printf(" ");
                 }
@@ -283,8 +276,6 @@ void obj_debug0(Object *obj, int indt) {
                 break;
             case listt:
                 printf("list<%p>\n", obj->data.ptr);
-                // obj_debug0(obj->data.cell.car, indt + 1);
-                // obj_debug0(obj->data.cell.cdr, indt);
                 while(obj != nil_obj) {
                     obj_debug0(obj->data.cell.car, indt + 1);
                     obj = obj->data.cell.cdr;

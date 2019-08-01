@@ -22,7 +22,7 @@ Object *la_sum(Object *list) {
 }
 
 Object *la_is_nil(Object *list) {
-    if(CAR(list)->type == listt && CAR(CAR(list)) == nil_obj) {
+    if(CAR(list) == nil_obj) {
         return tru_obj;
     } else {
         return nil_obj;

@@ -56,8 +56,6 @@ int main(int argc, char ** argv) {
         fclose(f);
         free(buffer);
 
-        obj_print(tokens, 0);
-        printf("\n");
         // insert program into environment to avoid garbage collection
         Object *prog = obj_init_str(strt, "*PROG*");
         envir_set(curr_envir, prog, tokens);
@@ -65,12 +63,8 @@ int main(int argc, char ** argv) {
         // list_debug0(tokens, 0);
         Object *ast = NULL;
         curr = tokens;
-        // obj_print(tokens, 0);
-        // printf("\n");
         while(curr != nil_obj) {
             read_form(&curr, &ast);
-            // obj_print(ast, 0);
-            // printf("\n");
             evaluate(curr_envir, ast);
             garbage_run();
         }
