@@ -2,7 +2,6 @@
 #define LA_EVAL_H
 
 #include "object.h"
-#include "hash.h"
 
 enum mode {
     eval_exe,

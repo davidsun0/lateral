@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "hash.h"
 #include "eval.h"
 #include "object.h"
 

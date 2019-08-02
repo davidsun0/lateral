@@ -7,10 +7,11 @@
 
 #include "reader.h"
 
-#define is_white_space(c) ((c) == ' ' || (c) == '\n' || (c) == ',' || \
-        (c) == '\t' || (c) == '\r')
+#define is_white_space(c) ((c) == ' ' || (c) == '\n' || (c) == ',' \
+        || (c) == '\t' || (c) == '\r')
 
-#define is_special_char(c) ((c) == '(' || (c) == ')' )
+#define is_special_char(c) ((c) == '(' || (c) == ')' || (c) == '{' \
+        || (c) == '}')
 
 int read_token(char **buf, Object **obj) {
     char *start = *buf;
@@ -99,6 +100,7 @@ Object *read_atom(Object *obj) {
 }
 
 int read_list(Object **tokens, Object **tree);
+int read_hash(Object **tokens, Object **tree);
 
 int read_form(Object **tokens, Object **tree) {
     if(*tokens == nil_obj || CAR(*tokens) == nil_obj) {
@@ -107,6 +109,10 @@ int read_form(Object **tokens, Object **tree) {
         // consume left paren
         *tokens = CDR(*tokens);
         return read_list(tokens, tree);
+    } else if(strcmp(obj_string(CAR(*tokens)), "{") == 0) {
+        // consume left bracket
+        *tokens = CDR(*tokens);
+        return read_hash(tokens, tree);
     } else {
         *tree = read_atom(CAR(*tokens));
         *tokens = CDR(*tokens);
@@ -137,6 +143,31 @@ int read_list(Object **tokens, Object **tree) {
     }
 
     // consume right paren
+    *tokens = CDR(*tokens);
+    return 0;
+}
+
+int read_hash(Object **tokens, Object **tree) {
+    Object *key = NULL;
+    Object *val = NULL;
+    *tree = obj_hashmap_init(16);
+    while(*tokens != nil_obj && strcmp(obj_string(CAR(*tokens)), "}") != 0) {
+        read_form(tokens, &key);
+        if(*tokens == nil_obj) {
+            fprintf(stderr, "synatx error: expect an even number of elements\
+                    in a hash map literal\n");
+            return -1;
+        }
+        read_form(tokens, &val);
+        hashmap_set((*tree)->data.hashmap, key, val);
+    }
+
+    if(*tokens == nil_obj) {
+        fprintf(stderr, "syntax error: unmatched '{'\n");
+        return -1;
+    }
+
+    // consume right bracket
     *tokens = CDR(*tokens);
     return 0;
 }

@@ -12,7 +12,7 @@
           (cons (fn (car list)) acc))))
 
 (defun map (fn in)
-  (reverse! (map0 fn in ())))
+  (reverse! (map0 fn in (quote ()))))
 
 ;; tail recursive filter helper function
 (defun filter0 (pred list acc)
@@ -27,21 +27,55 @@
                acc))))
 
 (defun filter (pred list)
-  (reverse! (filter0 pred list ())))
+  (reverse! (filter0 pred list (quote ()))))
 
-(defun inc (x)
-  (+ x 1))
+;; tail recursive reduce helper function
+(defun reduce0 (fn list acc)
+  (if (nil? list)
+    acc
+    (reduce0 fn
+             (cdr list)
+             (fn acc (car list)))))
+
+(defun reduce (fn list)
+  ; initial value of acc is (fn (car list) (cadr list))
+  (reduce0 fn
+           (cdr (cdr list))
+           (fn (car list) (car (cdr list)))))
 
 (defun not (p)
   (if p
     nil
     t))
 
-(defun not-nil? (p)
-  (not (nil? p)))
+(defun inc (x)
+  (+ x 1))
 
-(print (map inc (list 1 2 3)))
-(print (map (lambda (x) (not (nil? x))) (list 1 nil 2 nil 3)))
-(print (filter (lambda (x) (not (nil? x))) (list 1 nil 2 nil 3)))
-(print (list 1 nil 2))
-;(print (not t))
+(defun str-len0 (string acc)
+  (if (nil? (char-at string acc))
+    acc
+    (str-len0 string (inc acc))))
+
+(defun str-len (string)
+  (str-len0 string 0))
+
+(defun range0 (max curr acc)
+  (if (< curr max)
+    (range0 max (inc curr) (cons curr acc))
+    acc))
+
+(defun range1 (min max)
+  (reverse! (range0 max min (quote ()))))
+
+(defun range (max)
+  (range1 0 max))
+
+(print (range 10))
+(print (reverse! (range 10)))
+
+(defun to-chars (string)
+  (map (lambda (x) (char-at string x))
+       (range (str-len string))))
+
+(print (to-chars "hello world!"))
+(print (rev-str "hello world?"))

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hash.h"
 #include "reader.h"
 #include "garbage.h"
 #include "core.h"
@@ -32,7 +31,6 @@ char *type_to_str(obj_type type) {
         default:        return "corrupted";
     }
 }
-
 
 Object *obj_init(obj_type type, union Data data) {
     Object *obj = garbage_alloc();
@@ -73,11 +71,19 @@ Object *err_init(char *str) {
     return obj_init_str(errt, str);
 }
 
+Object *obj_hashmap_init(int size) {
+    HashMap *map = hashmap_init(size);
+    union Data dat = { .hashmap = map };
+    return obj_init(hashmapt, dat);
+}
+
 // releases data associated with object, but not itself
 void obj_release(Object *obj) {
     if(!GET_SSTR(obj) && (obj->type == symt || obj->type == strt
                 || obj->type == keywordt || obj->type == errt)) {
         free(obj->data.str);
+    } else if(obj->type == hashmapt) {
+        free(obj->data.hashmap->buckets);
     }
 }
 
@@ -132,22 +138,25 @@ int obj_equals(Object *a, Object *b) {
     }
 }
 
-Object *list_length(Object *obj) {
-    int len = 0;
+int list_length(Object *obj) {
     if(obj->type != listt) {
-        return err_init("type error: object is not a list");
+        return -1;
     }
 
+    if(CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
+        return 0;
+    }
+   
+    int len = 0;
     while(obj != nil_obj) {
         if(obj->type != listt) {
-            return err_init("type error: object not proper list");
+            return -1;
         }
         len ++;
         obj = CDR(obj); 
     }
 
-    union Data dat = { .int_val = len };
-    return obj_init(intt, dat);
+    return len;
 }
 
 Object *list_append(Object *list, Object *obj) {
@@ -225,6 +234,9 @@ void obj_print(Object *obj, int pretty) {
             }
             printf(")");
             break;
+        case hashmapt:
+            hashmap_print(obj->data.hashmap, pretty);
+            break;
         case natfnt:
             printf("natfn<%p>", obj->data.ptr);
             break;
@@ -281,6 +293,10 @@ void obj_debug0(Object *obj, int indt) {
                     obj = obj->data.cell.cdr;
                 }
                 break;
+            case hashmapt:
+                printf("implement hashmap debug\n");
+                printf("hashmap<%p>\n", (void *)&obj);
+                break;
             case natfnt:
                 printf("natfn<%p>\n", obj->data.ptr);
                 break;
@@ -300,4 +316,200 @@ void obj_debug0(Object *obj, int indt) {
 
 void obj_debug(Object *obj) {
     obj_debug0(obj, 0);
+}
+
+unsigned int str_hash(char *str) {
+    unsigned int hash = 5381;
+    int i = 0;
+    while(str[i] != '\0') {
+        hash += str[i] * 33;
+        i ++;
+    }
+    return hash;
+}
+
+HashMap *hashmap_init(int size) {
+    if(size < 8)
+        size = 8;
+    HashMap *map = malloc(sizeof(HashMap));
+    map->capacity = size;
+    map->load = 0;
+
+    map->buckets = malloc(sizeof(Object) * size);
+    for(int i = 0; i < size; i ++) {
+        (map->buckets + i)->type = listt;
+        CAR(map->buckets + i) = nil_obj;
+        CDR(map->buckets + i) = nil_obj;
+    }
+    return map;
+}
+
+void hashmap_free(HashMap *map) {
+    free(map->buckets);
+    free(map);
+}
+
+void hashmap_resize(HashMap *map) {
+    HashMap *newmap = hashmap_init(map->capacity * 2);
+    for(int i = 0; i < map->capacity; i ++) {
+        Object *list = map->buckets + i;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+            Object *key = CAR(keyval);
+            Object *val = CDR(keyval);
+            if(list != nil_obj && val != nil_obj) {
+                hashmap_set(newmap, key, val);
+            }
+            list = CDR(list);
+        }
+    }
+    map->capacity = newmap->capacity;
+
+    // swap the buckets
+    Object *temp = newmap->buckets;
+    newmap->buckets = map->buckets;
+    map->buckets = temp;
+
+    // freeing newmap also frees its buckets
+    free(newmap);
+}
+
+void hashmap_set(HashMap *map, Object *key, Object *value) {
+    if((float)map->load / map->capacity > 0.7) {
+        hashmap_resize(map);
+    }
+
+    unsigned int hash = obj_hash(key) % map->capacity;
+    if(CAR(map->buckets + hash) == nil_obj) {
+        Object *keyval = cell_init();
+        CAR(keyval) = key;
+        CDR(keyval) = value;
+
+        CAR(map->buckets + hash) = keyval;
+        map->load ++;
+    } else {
+        Object *list = map->buckets + hash;
+        while(list != nil_obj) {
+            if(obj_equals(key, CAR(CAR(list)))) {
+                // update value
+                CDR(CAR(list)) = value;
+                return;
+            } else if(CDR(list) == nil_obj) {
+                // append to end of linked list
+                Object *keyval = cell_init();
+                CAR(keyval) = key;
+                CDR(keyval) = value;
+
+                Object *bucket = cell_init();
+                CAR(bucket) = keyval;
+                CDR(list) = bucket;
+                map->load ++;
+                return;
+            }
+            list = CDR(list);
+        }
+    }
+}
+
+Object *hashmap_get(HashMap *map, Object *key) {
+    unsigned int hash = obj_hash(key) % map->capacity;
+    Object *list = map->buckets + hash;
+    if(CAR(list) == nil_obj) {
+        return NULL;
+    } else {
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+
+            if(obj_equals(key, CAR(keyval))) {
+                Object *val = CDR(keyval);
+                return val;
+            } else {
+                list = CDR(list);
+            }
+        }
+        return NULL;
+    }
+    return NULL;
+}
+
+void hashmap_print(HashMap *map, int pretty) {
+    int first = 1;
+    printf("{");
+    for(int i = 0; i < map->capacity; i ++) {
+        Object *keyval = map->buckets + i;
+        if(CAR(keyval) == NIL && CDR(keyval) == NIL) {
+            continue;
+        } else {
+            while(keyval != NIL) {
+                if(first) {
+                    first = 0;
+                } else {
+                    printf(", ");
+                }
+                Object *key = CAR(CAR(keyval));
+                Object *val = CDR(CAR(keyval));
+                obj_print(key, pretty);
+                printf(" ");
+                obj_print(val, pretty);
+                keyval = CDR(keyval);
+            }
+        }
+    }
+    printf("}");
+}
+
+void hashmap_debug(HashMap *map) {
+    for(int i = 0; i < map->capacity; i ++) {
+        Object *list = map->buckets + i;
+        if(CAR(list) != nil_obj) {
+            while(list != nil_obj) {
+                Object *key = CAR(CAR(list));
+                Object *value = CDR(CAR(list));
+                printf("===\n");
+                printf("key: ");
+                obj_debug(key);
+                printf("value: ");
+                obj_debug(value);
+
+                list = CDR(list);
+            }
+        }
+    }
+}
+
+Envir *envir_init(int size) {
+    Envir *envir = malloc(sizeof(Envir));
+    envir->map = hashmap_init(size);
+    envir->inner = NULL;
+    envir->outer = NULL;
+    return envir;
+}
+
+void envir_free(Envir *envir) {
+    hashmap_free(envir->map);
+    free(envir);
+}
+
+void envir_set(Envir *envir, Object *key, Object *value) {
+    hashmap_set(envir->map, key, value);
+}
+
+void envir_set_str(Envir *envir, char *key, Object *value) {
+    Object *key_obj = obj_init_str(symt, key);
+    hashmap_set(envir->map, key_obj, value);
+}
+
+Object *envir_get(Envir *envir, Object *key) {
+    return hashmap_get(envir->map, key);
+}
+
+Object *envir_search(Envir *envir, Object *key) {
+    Object *output;
+    while((output = envir_get(envir, key)) == NULL) {
+        envir = envir->outer;
+        if(envir == NULL) {
+            return NULL;
+        }
+    }
+    return output;
 }

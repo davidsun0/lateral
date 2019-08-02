@@ -1,31 +1,17 @@
 #ifndef LA_OBJECT_H
 #define LA_OBJECT_H
 
-#define CAR(a) ((a)->data.cell.car)
-#define CDR(a) ((a)->data.cell.cdr)
-
-// natural numbers indicating number of bits to shift to get flag
-#define MARK_MASK 1
-#define SSTR_MASK 2
-
-#define SET_MARK(a) ((a)->flags |= (1 << MARK_MASK))
-#define UNSET_MARK(a) ((a)->flags &= ~(1 << MARK_MASK))
-#define GET_MARK(a) ((a)->flags & (1 << MARK_MASK))
-
-#define SET_SSTR(a) ((a)->flags |= (1 << SSTR_MASK))
-#define GET_SSTR(a) ((a)->flags & (1 << SSTR_MASK))
-
 typedef enum {
     empty = 0,
-    symt,
-    strt,
-    keywordt,
-    intt,
-    floatt,
-    listt,
-    natfnt,
-    fnt,
-    macrot,
+    // string variety
+    symt, strt, keywordt,
+    // numerical variety
+    intt, floatt,
+    // data structure variety
+    listt, hashmapt,
+    // function variety
+    natfnt, fnt, macrot,
+
     errt
 } obj_type;
 
@@ -39,10 +25,20 @@ typedef struct Cell {
     struct Object *cdr;
 } Cell;
 
+#define CAR(a) ((a)->data.cell.car)
+#define CDR(a) ((a)->data.cell.cdr)
+
+typedef struct {
+    struct Object *buckets;
+    int capacity;
+    int load;
+} HashMap;
+
 union Data {
     void *ptr;
     char *str;
     char short_str[16];
+    HashMap *hashmap;
     int int_val;
     float float_val;
     struct Func func;
@@ -55,6 +51,17 @@ typedef struct Object {
     int flags;
     union Data data;
 } Object;
+
+// natural numbers indicating number of bits to shift to get flag
+#define MARK_MASK 1
+#define SSTR_MASK 2
+
+#define SET_MARK(a) ((a)->flags |= (1 << MARK_MASK))
+#define UNSET_MARK(a) ((a)->flags &= ~(1 << MARK_MASK))
+#define GET_MARK(a) ((a)->flags & (1 << MARK_MASK))
+
+#define SET_SSTR(a) ((a)->flags |= (1 << SSTR_MASK))
+#define GET_SSTR(a) ((a)->flags & (1 << SSTR_MASK))
 
 Object *nil_obj;
 #define NIL (nil_obj)
@@ -73,15 +80,41 @@ Object *err_init(char *);
 Object *str_init_len(int len, char *);
 Object *str_init(char *);
 Object *cell_init();
-
-unsigned int obj_hash(Object *);
-int obj_equals(Object *, Object *);
-int obj_eq_sym(Object *, char *);
-
-Object *list_length(Object *);
-Object *list_append(Object * list, Object *);
+Object *obj_hashmap_init(int);
 
 void obj_print(Object *, int pretty);
 void obj_debug(Object *);
 
+int obj_equals(Object *, Object *);
+int obj_eq_sym(Object *, char *);
+
+unsigned int str_hash(char *);
+unsigned int obj_hash(Object *);
+
+int list_length(Object *);
+Object *list_append(Object * list, Object *);
+
+HashMap *hashmap_init(int size);
+void hashmap_free(HashMap *);
+void hashmap_resize(HashMap *);
+
+void hashmap_set(HashMap *, Object *key, Object *value);
+Object *hashmap_get(HashMap *, Object *key);
+
+void hashmap_print(HashMap *, int);
+void hashmap_debug(HashMap *);
+
+typedef struct Envir {
+    HashMap *map;
+    struct Envir *inner;
+    struct Envir *outer;
+} Envir;
+
+Envir *envir_init(int size);
+void envir_free(Envir *);
+
+void envir_set(Envir *, Object *key, Object *value);
+void envir_set_str(Envir *, char *key, Object *value);
+Object *envir_get(Envir *, Object *key);
+Object *envir_search(Envir *, Object *key);
 #endif

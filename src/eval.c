@@ -6,13 +6,10 @@
 #include "eval.h"
 
 Envir *envir_push(Envir *envir, Object *args, Object *vals) {
-    Object *lena = list_length(args);
-    Object *lenb = list_length(vals);
+    int sizea = list_length(args);
+    int sizeb = list_length(vals);
 
-    int sizea = lena->data.int_val;
-    int sizeb = lenb->data.int_val;
-
-    if(sizea != sizeb) {
+    if(sizea != sizeb || sizea < 0 || sizeb < 0) {
         obj_print(args, 0);
         printf("\n");
         obj_print(vals, 0);
@@ -90,6 +87,16 @@ Object *eval_ast(Envir *envir, Object *ast) {
             ast = CDR(ast);
         }
         return list;
+    } else if(ast->type == hashmapt) {
+        HashMap *map = ast->data.hashmap;
+        for(int i = 0; i < map->capacity; i ++) {
+            Object *keyval = map->buckets + i;
+            if(CAR(keyval) != NIL) {
+                Object *val = CDR(CAR(keyval));
+                CDR(CAR(keyval)) = evaluate(envir, val);
+            }
+        }
+        return ast;
     } else {
         return ast;
     }
