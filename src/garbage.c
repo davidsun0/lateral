@@ -8,8 +8,8 @@
 
 Bank *bank_init() {
     Bank *bank = malloc(sizeof(Bank));
-    if(bank == NULL) {
-        printf("fatal: failed to allocate object bank\n");
+    if(!bank) {
+        fprintf(stderr, "out of memory while allocating object bank\n");
         exit(1);
     }
 

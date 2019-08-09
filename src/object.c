@@ -46,7 +46,7 @@ Object *cell_init() {
 }
 
 Object *obj_init_str_len(obj_type type, char *str, int len) {
-    if(len < 16) {
+    if(len < SHORT_STRING_LENGTH) {
         // store short strings within the data struct
         union Data dat;
         strncpy(dat.short_str, str, len);
@@ -56,6 +56,10 @@ Object *obj_init_str_len(obj_type type, char *str, int len) {
         return o;
     } else {
         char *newstr = malloc(len + 1);
+        if(!newstr) {
+            fprintf(stderr, "out of memory while creating object in obj_init_str_len\n");
+            exit(1);
+        }
         strncpy(newstr, str, len);
         newstr[len] = '\0';
         union Data dat = { .str = newstr };
@@ -96,7 +100,7 @@ void obj_mark(Object *obj) {
         obj_mark(CAR(obj));
         obj_mark(CDR(obj));
     } else if(obj->type == fnt || obj->type == macrot) {
-        obj_mark(obj->data.func.args);
+        obj_mark(obj->data.func.params);
         obj_mark(obj->data.func.expr);
     }
 }
@@ -143,9 +147,11 @@ int list_length(Object *obj) {
         return -1;
     }
 
+    /*
     if(CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
         return 0;
     }
+    */
    
     int len = 0;
     while(obj != nil_obj) {
@@ -224,15 +230,19 @@ void obj_print(Object *obj, int pretty) {
             printf("%d", obj->data.int_val);
             break;
         case listt:
-            printf("(");
-            while(obj != nil_obj) {
-                obj_print(CAR(obj), pretty);
-                if(CDR(obj) != nil_obj) {
-                    printf(" ");
+            if(CAR(obj) == NIL && CDR(obj) == NIL) {
+                printf("()");
+            } else {
+                printf("(");
+                while(obj != nil_obj) {
+                    obj_print(CAR(obj), pretty);
+                    if(CDR(obj) != nil_obj) {
+                        printf(" ");
+                    }
+                    obj = CDR(obj);
                 }
-                obj = CDR(obj);
+                printf(")");
             }
-            printf(")");
             break;
         case hashmapt:
             hashmap_print(obj->data.hashmap, pretty);
@@ -260,7 +270,7 @@ void obj_debug0(Object *obj, int indt) {
         printf("  ");
     }
 
-    printf("flags: %d\n", obj->flags);
+    // printf("flags: %d\n", obj->flags);
     if(obj == nil_obj) {
         printf("nil_obj\n");
         return;
@@ -305,7 +315,7 @@ void obj_debug0(Object *obj, int indt) {
                 break;
             case macrot:
                 printf("macro<%p>:\n", obj->data.ptr);
-                obj_debug0(obj->data.func.args, indt + 1);
+                obj_debug0(obj->data.func.params, indt + 1);
                 obj_debug0(obj->data.func.expr, indt + 1);
                 break;
             default:
@@ -332,10 +342,18 @@ HashMap *hashmap_init(int size) {
     if(size < 8)
         size = 8;
     HashMap *map = malloc(sizeof(HashMap));
+    if(!map) {
+        fprintf(stderr, "out of memory while initializing hashmap\n");
+        exit(1);
+    }
     map->capacity = size;
     map->load = 0;
 
     map->buckets = malloc(sizeof(Object) * size);
+    if(!map->buckets) {
+        fprintf(stderr, "out of memory while creating hashmap table\n");
+        exit(1);
+    }
     for(int i = 0; i < size; i ++) {
         (map->buckets + i)->type = listt;
         CAR(map->buckets + i) = nil_obj;
@@ -357,7 +375,13 @@ void hashmap_resize(HashMap *map) {
             Object *keyval = CAR(list);
             Object *key = CAR(keyval);
             Object *val = CDR(keyval);
-            if(list != nil_obj && val != nil_obj) {
+            /*
+            if(key->type == symt && strcmp(obj_string(key), "nil") == 0) {
+                printf("relocating nil!\n");
+            }
+            */
+            // if(list != nil_obj && val != nil_obj) {
+            if(keyval != nil_obj) {
                 hashmap_set(newmap, key, val);
             }
             list = CDR(list);
@@ -371,7 +395,7 @@ void hashmap_resize(HashMap *map) {
     map->buckets = temp;
 
     // freeing newmap also frees its buckets
-    free(newmap);
+    hashmap_free(newmap);
 }
 
 void hashmap_set(HashMap *map, Object *key, Object *value) {
@@ -432,6 +456,33 @@ Object *hashmap_get(HashMap *map, Object *key) {
     return NULL;
 }
 
+int hashmap_rem(HashMap *map, Object *key) {
+    unsigned int hash = obj_hash(key) % map->capacity;
+    Object *list = map->buckets + hash;
+    if(CAR(list) == nil_obj) {
+        return 0;
+    } else {
+        Object *prev = list;
+        while(list != nil_obj) {
+            Object *keyval = CAR(list);
+
+            if(obj_equals(key, CAR(keyval))) {
+                // Object *val = CDR(keyval);
+                if(prev == list) {
+                    CAR(prev) = CAR(CDR(list));
+                    CDR(prev) = CDR(CDR(list));
+                } else {
+                    CDR(prev) = CDR(list);
+                }
+                return 1;
+            } else {
+                prev = list;
+                list = CDR(list);
+            }
+        }
+        return 0;
+    }
+}
 void hashmap_print(HashMap *map, int pretty) {
     int first = 1;
     printf("{");
@@ -479,9 +530,13 @@ void hashmap_debug(HashMap *map) {
 
 Envir *envir_init(int size) {
     Envir *envir = malloc(sizeof(Envir));
+    if(!envir) {
+        fprintf(stderr, "out of memory while initializing environment\n");
+        exit(1);
+    }
     envir->map = hashmap_init(size);
-    envir->inner = NULL;
-    envir->outer = NULL;
+    envir->next = NULL;
+    envir->prev = NULL;
     return envir;
 }
 
@@ -506,7 +561,7 @@ Object *envir_get(Envir *envir, Object *key) {
 Object *envir_search(Envir *envir, Object *key) {
     Object *output;
     while((output = envir_get(envir, key)) == NULL) {
-        envir = envir->outer;
+        envir = envir->prev;
         if(envir == NULL) {
             return NULL;
         }

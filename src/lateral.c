@@ -20,54 +20,12 @@ int main(int argc, char ** argv) {
     CDR(nil_obj) = nil_obj;
 
     curr_envir = envir_init(32);
+    user_envir = curr_envir;
     lang_init();
 
+    read_file("./core.lisp");
     if(argc == 2) {
-        // FILE INTERPRETER
-        FILE *f = fopen(argv[1], "r");
-        char *buffer = NULL;
-        int length;
-        if(f != NULL) {
-            fseek(f, 0, SEEK_END);
-            length = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            buffer = malloc(sizeof(char) * (length + 1));
-            if(buffer == NULL) {
-                printf("failed to alloc buffer for file\n");
-                exit(1);
-            }
-            fread(buffer, 1, length, f);
-            buffer[length] = '\0';
-        } else {
-            printf("failed to open file %s\n", argv[1]);
-            exit(1);
-        }
-
-        Object *tokens = NULL; 
-        Object *curr = tokens;
-        Object *obj = NULL;
-        char *lbuf = buffer;
-        while(read_token(&lbuf, &obj) >= 0) {
-            curr = list_append(curr, obj);
-            if(tokens == NULL) {
-                tokens = curr;
-            }
-        }
-        fclose(f);
-        free(buffer);
-
-        // insert program into environment to avoid garbage collection
-        Object *prog = obj_init_str(strt, "*PROG*");
-        envir_set(curr_envir, prog, tokens);
-
-        // list_debug0(tokens, 0);
-        Object *ast = NULL;
-        curr = tokens;
-        while(curr != nil_obj) {
-            read_form(&curr, &ast);
-            evaluate(curr_envir, ast);
-            garbage_run();
-        }
+        read_file(argv[1]);
     } else {
         //REPL MODE
         

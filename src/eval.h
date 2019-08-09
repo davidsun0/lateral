@@ -13,7 +13,6 @@ enum mode {
 
 typedef struct StackFrame {
     struct StackFrame* prev;
-    // Object *fn;
     Object *in;
     Object *out;
     Object *ret;
@@ -22,6 +21,7 @@ typedef struct StackFrame {
 
 StackFrame *stack;
 Envir *curr_envir;
+Envir *user_envir;
 
 Object *evaluate(Envir *envir, Object *ast);
 

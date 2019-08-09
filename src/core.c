@@ -4,6 +4,7 @@
 
 #include "eval.h"
 #include "reader.h"
+#include "object.h"
 
 #include "core.h"
 
@@ -46,6 +47,53 @@ Object *la_eq(Object *list) {
     }
 }
 
+Object *la_type(Object *list) {
+    Object *a = CAR(list);
+    if(a->type == symt) {
+        return obj_init_str(keywordt, ":symbol");
+    } else if(a->type == strt) {
+        return obj_init_str(keywordt, ":string");
+    } else if(a->type == keywordt) {
+        return obj_init_str(keywordt, ":keyword");
+    } else if(a->type == intt) {
+        return obj_init_str(keywordt, ":integer");
+    } else if(a->type == floatt) {
+        return obj_init_str(keywordt, ":float");
+    } else if(a->type == listt) {
+        return obj_init_str(keywordt, ":list");
+    } else if(a->type == hashmapt) {
+        return obj_init_str(keywordt, ":hashmap");
+    } else if(a->type == natfnt) {
+        return obj_init_str(keywordt, ":function");
+    } else if(a->type == fnt) {
+        return obj_init_str(keywordt, ":function");
+    } else if(a->type == macrot) {
+        return obj_init_str(keywordt, ":macro");
+    } else {
+        return err_init("error: corrupted object");
+    }
+}
+
+/*
+ * FUNCTION FUNCTIONS
+ *
+ */
+Object *la_func_params(Object *list) {
+    if(CAR(list)->type == fnt) {
+        return CAR(list)->data.func.params;
+    } else {
+        return err_init("type error");
+    }
+}
+
+Object *la_func_expr(Object *list) {
+    if(CAR(list)->type == fnt) {
+        return CAR(list)->data.func.expr;
+    } else {
+        return err_init("type error");
+    }
+}
+
 /*
  * LIST FUNCTIONS
  *
@@ -67,6 +115,14 @@ Object *la_is_empty(Object *list) {
     }
 }
 
+Object *la_is_list(Object *list) {
+    if(CAR(list)->type == listt) {
+        return tru_obj;
+    } else {
+        return nil_obj;
+    }
+}
+
 Object *la_list(Object *list) {
     Object *ret = NULL;
     Object *retb = ret;
@@ -81,17 +137,19 @@ Object *la_list(Object *list) {
 }
 
 Object *la_car(Object *list) {
-    if(CAR(list) != nil_obj && CAR(list)->type == listt) {
+    if(CAR(list)->type == listt) {
         return CAR(CAR(list));
     } else {
+        printf("%s type in car\n", type_to_str(CAR(list)->type));
         return err_init("type error in car\n");
     }
 }
 
 Object *la_cdr(Object *list) {
-    if(CAR(list) != nil_obj && CAR(list)->type == listt) {
+    if(CAR(list)->type == listt) {
         return CDR(CAR(list));
     } else {
+        printf("%s type in cdr\n", type_to_str(CAR(list)->type));
         return err_init("type error in cdr\n");
     }
 }
@@ -205,23 +263,14 @@ Object *la_char_at(Object *list) {
     }
 }
 
-/*
-Object *la_str_len(Object *list) {
-    Object *obj = CAR(list);
-    if(obj->type == strt) {
-        int len = strlen(obj_string(obj));
-        union Data dat = { .int_val = len };
-        return obj_init(intt, dat);
-    } else {
-        return err_init("type error");
-    }
-}
-*/
-
 Object *la_str_cat(Object *list) {
-    char *buff = malloc(16);
     int len = 0;
-    int capacity = 16;
+    int capacity = SHORT_STRING_LENGTH;
+    char *buff = malloc(capacity);
+    if(!buff) {
+        fprintf(stderr, "out of memory while allocating string in la_str_cat\n");
+        exit(1);
+    }
     while(list != nil_obj) {
         Object *s = CAR(list);
         if(s->type != strt) {
@@ -236,6 +285,10 @@ Object *la_str_cat(Object *list) {
             if(len == capacity - 2) { // zero index + null terminator
                 capacity *= 2;
                 buff = realloc(buff, capacity);
+                if(!buff) {
+                    fprintf(stderr, "out of memory while resizing string in la_str_cat\n");
+                    exit(1);
+                }
             }
         }
         list = CDR(list);
@@ -275,18 +328,23 @@ void lang_init() {
     union Data dat = { .int_val = 0 };
     tru_obj = obj_init(intt, dat);
     envir_set_str(curr_envir, "t", tru_obj);
-
     envir_set_str(curr_envir, "nil", nil_obj);
 
     insert_function("+", la_sum);
     insert_function("<", la_lt);
     insert_function("=", la_eq);
+    insert_function("type", la_type);
 
     insert_function("nil?", la_is_nil);
     insert_function("empty?", la_is_empty);
 
+    // function functions
+    insert_function("params", la_func_params);
+    insert_function("expr", la_func_expr);
+
     // list functions
     insert_function("list", la_list);
+    insert_function("list?", la_is_list);
     insert_function("car", la_car);
     insert_function("cdr", la_cdr);
     insert_function("cons", la_cons);

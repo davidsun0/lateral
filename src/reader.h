@@ -6,5 +6,6 @@
 int read_token(char **, Object **);
 int read_form(Object**, Object **);
 Object* read_string(char *str);
+void read_file(char *path);
 
 #endif

@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "object.h"
+#include "eval.h"
+#include "garbage.h"
 
 #include "reader.h"
 
@@ -52,12 +54,7 @@ int read_token(char **buf, Object **obj) {
 
     if(start != end) {
         int len = end - start;
-        char *str = malloc(sizeof(char) * (len + 1));
-        strncpy(str, start, len);
-        str[len] = '\0';
-        
-        union Data d = { .ptr = str };
-        *obj = obj_init(strt, d);
+        *obj = obj_init_str_len(strt, start, len);
         *buf = end;
         return 0;
     } else {
@@ -207,3 +204,56 @@ Object *read_string(char *str) {
 
     return tokens;
 }
+
+void read_file(char *path) {
+    // FILE INTERPRETER
+    FILE *f = fopen(path, "r");
+    char *buffer = NULL;
+    int length;
+    if(f != NULL) {
+        fseek(f, 0, SEEK_END);
+        length = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        buffer = malloc(sizeof(char) * (length + 1));
+        if(buffer == NULL) {
+            fprintf(stderr, "out of memory while loading file\n");
+            exit(1);
+        }
+        fread(buffer, 1, length, f);
+        buffer[length] = '\0';
+    } else {
+        printf("failed to open file %s\n", path);
+        return;
+    }
+
+    Object *tokens = NULL; 
+    Object *curr = tokens;
+    Object *obj = NULL;
+    char *lbuf = buffer;
+    while(read_token(&lbuf, &obj) >= 0) {
+        curr = list_append(curr, obj);
+        if(tokens == NULL) {
+            tokens = curr;
+        }
+    }
+    fclose(f);
+    free(buffer);
+
+    // insert program into environment to avoid garbage collection
+    Object *prog = obj_init_str(strt, "*PROG*");
+    envir_set(curr_envir, prog, tokens);
+
+    // list_debug0(tokens, 0);
+    Object *ast = NULL;
+    curr = tokens;
+    while(curr != nil_obj) {
+        read_form(&curr, &ast);
+        evaluate(curr_envir, ast);
+        garbage_run();
+    }
+    if(hashmap_rem(curr_envir->map, prog) != 1) {
+        printf("something has gone horribly wrong\n");
+    }
+    garbage_run();
+}
+

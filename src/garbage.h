@@ -3,9 +3,11 @@
 
 #include "object.h"
 
+/*
+ * no meaning to bank size number, might be more efficient to make Bank a total
+ * of 4KiB and align to page
+ */
 #define BANKSIZE 256
-
-// List *all_objects;
 
 typedef struct Bank {
     struct Bank *next;
@@ -16,7 +18,6 @@ Bank *all_objects;
 
 void garbage_init();
 Object *garbage_alloc();
-// void garbage_insert(Object *);
 void garbage_run();
 void garbage_shutdown();
 

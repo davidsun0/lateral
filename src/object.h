@@ -16,7 +16,7 @@ typedef enum {
 } obj_type;
 
 struct Func {
-    struct Object *args;
+    struct Object *params;
     struct Object *expr;
 };
 
@@ -34,10 +34,12 @@ typedef struct {
     int load;
 } HashMap;
 
+#define SHORT_STRING_LENGTH 16
+
 union Data {
     void *ptr;
     char *str;
-    char short_str[16];
+    char short_str[SHORT_STRING_LENGTH];
     HashMap *hashmap;
     int int_val;
     float float_val;
@@ -100,14 +102,15 @@ void hashmap_resize(HashMap *);
 
 void hashmap_set(HashMap *, Object *key, Object *value);
 Object *hashmap_get(HashMap *, Object *key);
+int hashmap_rem(HashMap *, Object *key);
 
 void hashmap_print(HashMap *, int);
 void hashmap_debug(HashMap *);
 
 typedef struct Envir {
     HashMap *map;
-    struct Envir *inner;
-    struct Envir *outer;
+    struct Envir *prev;
+    struct Envir *next;
 } Envir;
 
 Envir *envir_init(int size);
