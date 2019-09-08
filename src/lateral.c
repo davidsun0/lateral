@@ -24,46 +24,50 @@ int main(int argc, char ** argv) {
     lang_init();
 
     read_file("./core.lisp");
-    if(argc == 2) {
+    if(argc >= 2) {
         read_file(argv[1]);
-    } else {
-        //REPL MODE
-        
-        // turn off tab completion
-        rl_bind_key('\t', rl_insert);
+        if(argc == 2) {
+            exit(0);
+        }
+    }
 
-        while(1) {
-            char *input_str = readline("user> ");
-            if(input_str == NULL) {
-                break;
-            } else if(input_str[0] == '\0') {
-                free(input_str);
-                continue;
-            }
+    //REPL MODE
 
-            // read
-            Object* ast = read_string(input_str);
+    // turn off tab completion
+    rl_bind_key('\t', rl_insert);
+
+    while(1) {
+        char *input_str = readline("user> ");
+        if(input_str == NULL) {
+            break;
+        } else if(input_str[0] == '\0') {
             free(input_str);
-            if(ast == NULL) {
-                continue;
-            }
-
-            // eval
-            Object *result = evaluate(curr_envir, ast);
-
-            // print
-            if(result == NULL) {
-                printf("NULL RESULT\n");
-            } else {
-                obj_print(result, 0);
-                printf("\n");
-            }
-            garbage_run();
+            continue;
         }
 
-        printf("\ngoodbye! ('u' )/\n");
+        // read
+        Object* ast = read_string(input_str);
+        free(input_str);
+        if(ast == NULL) {
+            continue;
+        }
 
-        envir_free(curr_envir);
-        // garbage_shutdown();
+        // eval
+        Object *result = evaluate(curr_envir, ast);
+
+        // print
+        if(result == NULL) {
+            printf("NULL RESULT\n");
+        } else {
+            // printf("=> ");
+            obj_print(result, 0);
+            printf("\n");
+        }
+        garbage_run();
     }
+
+    printf("\ngoodbye! ('u' )/\n");
+
+    envir_free(curr_envir);
+    // garbage_shutdown();
 }

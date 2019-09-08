@@ -23,6 +23,34 @@ Object *la_sum(Object *list) {
     return obj_init(intt, dat);
 }
 
+Object *la_diff(Object *list) {
+    int diff;
+    Object *obj = CAR(list);
+    if(obj->type == intt) {
+        diff = obj->data.int_val;
+    } else {
+        return err_init("type error");
+    }
+
+    if(CAR(CDR(list)) == nil_obj) {
+        union Data dat = { .int_val = -1 * diff };
+        return obj_init(intt, dat);
+    } else {
+        list = CDR(list);
+        while(list != nil_obj) {
+            Object *obj = CAR(list);
+            if(obj->type == intt) {
+                diff -= obj->data.int_val;
+            } else {
+                return err_init("type error");
+            }
+            list = CDR(list);
+        }
+        union Data dat = { .int_val = diff };
+        return obj_init(intt, dat);
+    }
+}
+
 Object *la_lt(Object *list) {
     Object *a = CAR(list);
     Object *b = CAR(CDR(list));
@@ -47,28 +75,63 @@ Object *la_eq(Object *list) {
     }
 }
 
+Object *la_identical(Object *list) {
+    if(CAR(list) == CAR(CDR(list))) {
+        return tru_obj;
+    } else {
+        return nil_obj;
+    }
+}
+
+Object *la_equal(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+
+    if(a == b) {
+        return tru_obj;
+    }
+
+    if(a->type != b->type) {
+        return nil_obj;
+    }
+
+    int is_equal = 0;
+    if(a->type == symt || a->type == strt || a->type == keywordt) {
+        is_equal = strcmp(obj_string(a), obj_string(b)) == 0;
+    } else if(a->type == intt) {
+        is_equal = a->data.int_val == b->data.int_val;
+    } else if(a->type == floatt) {
+        is_equal = a->data.float_val == b->data.float_val;
+    } else {
+        fprintf(stderr, "la_equal not implemented for %s type\n",
+                type_to_str(a->type));
+    }
+
+    return is_equal ? tru_obj : nil_obj;
+}
+
 Object *la_type(Object *list) {
     Object *a = CAR(list);
     if(a->type == symt) {
-        return obj_init_str(keywordt, ":symbol");
+        return obj_init_str(keywordt, "symbol");
     } else if(a->type == strt) {
-        return obj_init_str(keywordt, ":string");
+        return obj_init_str(keywordt, "string");
     } else if(a->type == keywordt) {
-        return obj_init_str(keywordt, ":keyword");
+        return obj_init_str(keywordt, "keyword");
     } else if(a->type == intt) {
-        return obj_init_str(keywordt, ":integer");
+        return obj_init_str(keywordt, "integer");
     } else if(a->type == floatt) {
-        return obj_init_str(keywordt, ":float");
+        return obj_init_str(keywordt, "float");
     } else if(a->type == listt) {
-        return obj_init_str(keywordt, ":list");
+        return obj_init_str(keywordt, "list");
     } else if(a->type == hashmapt) {
-        return obj_init_str(keywordt, ":hashmap");
+        return obj_init_str(keywordt, "hashmap");
     } else if(a->type == natfnt) {
-        return obj_init_str(keywordt, ":function");
+        return obj_init_str(keywordt, "function");
     } else if(a->type == fnt) {
-        return obj_init_str(keywordt, ":function");
+        return obj_init_str(keywordt, "function");
     } else if(a->type == macrot) {
-        return obj_init_str(keywordt, ":macro");
+        return obj_init_str(keywordt, "macro");
     } else {
         return err_init("error: corrupted object");
     }
@@ -115,14 +178,6 @@ Object *la_is_empty(Object *list) {
     }
 }
 
-Object *la_is_list(Object *list) {
-    if(CAR(list)->type == listt) {
-        return tru_obj;
-    } else {
-        return nil_obj;
-    }
-}
-
 Object *la_list(Object *list) {
     Object *ret = NULL;
     Object *retb = ret;
@@ -155,17 +210,10 @@ Object *la_cdr(Object *list) {
 }
 
 Object *la_cons(Object *list) {
-    Object *arg2 = CAR(CDR(list));
     Object *ret = cell_init();
     CAR(ret) = CAR(list);
-    // cons to an empty list
-    if(arg2->type == listt && CAR(arg2) == nil_obj && CDR(arg2) == nil_obj) {
-        return ret;
-    } else {
-        // CDR(ret) = CAR(CDR(list));
-        CDR(ret) = arg2;
-        return ret;
-    }
+    CDR(ret) = CAR(CDR(list));
+    return ret;
 }
 
 Object *la_reverse_mut(Object *list) {
@@ -331,8 +379,11 @@ void lang_init() {
     envir_set_str(curr_envir, "nil", nil_obj);
 
     insert_function("+", la_sum);
+    insert_function("-", la_diff);
     insert_function("<", la_lt);
     insert_function("=", la_eq);
+    insert_function("eq?", la_identical);
+    insert_function("equal?0", la_equal);
     insert_function("type", la_type);
 
     insert_function("nil?", la_is_nil);
@@ -344,7 +395,6 @@ void lang_init() {
 
     // list functions
     insert_function("list", la_list);
-    insert_function("list?", la_is_list);
     insert_function("car", la_car);
     insert_function("cdr", la_cdr);
     insert_function("cons", la_cons);

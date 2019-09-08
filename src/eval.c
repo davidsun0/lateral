@@ -38,7 +38,6 @@ Envir *envir_pop(Envir *envir) {
 
 int is_macro(Envir *envir, Object *ast) {
     if(ast->type == listt) {
-        // Object *fn = ast->data.cell.car;
         Object *fn = CAR(ast);
         if(fn->type == symt) {
             fn = envir_search(envir, fn);
@@ -72,7 +71,6 @@ Object *eval_ast(Envir *envir, Object *ast) {
         }
         return ret;
     } else if(ast->type == listt) {
-        // Object *list = cell_init();
         Object *list = NULL;
         Object *listb = list;
         while(ast != nil_obj) {
@@ -150,6 +148,41 @@ Object *evaluate(Envir *envir, Object *ast) {
                 }
             } else {
                 return evaluate(envir, CAR(ast));
+            }
+        } else if(obj_eq_sym(CAR(ast), "cond")) {
+            ast = CDR(ast);
+            while(ast != nil_obj) {
+                if(CAR(CDR(ast)) == nil_obj) {
+                    return err_init("cond expects an even number of elements");
+                }
+                Object *pred = evaluate(envir, CAR(ast));
+                if(pred != nil_obj) {
+                    return evaluate(envir, CAR(CDR(ast)));
+                }
+                ast = CDR(CDR(ast));
+            }
+            return nil_obj;
+        } else if(obj_eq_sym(CAR(ast), "and")) {
+            ast = CDR(ast);
+            while(ast != nil_obj && evaluate(envir, CAR(ast)) != nil_obj) {
+                ast = CDR(ast);
+            }
+
+            if(ast == nil_obj) {
+                return tru_obj;
+            } else {
+                return nil_obj;
+            }
+        } else if(obj_eq_sym(CAR(ast), "or")) {
+            ast = CDR(ast);
+            while(ast != nil_obj && evaluate(envir, CAR(ast)) == nil_obj) {
+                ast = CDR(ast);
+            }
+
+            if(ast == nil_obj) {
+                return nil_obj;
+            } else {
+                return tru_obj;
             }
         } else if(obj_eq_sym(CAR(ast), "quote")) {
             return CAR(CDR(ast));

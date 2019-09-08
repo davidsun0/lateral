@@ -135,7 +135,6 @@ int obj_equals(Object *a, Object *b) {
         case floatt:
             return a->data.float_val == b->data.float_val;
         default:
-            // printf("equality not implemented for this type\n");
             printf("equality not implemented for %s type\n",
                     type_to_str(a->type));
             return 0;
@@ -147,12 +146,6 @@ int list_length(Object *obj) {
         return -1;
     }
 
-    /*
-    if(CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
-        return 0;
-    }
-    */
-   
     int len = 0;
     while(obj != nil_obj) {
         if(obj->type != listt) {
@@ -221,8 +214,10 @@ void obj_print(Object *obj, int pretty) {
                 printf("\"%s\"", obj_string(obj));
             }
             break;
-        case symt:
         case keywordt:
+            printf(":%s", obj_string(obj));
+            break;
+        case symt:
         case errt:
             printf("%s", obj_string(obj));
             break;
@@ -234,12 +229,16 @@ void obj_print(Object *obj, int pretty) {
                 printf("()");
             } else {
                 printf("(");
-                while(obj != nil_obj) {
+                while(obj->type == listt && obj != nil_obj) {
                     obj_print(CAR(obj), pretty);
                     if(CDR(obj) != nil_obj) {
                         printf(" ");
                     }
                     obj = CDR(obj);
+                }
+                if(obj->type != listt) {
+                    printf(". ");
+                    obj_print(obj, pretty);
                 }
                 printf(")");
             }
@@ -375,12 +374,6 @@ void hashmap_resize(HashMap *map) {
             Object *keyval = CAR(list);
             Object *key = CAR(keyval);
             Object *val = CDR(keyval);
-            /*
-            if(key->type == symt && strcmp(obj_string(key), "nil") == 0) {
-                printf("relocating nil!\n");
-            }
-            */
-            // if(list != nil_obj && val != nil_obj) {
             if(keyval != nil_obj) {
                 hashmap_set(newmap, key, val);
             }
@@ -467,7 +460,6 @@ int hashmap_rem(HashMap *map, Object *key) {
             Object *keyval = CAR(list);
 
             if(obj_equals(key, CAR(keyval))) {
-                // Object *val = CDR(keyval);
                 if(prev == list) {
                     CAR(prev) = CAR(CDR(list));
                     CDR(prev) = CDR(CDR(list));

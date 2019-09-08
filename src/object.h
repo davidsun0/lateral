@@ -67,6 +67,7 @@ typedef struct Object {
 
 Object *nil_obj;
 #define NIL (nil_obj)
+Object *tru_obj;
 
 char *type_to_str(obj_type);
 

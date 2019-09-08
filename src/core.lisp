@@ -17,29 +17,29 @@
 
 ;; tail recursive map helper function
 (defun map0 (fn in acc)
-  (if (nil? in)
-    acc
+  (if in
     (map0 fn
           (cdr in)
-          (cons (fn (car in)) acc))))
+          (cons (fn (car in)) acc))
+    acc))
 
 (defun map (fn in)
-  (reverse! (map0 fn in (quote ()))))
+  (reverse! (map0 fn in nil)))
 
 ;; tail recursive filter helper function
 (defun filter0 (pred in acc)
-  (if (nil? in)
-    acc
+  (if in
     (if (pred (car in))
       (filter0 pred
                (cdr in)
                (cons (car in) acc))
       (filter0 pred
                (cdr in)
-               acc))))
+               acc))
+    acc))
 
 (defun filter (pred in)
-  (reverse! (filter0 pred in (quote ()))))
+  (reverse! (filter0 pred in nil)))
 
 ;; tail recursive reduce helper function
 (defun reduce0 (fn in acc)
@@ -58,8 +58,11 @@
 (defun not (p)
   (nil? p))
 
-(defun inc (x)
-  (+ x 1))
+(defun inc (n)
+  (+ n 1))
+
+(defun dec (n)
+  (- n 1))
 
 (defun str-len0 (string acc)
   (if (nil? (char-at string acc))
@@ -122,7 +125,7 @@
     (concat0 (cdr a) b (cons (car a) acc))))
 
 (defun concat (a b)
-  (reverse! (concat0 a b (quote ()))))
+  (reverse! (concat0 a b nil)))
 
 (defun append0 (in obj acc)
   (if in
@@ -130,4 +133,31 @@
     (cons obj acc)))
 
 (defun append (in obj)
-  (reverse! (append0 in obj (quote ()))))
+  (reverse! (append0 in obj nil)))
+
+(defun nth (n in)
+  (if (= n 0)
+    (car in)
+    (nth (dec n) (cdr in))))
+
+(defun reverse0 (in acc)
+  (if in
+    (reverse0 (cdr in) (cons (car in) acc))
+    acc))
+
+(defun reverse (in)
+  (reverse0 in nil))
+
+(defun equal? (a b)
+  (cond (and (nil? a) (nil? b)) t,
+        (or (nil? a) (nil? b)) nil,
+        (not (equal?0 (type a) (type b))) nil,
+        (and (equal?0 (type a) :list) (equal?0 (car a) (car b)))
+          (equal? (cdr a) (cdr b)),
+        t (equal?0 a b)))
+
+(defun list? (a)
+  (equal? :list (type a)))
+
+(defun gensym ()
+  ())

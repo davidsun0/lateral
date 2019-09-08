@@ -71,10 +71,14 @@ Object *read_atom(Object *obj) {
     }
 
     char *str = obj_string(obj);
-    if('0' <= str[0] && str[0] <= '9') {
+    if('0' <= *str && *str <= '9') {
         // try to parse as number
         int sum = 0;
         int i = 0;
+        int negative = 0;
+        if(*str == '-') {
+            negative = 1;
+        }
         while(str[i] != '\0') {
             if(str[i] < '0' || str[i] > '9') {
                 printf("error: %s is not an integer\n", str);
@@ -84,13 +88,16 @@ Object *read_atom(Object *obj) {
             sum += str[i] - '0';
             i ++;
         }
+        if(negative) {
+            sum *= -1;
+        }
         union Data dat = { .int_val = sum };
         return obj_init(intt, dat);
     } else if (str[0] == '"') {
         // remove beginning and ending quotation marks
         return obj_init_str_len(strt, str + 1, strlen(str) - 2);
     } else if (str[0] == ':') {
-        return obj_init_str(keywordt, str);
+        return obj_init_str(keywordt, str + 1);
     } else {
         return obj_init_str(symt, str);
     }
@@ -180,6 +187,11 @@ Object *read_string(char *str) {
         }
     }
 
+    // if expression is just white space
+    if(tokens == NULL) {
+        return NULL;
+    }
+
     Object *ast = NULL;
     curr = tokens;
     int ret = read_form(&curr, &ast);
@@ -243,7 +255,6 @@ void read_file(char *path) {
     Object *prog = obj_init_str(strt, "*PROG*");
     envir_set(curr_envir, prog, tokens);
 
-    // list_debug0(tokens, 0);
     Object *ast = NULL;
     curr = tokens;
     while(curr != nil_obj) {
@@ -256,4 +267,3 @@ void read_file(char *path) {
     }
     garbage_run();
 }
-
