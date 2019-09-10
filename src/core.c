@@ -8,6 +8,28 @@
 
 #include "core.h"
 
+Object *la_eval(Object *list) {
+    return evaluate(curr_envir, CAR(list));
+}
+
+Object *la_apply(Object *list) {
+    Object *fn = CAR(list);
+    Object *arglist = CAR(CDR(list));
+    if(fn->type == natfnt) {
+        return fn->data.fn_ptr(arglist);
+    } else if(fn->type == fnt) {
+        Envir* envir = envir_push(curr_envir, fn->data.func.params, arglist);
+        if(envir == NULL) {
+            return err_init("failed to create envir");
+        }
+        Object *ret = evaluate(envir, fn->data.func.expr);
+        envir_pop(envir);
+        return ret;
+    } else {
+        return err_init("object is not a function");
+    }
+}
+
 Object *la_sum(Object *list) {
     int sum = 0;
     while(list != nil_obj) {
@@ -49,6 +71,45 @@ Object *la_diff(Object *list) {
         union Data dat = { .int_val = diff };
         return obj_init(intt, dat);
     }
+}
+
+Object *la_mult(Object *list) {
+    int product = 1;
+    while(list != nil_obj) {
+        Object *obj = CAR(list);
+        if(obj->type == intt) {
+            product *= obj->data.int_val;
+        } else {
+            return err_init("type error");
+        }
+        list = CDR(list);
+    }
+    union Data dat = { .int_val = product };
+    return obj_init(intt, dat);
+}
+
+Object *la_divide(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+    if(a->type != intt || b->type != intt) {
+        return err_init("type error");
+    }
+    int ai = a->data.int_val;
+    int bi = b->data.int_val;
+    union Data dat = { .int_val = ai / bi };
+    return obj_init(intt, dat);
+}
+
+Object *la_modulo(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+    if(a->type != intt || b->type != intt) {
+        return err_init("type error");
+    }
+    int ai = a->data.int_val;
+    int bi = b->data.int_val;
+    union Data dat = { .int_val = ai % bi };
+    return obj_init(intt, dat);
 }
 
 Object *la_lt(Object *list) {
@@ -119,7 +180,7 @@ Object *la_type(Object *list) {
     } else if(a->type == keywordt) {
         return obj_init_str(keywordt, "keyword");
     } else if(a->type == intt) {
-        return obj_init_str(keywordt, "integer");
+        return obj_init_str(keywordt, "int");
     } else if(a->type == floatt) {
         return obj_init_str(keywordt, "float");
     } else if(a->type == listt) {
@@ -134,6 +195,17 @@ Object *la_type(Object *list) {
         return obj_init_str(keywordt, "macro");
     } else {
         return err_init("error: corrupted object");
+    }
+}
+
+Object *la_to_keyword(Object *list) {
+    Object *a = CAR(list);
+    if(a->type == symt || a->type == strt) {
+        return obj_init_str(keywordt, obj_string(a));
+    } else if(a->type == keywordt) {
+        return a;
+    } else {
+        return err_init("type error\n");
     }
 }
 
@@ -378,13 +450,21 @@ void lang_init() {
     envir_set_str(curr_envir, "t", tru_obj);
     envir_set_str(curr_envir, "nil", nil_obj);
 
+    insert_function("eval", la_eval);
+    insert_function("apply", la_apply);
+
     insert_function("+", la_sum);
     insert_function("-", la_diff);
+    insert_function("*", la_mult);
+    insert_function("%", la_modulo);
+    insert_function("//", la_divide);
     insert_function("<", la_lt);
     insert_function("=", la_eq);
     insert_function("eq?", la_identical);
     insert_function("equal?0", la_equal);
     insert_function("type", la_type);
+
+    insert_function("keyword", la_to_keyword);
 
     insert_function("nil?", la_is_nil);
     insert_function("empty?", la_is_empty);
@@ -406,7 +486,7 @@ void lang_init() {
     insert_function("hashmap-set!", la_hashmap_set);
 
     // string functions
-    insert_function("to-string", la_to_string);
+    insert_function("string0", la_to_string);
     insert_function("char-at", la_char_at);
     // insert_function("str-len", la_str_len);
     insert_function("str-cat", la_str_cat);

@@ -59,9 +59,9 @@ if __name__ == '__main__':
             ]
 
     function = [
-            ('((fn () 321))', '321'),
-            ('((fn (x) (+ x x x)) 333)', '999'),
-            ('((fn (x) ((fn (y) (+ y 1)) x)) 10)', '11')
+            ('((lambda () 321))', '321'),
+            ('((lambda (x) (+ x x x)) 333)', '999'),
+            ('((lambda (x) ((lambda (y) (+ y 1)) x)) 10)', '11')
             ]
  
     envir = [
@@ -71,7 +71,14 @@ if __name__ == '__main__':
             ('x', '31415')
             ]
 
+    special = [
+            ('(def a "text")', '"text"'),
+            ('a', '"text"'),
+            ('(quote a)', 'a')
+            ]
+
     runSuite(arith)
     runSuite(function)
     runSuite(envir)
+    runSuite(special)
     # runTest(['(+ 1 1)'], ['2'])

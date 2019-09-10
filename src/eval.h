@@ -23,6 +23,9 @@ StackFrame *stack;
 Envir *curr_envir;
 Envir *user_envir;
 
+Envir *envir_push(Envir*, Object *params, Object *args);
+Envir *envir_pop(Envir*);
+
 Object *evaluate(Envir *envir, Object *ast);
 
 #endif

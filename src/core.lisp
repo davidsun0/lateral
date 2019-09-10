@@ -64,13 +64,13 @@
 (defun dec (n)
   (- n 1))
 
-(defun str-len0 (string acc)
-  (if (nil? (char-at string acc))
+(defun str-len0 (str acc)
+  (if (nil? (char-at str acc))
     acc
-    (str-len0 string (inc acc))))
+    (str-len0 str (inc acc))))
 
-(defun str-len (string)
-  (str-len0 string 0))
+(defun str-len (str)
+  (str-len0 str 0))
 
 (defun range0 (curr max acc)
   (if (< curr max)
@@ -78,17 +78,17 @@
     acc))
 
 (defun range1 (min max)
-  (reverse! (range0 min max (quote ()))))
+  (reverse! (range0 min max nil)))
 
 (defun range (max)
   (range1 0 max))
 
-(defun to-chars (string)
-  (map (lambda (x) (char-at string x))
-       (range (str-len string))))
+(defun to-chars (str)
+  (map (lambda (x) (char-at str x))
+       (range (str-len str))))
 
-(defun rev-str (string)
-  (reduce str-cat (reverse! (to-chars string))))
+(defun rev-str (str)
+  (reduce str-cat (reverse! (to-chars str))))
 
 (defun max0 (list acc)
   (if (nil? list)
@@ -140,6 +140,11 @@
     (car in)
     (nth (dec n) (cdr in))))
 
+(defun last (in)
+  (if (cdr in)
+    (last (cdr in))
+    (car in)))
+
 (defun reverse0 (in acc)
   (if in
     (reverse0 (cdr in) (cons (car in) acc))
@@ -159,5 +164,55 @@
 (defun list? (a)
   (equal? :list (type a)))
 
-(defun gensym ()
-  ())
+(defun int? (a)
+  (equal? :int (type a)))
+
+(defun keyword? (a)
+  (equal? :keyword (type a)))
+
+(defun itoa0 (n acc)
+  (if (= n 0)
+    acc
+    (let (digit (% n 10)
+          dchar (cond
+                  (= digit 0) "0",
+                  (= digit 1) "1",
+                  (= digit 2) "2",
+                  (= digit 3) "3",
+                  (= digit 4) "4",
+                  (= digit 5) "5",
+                  (= digit 6) "6",
+                  (= digit 7) "7",
+                  (= digit 8) "8",
+                  (= digit 9) "9"))
+      (itoa0 (// n 10) (cons dchar acc)))))
+
+(defun itoa (n)
+  (if (= n 0)
+    "0"
+    (eval (cons (quote str-cat) (itoa0 n nil)))))
+
+(defun atoi0 (in acc)
+  (if in
+    (let (dchar (car in)
+          digit (cond
+                  (equal? dchar "0") 0
+                  (equal? dchar "1") 1
+                  (equal? dchar "2") 2
+                  (equal? dchar "3") 3
+                  (equal? dchar "4") 4
+                  (equal? dchar "5") 5
+                  (equal? dchar "6") 6
+                  (equal? dchar "7") 7
+                  (equal? dchar "8") 8
+                  (equal? dchar "9") 9))
+      (atoi0 (cdr in) (+ digit (* 10 acc))))
+    acc))
+
+(defun atoi (int-str)
+  (atoi0 (to-chars int-str) 0))
+
+(defun string (x)
+  (if (int? x)
+    (itoa x)
+    (string0 x)))

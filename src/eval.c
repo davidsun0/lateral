@@ -1,9 +1,25 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "object.h"
 
 #include "eval.h"
+
+Object *funcall(Object *(fn_ptr)(Object *), int count, ...) {
+    Object *list = NULL;
+    Object *listb = list;
+
+    va_list vl;
+    va_start(vl, count);
+    for(int i = 0; i < count; i ++) {
+        Object* next = va_arg(vl, Object*);
+        listb = list_append(listb, next);
+    }
+    va_end(vl);
+
+    return fn_ptr(listb);
+}
 
 Envir *envir_push(Envir *envir, Object *params, Object *args) {
     int sizea = list_length(params);
@@ -239,7 +255,7 @@ Object *evaluate(Envir *envir, Object *ast) {
                 // obj_debug(ast);
                 obj_print(ast, 0);
                 printf("\n");
-                exit(1);
+                return err_init("failed to create envir");
             }
             Object *ret = evaluate(envir, fn->data.func.expr);
             envir = envir_pop(envir);
