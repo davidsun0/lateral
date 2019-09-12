@@ -18,6 +18,8 @@ Bank *bank_init() {
         bank->objs[i].type = empty;
         SET_MARK(&bank->objs[i]);
     }
+
+    bank->is_full = 0;
     return bank;
 }
 
@@ -28,10 +30,13 @@ void garbage_init() {
 Object* garbage_alloc() {
     Bank *bank = all_objects;
     while(bank != NULL) {
-        for(int i = 0; i < BANKSIZE; i ++) {
-            if(bank->objs[i].type == empty) {
-                return &bank->objs[i];
+        if(!bank->is_full) {
+            for(int i = 0; i < BANKSIZE; i ++) {
+                if(bank->objs[i].type == empty) {
+                    return &bank->objs[i];
+                }
             }
+            bank->is_full = 1;
         }
 
         if(bank->next == NULL) {
@@ -60,6 +65,7 @@ void garbage_run() {
                 obj_release(&bank->objs[i]);
                 bank->objs[i].type = empty;
                 bank->objs[i].flags = 0;
+                bank->is_full = 0;
             }
             UNSET_MARK(&bank->objs[i]);
         }

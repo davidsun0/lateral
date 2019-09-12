@@ -7,10 +7,11 @@
  * no meaning to bank size number, might be more efficient to make Bank a total
  * of 4KiB and align to page
  */
-#define BANKSIZE 256
+#define BANKSIZE 1024
 
 typedef struct Bank {
     struct Bank *next;
+    int is_full;
     Object objs[BANKSIZE];
 } Bank;
 

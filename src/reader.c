@@ -37,6 +37,7 @@ int read_token(char **buf, Object **obj) {
     if(is_special_char(*end)) {
         end ++;
     } else if(*end == '"') {
+        // read string
         end ++;
         while(*end != '"') {
             end ++;
@@ -251,7 +252,14 @@ void read_file(char *path) {
     fclose(f);
     free(buffer);
 
-    // insert program into environment to avoid garbage collection
+    /*
+     * inserting the text of the program into the environment to avoid the
+     * program itself being garbage collected
+     *
+     * setting the type to string ensures that the program cannot view / modify
+     * itself - only symbols can be looked up in the environment
+     * this also ensures that the user can define *PROG* without conflicts
+     */
     Object *prog = obj_init_str(strt, "*PROG*");
     envir_set(curr_envir, prog, tokens);
 
