@@ -64,6 +64,14 @@
 (defun dec (n)
   (- n 1))
 
+(defun length0 (in acc)
+  (if in
+    (length0 (cdr in) (inc acc))
+    acc))
+
+(defun length (in)
+  (length0 in 0))
+
 (defun str-len0 (str acc)
   (if (nil? (char-at str acc))
     acc

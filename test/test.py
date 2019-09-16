@@ -3,7 +3,7 @@ import subprocess
 import sys
 import itertools
 
-def runSuite(cases):
+def run_suite(cases):
     inputs = [i for i, e in cases]
     expected = [e for i, e in cases]
 
@@ -28,11 +28,11 @@ def runSuite(cases):
     for i, r, e in itertools.zip_longest(inputs, results, expected):
         total += 1
         if r != e:
-            print('===== TEST FAILED =====')
+            # print('===== TEST FAILED =====')
             print('input: ', i)
             print('expected: ', e)
             print('actual: ', r)
-            # print('=======================')
+            print()
         else:
             passed += 1
 
@@ -44,41 +44,37 @@ def runSuite(cases):
     print('{}/{} cases passed'.format(passed, total))
     print('\n\n\n')
 
+def run_test_file(filename):
+    with open(filename, "r") as testfile:
+        tests = []
+        code_lines = []
+        expected = None
+        
+        for line in testfile:
+            if line == "\n":
+                # join finished test case to list
+                tests.append(("".join(code_lines), expected))
+                code_lines = []
+            elif line[:2] == "; ":
+                # cut off ": " and newline char from expected result
+                expected = line[2:-1]
+            elif line[:2] == ";;":
+                pass
+            else:
+                # cut off newline char from line of code
+                code_lines.append(line[:-1])
+        tests.append(("".join(code_lines), expected))
+
+        run_suite(tests)
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('usage: {} <interpreter path>', sys.argv[0])
         exit(1)
+    else:
+        global path
+        path = sys.argv[1]
 
-    global path
-    path = sys.argv[1]
-    arith = [
-            ('12345', '12345'),
-            ('(+ 1 1)', '2'),
-            ('(+ 1 2 3 4 5)', '15'),
-            ('(+ 1 (+ 1 1))', '3'),
-            ]
-
-    function = [
-            ('((lambda () 321))', '321'),
-            ('((lambda (x) (+ x x x)) 333)', '999'),
-            ('((lambda (x) ((lambda (y) (+ y 1)) x)) 10)', '11')
-            ]
- 
-    envir = [
-            ('(def x (+ 100 200))', '300'),
-            ('x', '300'),
-            ('(def x 31415)', '31415'),
-            ('x', '31415')
-            ]
-
-    special = [
-            ('(def a "text")', '"text"'),
-            ('a', '"text"'),
-            ('(quote a)', 'a')
-            ]
-
-    runSuite(arith)
-    runSuite(function)
-    runSuite(envir)
-    runSuite(special)
-    # runTest(['(+ 1 1)'], ['2'])
+    # run_test_file("simple.lisp")
+    for testfile in sys.argv[2:]:
+        run_test_file(testfile)

@@ -13,7 +13,7 @@ clean:
 
 .PHONY: test
 test:
-	../test/test.py ./a.out
+	../test/test.py ./a.out ../test/simple.lisp
 
 lateral: $(objects)
 	$(CC) $(CFLAGS) -o a.out $^ $(LDFLAGS)

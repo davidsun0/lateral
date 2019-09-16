@@ -23,10 +23,11 @@ int main(int argc, char ** argv) {
     user_envir = curr_envir;
     lang_init();
 
-    read_file("./core.lisp");
+    read_file("/home/david/Lateral/src/core.lisp");
     if(argc >= 2) {
         read_file(argv[1]);
         if(argc == 2) {
+            // garbage_shutdown();
             exit(0);
         }
     }
