@@ -4,7 +4,7 @@
 typedef enum {
     empty = 0,
     // string variety
-    symt, strt, keywordt,
+    symt, strt, keywordt, chart,
     // numerical variety
     intt, floatt,
     // data structure variety

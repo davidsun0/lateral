@@ -3,18 +3,6 @@
         name
         (list (quote lambda) args expr)))
 
-(defun caar (x)
-  (car (car x)))
-
-(defun cadr (x)
-  (car (cdr x)))
-
-(defun cdar (x)
-  (cdr (car x)))
-
-(defun cddr (x)
-  (cdr (cdr x)))
-
 ;; tail recursive map helper function
 (defun map0 (fn in acc)
   (if in
@@ -43,20 +31,21 @@
 
 ;; tail recursive reduce helper function
 (defun reduce0 (fn in acc)
-  (if (nil? in)
-    acc
+  (if in
     (reduce0 fn
              (cdr in)
-             (fn acc (car in)))))
+             (fn acc (car in)))
+    acc))
 
 (defun reduce (fn in)
-  ; initial value of acc is (fn (car in) (cadr in))
   (reduce0 fn
            (cdr (cdr in))
-           (fn (car in) (cadr in))))
+           (fn (car in) (nth 1 in))))
 
-(defun not (p)
-  (nil? p))
+(defun nil? (p)
+  (if p nil t))
+
+(def not nil?)
 
 (defun inc (n)
   (+ n 1))
@@ -70,67 +59,22 @@
     acc))
 
 (defun length (in)
-  (length0 in 0))
-
-(defun str-len0 (str acc)
-  (if (nil? (char-at str acc))
-    acc
-    (str-len0 str (inc acc))))
-
-(defun str-len (str)
-  (str-len0 str 0))
-
-(defun range0 (curr max acc)
-  (if (< curr max)
-    (range0 (inc curr) max (cons curr acc))
-    acc))
-
-(defun range1 (min max)
-  (reverse! (range0 min max nil)))
-
-(defun range (max)
-  (range1 0 max))
-
-(defun to-chars (str)
-  (map (lambda (x) (char-at str x))
-       (range (str-len str))))
-
-(defun rev-str (str)
-  (reduce str-cat (reverse! (to-chars str))))
-
-(defun max0 (list acc)
-  (if (nil? list)
-    acc
-    (if (< acc (car list))
-      (max0 (cdr list) (car list))
-      (max0 (cdr list) acc))))
-
-(defun max (list)
-  (max0 (cdr list) (car list)))
+  (if (string? in)
+    (length0 (to-chars in) 0)
+    (length0 in 0)))
 
 (defun flatten (tree)
-  (if (nil? tree)
-    nil
-    (if (list? tree)
-      ;(map flatten tree)
-      nil
-      (list tree))))
-
-(defun flatten (tree)
-  (if (nil? tree)
-    nil
+  (if tree
     (if (list? tree)
       (reduce concat (map flatten tree))
-      ; (map flatten2 tree)
-      (list tree)
-      )))
+      (list tree))))
 
 (defun concat0 (a b acc)
-  (if (nil? a)
-    (if (nil? b)
-      acc
-      (concat0 nil (cdr b) (cons (car b) acc)))
-    (concat0 (cdr a) b (cons (car a) acc))))
+  (if a
+    (concat0 (cdr a) b (cons (car a) acc))
+    (if b
+      (concat0 nil (cdr b) (cons (car b) acc))
+      acc)))
 
 (defun concat (a b)
   (reverse! (concat0 a b nil)))
@@ -161,6 +105,38 @@
 (defun reverse (in)
   (reverse0 in nil))
 
+(defun range0 (curr max acc)
+  (if (< curr max)
+    (range0 (inc curr) max (cons curr acc))
+    acc))
+
+(defun range1 (min max)
+  (reverse! (range0 min max nil)))
+
+(defun range (max)
+  (range1 0 max))
+
+(defun to-chars0 (str idx acc)
+  (if (char-at idx str)
+    (to-chars0 str (inc idx) (cons (char-at idx str) acc))
+    acc))
+
+(defun to-chars (str)
+  (reverse! (to-chars0 str 0 nil)))
+
+(defun rev-str (str)
+  (reduce str-cat (reverse! (to-chars str))))
+
+(defun max0 (in acc)
+  (if in
+    (if (< acc (car in))
+      (max0 (cdr in) (car in))
+      (max0 (cdr in) acc))
+    acc))
+
+(defun max (in)
+  (max0 (cdr in) (car in)))
+
 (defun equal? (a b)
   (cond (and (nil? a) (nil? b)) t,
         (or (nil? a) (nil? b)) nil,
@@ -177,6 +153,9 @@
 
 (defun keyword? (a)
   (equal? :keyword (type a)))
+
+(defun string? (a)
+  (equal? :string (type a)))
 
 (defun itoa0 (n acc)
   (if (= n 0)

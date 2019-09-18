@@ -21,6 +21,27 @@ Object *funcall(Object *(fn_ptr)(Object *), int count, ...) {
     return fn_ptr(listb);
 }
 
+Object *funcall2(Object *fn, Object *args) {
+    if(fn->type == natfnt) {
+        return fn->data.fn_ptr(args);
+    } else if(fn->type == fnt) {
+        Object *params = fn->data.func.params;
+        Envir *envir = envir_push2(params, args);
+        if(envir == NULL) {
+            printf("failed to create envir\n");
+            printf("funcall: \n");
+            obj_print(fn, 0);
+            printf("\n");
+            return err_init("failed to create envir");
+        }
+        Object *ret = evaluate(envir, fn->data.func.expr);
+        envir_pop2();
+        return ret;
+    } else {
+        return err_init("fn is not a function");
+    }
+}
+
 Envir *envir_push(Envir *envir, Object *params, Object *args) {
     int sizea = list_length(params);
     int sizeb = list_length(args);
@@ -45,11 +66,44 @@ Envir *envir_push(Envir *envir, Object *params, Object *args) {
     return next;
 }
 
+Envir *envir_push2(Object *params, Object *args) {
+    int sizea = list_length(params);
+    int sizeb = list_length(args);
+
+    if(sizea != sizeb || sizea < 0 || sizeb < 0) {
+        obj_print(params, 0);
+        printf("\n");
+        obj_print(args, 0);
+        printf("\n");
+        printf("expected %d arguments, but got %d\n", sizea, sizeb);
+        return NULL;
+    }
+
+    Envir *next = envir_init(sizea * 2);
+    for(int i = 0; i < sizea; i ++) {
+        envir_set(next, CAR(params), CAR(args));
+        params = CDR(params);
+        args = CDR(args);
+    }
+
+    curr_envir->next = next;
+    next->prev = curr_envir;
+    curr_envir = next;
+    return next;
+}
+
 Envir *envir_pop(Envir *envir) {
     Envir *prev = envir->prev;
     prev->next = NULL;
     envir_free(envir);
     return prev;
+}
+
+void envir_pop2() {
+    Envir *prev = curr_envir->prev;
+    prev->next = NULL;
+    envir_free(curr_envir);
+    curr_envir = prev;
 }
 
 int is_macro(Envir *envir, Object *ast) {
@@ -70,10 +124,11 @@ Object *macro_expand(Envir *envir, Object *ast) {
         Object *args = CDR(ast);
 
         Object *params = macro->data.func.params;
-        Envir *inner = envir_push(envir, params, args);
+        Envir *inner = envir_push2(params, args);
         Object *expr = macro->data.func.expr;
         ast = evaluate(inner, expr);
-        curr_envir = envir_pop(inner);
+        // curr_envir = envir_pop(inner);
+        envir_pop2();
     }
     return ast;
 }
@@ -245,7 +300,7 @@ Object *evaluate(Envir *envir, Object *ast) {
         } else if(fn->type == fnt) {
             Object *vals = CDR(funcall);
             Object *params = fn->data.func.params;
-            envir = envir_push(envir, params, vals);
+            envir = envir_push2(params, vals);
             if(envir == NULL) {
                 printf("failed to create envir\n");
                 printf("funcall: \n");
@@ -258,7 +313,8 @@ Object *evaluate(Envir *envir, Object *ast) {
                 return err_init("failed to create envir");
             }
             Object *ret = evaluate(envir, fn->data.func.expr);
-            envir = envir_pop(envir);
+            // envir = envir_pop(envir);
+            envir_pop2();
             return ret;
         } else {
             printf("Error: ");

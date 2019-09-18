@@ -72,7 +72,27 @@ Object *read_atom(Object *obj) {
     }
 
     char *str = obj_string(obj);
-    if('0' <= *str && *str <= '9') {
+    if (str[0] == '0' && str[1] == 'x') {
+        // parse hex number
+        int sum = 0;
+        int i = 2;
+        while(str[i] != '\0') {
+            sum *= 16;
+            if('0' <= str[i] && str[i] <= '9') {
+                sum += str[i] - '0';
+            } else if('A' <= str[i] && str[i] <= 'F') {
+                sum += str[i] - 'A' + 10;
+            } else if('a' <= str[i] && str[i] <= 'f') {
+                sum += str[i] - 'a' + 10;
+            } else {
+                printf("error: %s is not a hex number\n", str);
+                return NULL;
+            }
+            i++;
+        }
+        union Data dat = { .int_val = sum };
+        return obj_init(intt, dat);
+    } else if('0' <= *str && *str <= '9') {
         // try to parse as number
         int sum = 0;
         int i = 0;
@@ -97,6 +117,8 @@ Object *read_atom(Object *obj) {
     } else if (str[0] == '"') {
         // remove beginning and ending quotation marks
         return obj_init_str_len(strt, str + 1, strlen(str) - 2);
+    } else if (str[0] == '\'' && str[2] == '\'' && str[3] == '\0') {
+        return obj_init_str_len(chart, str + 1, 1);
     } else if (str[0] == ':') {
         return obj_init_str(keywordt, str + 1);
     } else {

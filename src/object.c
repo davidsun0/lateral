@@ -22,6 +22,7 @@ char *type_to_str(obj_type type) {
         case symt:      return "symt";
         case strt:      return "strt";
         case keywordt:  return "keywordt";
+        case chart:     return "chart";
         case intt:      return "intt";
         case floatt:    return "floatt";
         case listt:     return "listt";
@@ -102,13 +103,46 @@ void obj_mark(Object *obj) {
     } else if(obj->type == fnt || obj->type == macrot) {
         obj_mark(obj->data.func.params);
         obj_mark(obj->data.func.expr);
+    } else if(obj->type == hashmapt) {
+        HashMap* map = obj->data.hashmap;
+        for(int i = 0; i < map->capacity; i ++) {
+            Object *keyval = map->buckets + i;
+            while(keyval != nil_obj) {
+                Object *key = CAR(keyval);
+                Object *val = CDR(keyval);
+                obj_mark(key);
+                obj_mark(val);
+                keyval = CDR(keyval);
+            }
+        }
     }
 }
 
+unsigned int str_hash(char *str) {
+    unsigned int hash = 5381;
+    int i = 0;
+    while(str[i] != '\0') {
+        hash += str[i] * 33;
+        i ++;
+    }
+    return hash;
+}
+
 unsigned int obj_hash(Object *obj) {
-    if(obj->type == symt || obj->type == strt || obj->type == keywordt
+    if(obj == nil_obj) {
+        return 13;
+    } else if(obj->type == symt || obj->type == strt || obj->type == keywordt
             || obj->type == errt) {
         return str_hash(obj_string(obj));
+    } else if(obj->type == listt) {
+        unsigned int acc = 0;
+        while(obj != nil_obj) {
+            acc += obj_hash(CAR(obj)) * 33;
+            obj = CDR(obj);
+        }
+        return acc;
+    } else if(obj->type == intt) {
+        return obj->data.int_val;
     } else {
         printf("hash function not implemented for %s type\n",
                 type_to_str(obj->type));
@@ -124,11 +158,24 @@ int obj_equals(Object *a, Object *b) {
         return 0;
     }
 
+    if(a->type == listt) {
+        while(obj_equals(CAR(a), CAR(b)) && a != nil_obj && b != nil_obj) {
+            a = CDR(a);
+            b = CDR(b);
+        }
+        if(a != nil_obj || b != nil_obj) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+
     switch(a->type) {
         case symt:
         case strt:
         case keywordt:
         case errt:
+        case chart:
             return strcmp(obj_string(a), obj_string(b)) == 0;
         case intt:
             return a->data.int_val == b->data.int_val;
@@ -221,6 +268,12 @@ void obj_print(Object *obj, int pretty) {
         case errt:
             printf("%s", obj_string(obj));
             break;
+        case chart:
+            if(pretty)
+                printf("%s", obj_string(obj));
+            else
+                printf("'%s'", obj_string(obj));
+            break;
         case intt:
             printf("%d", obj->data.int_val);
             break;
@@ -292,6 +345,9 @@ void obj_debug0(Object *obj, int indt) {
             case errt:
                 printf("err: %s\n", obj_string(obj));
                 break;
+            case chart:
+                printf("char: %s\n", obj_string(obj));
+                break;
             case intt:
                 printf("int: %d\n", obj->data.int_val);
                 break;
@@ -325,16 +381,6 @@ void obj_debug0(Object *obj, int indt) {
 
 void obj_debug(Object *obj) {
     obj_debug0(obj, 0);
-}
-
-unsigned int str_hash(char *str) {
-    unsigned int hash = 5381;
-    int i = 0;
-    while(str[i] != '\0') {
-        hash += str[i] * 33;
-        i ++;
-    }
-    return hash;
 }
 
 HashMap *hashmap_init(int size) {

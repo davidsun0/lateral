@@ -19,8 +19,8 @@ int main(int argc, char ** argv) {
     CAR(nil_obj) = nil_obj;
     CDR(nil_obj) = nil_obj;
 
-    curr_envir = envir_init(32);
-    user_envir = curr_envir;
+    user_envir = envir_init(32);
+    curr_envir = user_envir;
     lang_init();
 
     read_file("/home/david/Lateral/src/core.lisp");

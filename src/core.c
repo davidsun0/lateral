@@ -179,6 +179,8 @@ Object *la_type(Object *list) {
         return obj_init_str(keywordt, "string");
     } else if(a->type == keywordt) {
         return obj_init_str(keywordt, "keyword");
+    } else if(a->type == chart) {
+        return obj_init_str(keywordt, "char");
     } else if(a->type == intt) {
         return obj_init_str(keywordt, "int");
     } else if(a->type == floatt) {
@@ -233,23 +235,6 @@ Object *la_func_expr(Object *list) {
  * LIST FUNCTIONS
  *
  */
-Object *la_is_nil(Object *list) {
-    if(CAR(list) == nil_obj) {
-        return tru_obj;
-    } else {
-        return nil_obj;
-    }
-}
-
-Object *la_is_empty(Object *list) {
-    Object *obj = CAR(list);
-    if(obj->type == listt && CAR(obj) == nil_obj && CDR(obj) == nil_obj) {
-        return tru_obj;
-    } else {
-        return nil_obj;
-    }
-}
-
 Object *la_list(Object *list) {
     Object *ret = NULL;
     Object *retb = ret;
@@ -335,10 +320,43 @@ Object *la_hashmap_get(Object *list) {
 
 Object *la_hashmap_set(Object *list) {
     Object *hashmap = CAR(list);
+    if(hashmap->type != hashmapt) {
+        return err_init("arg is not of type hashmap");
+    }
     Object *key = CAR(CDR(list));
     Object *val = CAR(CDR(CDR(list)));
     hashmap_set(hashmap->data.hashmap, key, val);
     return hashmap;
+}
+
+Object *la_maphash(Object *list) {
+    Object *fun = CAR(list);
+    Object *hashobj = CAR(CDR(list));
+    HashMap *hashmap = hashobj->data.hashmap;
+    for(int i = 0; i < hashmap->capacity; i ++) {
+        Object* bucket = hashmap->buckets + i;
+        while(CAR(bucket) != nil_obj) {
+            Object *key = CAR(CAR(bucket));
+            Object *val = CDR(CAR(bucket));
+
+            Object *valcell = cell_init();
+            CAR(valcell) = val;
+            Object *keycell = cell_init();
+            CAR(keycell) = key;
+            CDR(keycell) = valcell;
+
+            /*
+            Object *funcall = cell_init();
+            CAR(funcall) = fun;
+            CDR(funcall) = keycell;
+            */
+            // evaluate(curr_envir, funcall);
+            funcall2(fun, keycell);
+
+            bucket = CDR(bucket);
+        }
+    }
+    return nil_obj;
 }
 
 /*
@@ -359,8 +377,8 @@ Object *la_to_string(Object *list) {
 }
 
 Object *la_char_at(Object *list) {
-    Object *str = CAR(list);
-    Object *idx = CAR(CDR(list));
+    Object *idx = CAR(list);
+    Object *str = CAR(CDR(list));
     if(str->type != strt) {
         printf("error: can't take char at from %s type\n",
             type_to_str(str->type));
@@ -379,8 +397,17 @@ Object *la_char_at(Object *list) {
                 return nil_obj;
             }
         }
-        return obj_init_str_len(strt, s + idx->data.int_val, 1);
+        return obj_init_str_len(chart, s + idx->data.int_val, 1);
     }
+}
+
+Object *la_char_int(Object *list) {
+    Object *chr = CAR(list);
+    if(chr->type != chart) {
+        return err_init("type error");
+    }
+    union Data dat = { .int_val = obj_string(chr)[0] };
+    return obj_init(intt, dat);
 }
 
 Object *la_str_cat(Object *list) {
@@ -393,7 +420,7 @@ Object *la_str_cat(Object *list) {
     }
     while(list != nil_obj) {
         Object *s = CAR(list);
-        if(s->type != strt) {
+        if(s->type != strt && s->type != chart) {
             free(buff);
             printf("str cat expects string type, not %s\n", type_to_str(s->type));
             return err_init("type error");
@@ -436,6 +463,28 @@ Object *la_debug(Object *list) {
     return nil_obj;
 }
 
+Object *la_write_bytes(Object *list) {
+    Object* file_name = CAR(list);
+    Object* byte_list = CAR(CDR(list));
+    if(file_name->type != strt) {
+        return err_init("type error");
+    }
+    FILE *f = fopen(obj_string(file_name), "wb");
+    if(f != NULL) {
+        while(byte_list != nil_obj) {
+            if(CAR(byte_list)->type != intt) {
+                return err_init("type error");
+            }
+            char lowest = CAR(byte_list)->data.int_val & 0xFF;
+            fwrite(&lowest, sizeof(char), 1, f);
+            byte_list = CDR(byte_list);
+        }
+        return tru_obj;
+    } else {
+        return err_init("failed to open file");
+    }
+}
+
 void insert_function(char *name, Object *(fn_ptr)(Object *)) {
     union Data dat = { .fn_ptr = fn_ptr };
     Object *fn = obj_init(natfnt, dat);
@@ -466,9 +515,6 @@ void lang_init() {
 
     insert_function("keyword", la_to_keyword);
 
-    insert_function("nil?", la_is_nil);
-    insert_function("empty?", la_is_empty);
-
     // function functions
     insert_function("params", la_func_params);
     insert_function("expr", la_func_expr);
@@ -484,12 +530,15 @@ void lang_init() {
     insert_function("make-hashmap", la_hashmap_init);
     insert_function("hashmap-get", la_hashmap_get);
     insert_function("hashmap-set!", la_hashmap_set);
+    insert_function("maphash", la_maphash);
 
     // string functions
     insert_function("string0", la_to_string);
     insert_function("char-at", la_char_at);
-    // insert_function("str-len", la_str_len);
+    insert_function("char-int", la_char_int);
     insert_function("str-cat", la_str_cat);
+
+    insert_function("write-bytes", la_write_bytes);
 
     insert_function("print", la_print);
     insert_function("pprint", la_pprint);

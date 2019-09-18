@@ -28,4 +28,8 @@ Envir *envir_pop(Envir*);
 
 Object *evaluate(Envir *envir, Object *ast);
 
+Object *funcall2(Object *fn, Object *args);
+Envir *envir_push2(Object* params, Object* args);
+void envir_pop2();
+
 #endif
