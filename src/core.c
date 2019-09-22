@@ -30,6 +30,13 @@ Object *la_apply(Object *list) {
     }
 }
 
+Object *la_read_file(Object* list) {
+    Object *str = CAR(list);
+    char *file_name = obj_string(str);
+    read_file(file_name);
+    return nil_obj;
+}
+
 Object *la_sum(Object *list) {
     int sum = 0;
     while(list != nil_obj) {
@@ -499,6 +506,7 @@ void lang_init() {
     envir_set_str(curr_envir, "t", tru_obj);
     envir_set_str(curr_envir, "nil", nil_obj);
 
+    insert_function("include", la_read_file);
     insert_function("eval", la_eval);
     insert_function("apply", la_apply);
 

@@ -249,12 +249,7 @@ Object *evaluate(Envir *envir, Object *ast) {
             while(ast != nil_obj && evaluate(envir, CAR(ast)) == nil_obj) {
                 ast = CDR(ast);
             }
-
-            if(ast == nil_obj) {
-                return nil_obj;
-            } else {
-                return tru_obj;
-            }
+            return CAR(ast);
         } else if(obj_eq_sym(CAR(ast), "quote")) {
             return CAR(CDR(ast));
         } else if(obj_eq_sym(CAR(ast), "progn")) {
@@ -274,8 +269,9 @@ Object *evaluate(Envir *envir, Object *ast) {
             }
 
             Envir *let_envir = envir_init(bind_len * 2);
-            let_envir->prev = envir;
-            envir->next = let_envir;
+            let_envir->prev = curr_envir;
+            curr_envir->next = let_envir;
+            curr_envir = let_envir;
             while(bindings != NIL) {
                 Object *sym = CAR(bindings);
                 Object *val = CAR(CDR(bindings));
@@ -284,7 +280,8 @@ Object *evaluate(Envir *envir, Object *ast) {
                 bindings = CDR(CDR(bindings));
             }
             Object *ret = evaluate(let_envir, expr);
-            envir->next = NULL;
+            curr_envir = curr_envir->prev;
+            // envir->next = NULL;
             envir_free(let_envir);
             return ret;
         }

@@ -313,6 +313,24 @@ void obj_print(Object *obj, int pretty) {
     }
 }
 
+void obj_debug_basic(Object *obj) {
+    printf("%s ", type_to_str(obj->type));
+    if(obj->type == symt || obj->type == keywordt || obj->type == strt
+            || obj->type == errt) {
+        if(GET_SSTR(obj)) {
+            printf("m:1 ");
+            printf("%s", obj->data.short_str);
+        } else {
+            printf("m:0 ");
+            printf("%p: %s", (void *)obj->data.str, obj->data.str);
+        }
+    } else if(obj->type == listt) {
+        printf("car: %p\t\tcdr:%p", (void *)obj->data.cell.car,
+                (void *)obj->data.cell.cdr);
+    }
+    printf("\n");
+}
+
 void obj_debug0(Object *obj, int indt) {
     if(obj == NULL) {
         return;

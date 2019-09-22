@@ -87,6 +87,7 @@ Object *obj_hashmap_init(int);
 
 void obj_print(Object *, int pretty);
 void obj_debug(Object *);
+void obj_debug_basic(Object *);
 
 int obj_equals(Object *, Object *);
 int obj_eq_sym(Object *, char *);

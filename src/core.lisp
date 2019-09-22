@@ -203,3 +203,15 @@
   (if (int? x)
     (itoa x)
     (string0 x)))
+
+(defun hashmap-contains? (hashmap key)
+  (nth 1 (hashmap-get hashmap key)))
+
+(defun index0 (needle haystack acc)
+  (if haystack
+    (if (equal? needle (car haystack))
+      acc
+      (index0 needle (cdr haystack) (inc acc)))))
+
+(defun index (needle haystack)
+  (index0 needle haystack 0))

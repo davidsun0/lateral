@@ -23,7 +23,7 @@ int main(int argc, char ** argv) {
     curr_envir = user_envir;
     lang_init();
 
-    read_file("/home/david/Lateral/src/core.lisp");
+    read_file("./core.lisp");
     if(argc >= 2) {
         read_file(argv[1]);
         if(argc == 2) {

@@ -282,7 +282,8 @@ void read_file(char *path) {
      * itself - only symbols can be looked up in the environment
      * this also ensures that the user can define *PROG* without conflicts
      */
-    Object *prog = obj_init_str(strt, "*PROG*");
+    // Object *prog = obj_init_str(strt, "*PROG*");
+    Object *prog = obj_init_str(strt, path);
     envir_set(curr_envir, prog, tokens);
 
     Object *ast = NULL;
