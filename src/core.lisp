@@ -63,11 +63,12 @@
     (length0 (to-chars in) 0)
     (length0 in 0)))
 
-(defun flatten (tree)
-  (if tree
-    (if (list? tree)
-      (reduce concat (map flatten tree))
-      (list tree))))
+;; using native flatten now for performance reasons
+;(defun flatten (tree)
+;  (if tree
+;    (if (list? tree)
+;      (reduce concat (map flatten tree))
+;      (list tree))))
 
 (defun concat0 (a b acc)
   (if a

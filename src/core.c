@@ -107,6 +107,18 @@ Object *la_divide(Object *list) {
     return obj_init(intt, dat);
 }
 
+Object *la_bitand(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+    if(a->type != intt || b->type != intt) {
+        return err_init("type error");
+    }
+    int ai = a->data.int_val;
+    int bi = b->data.int_val;
+    union Data dat = { .int_val = ai & bi };
+    return obj_init(intt, dat);
+}
+
 Object *la_modulo(Object *list) {
     Object *a = CAR(list);
     Object *b = CAR(CDR(list));
@@ -292,6 +304,61 @@ Object *la_reverse_mut(Object *list) {
         curr = next;
     }
     return prev;
+}
+
+#define FLATTEN_DEPTH 512
+// because lisp flatten is too slow :(
+Object *la_flatten(Object *list) {
+    Object *tree = CAR(list);
+    if(tree == nil_obj || tree->type != listt)
+        return tree;
+    else {
+        Object *tree_stack[FLATTEN_DEPTH];
+        int stack_top = 0;
+
+        Object *output = NULL;
+        Object *out_tail = NULL;
+
+        while(stack_top != 0 || tree != nil_obj) {
+            if(tree == nil_obj) {
+                stack_top --;
+                if(stack_top < 0)
+                    break;
+                else
+                    tree = tree_stack[stack_top];
+            }
+            // if the car is a list
+            else if(CAR(tree) != nil_obj && CAR(tree)->type == listt) {
+                // push CDR(tree) onto the stack
+                tree_stack[stack_top] = CDR(tree);
+                stack_top ++;
+                if(stack_top >= FLATTEN_DEPTH) {
+                    printf("flatten can't handle more than %d nested lists\n",
+                            FLATTEN_DEPTH);
+                    obj_debug(tree);
+                    return NULL;
+                }
+                tree = CAR(tree);
+            } else {
+                out_tail = list_append(out_tail, CAR(tree));
+                if(output == NULL)
+                   output = out_tail;
+
+                tree = CDR(tree);
+                /*
+                if(tree == nil_obj) {
+                    // pop off of stack
+                    stack_top --;
+                    if(stack_top < 0)
+                        break;
+                    else
+                        tree = tree_stack[stack_top];
+                }
+                */
+            }
+        }
+        return output;
+    }
 }
 
 /*
@@ -515,6 +582,7 @@ void lang_init() {
     insert_function("*", la_mult);
     insert_function("%", la_modulo);
     insert_function("//", la_divide);
+    insert_function("bit-and", la_bitand);
     insert_function("<", la_lt);
     insert_function("=", la_eq);
     insert_function("eq?", la_identical);
@@ -533,6 +601,7 @@ void lang_init() {
     insert_function("cdr", la_cdr);
     insert_function("cons", la_cons);
     insert_function("reverse!", la_reverse_mut);
+    insert_function("flatten", la_flatten);
 
     // map functions
     insert_function("make-hashmap", la_hashmap_init);

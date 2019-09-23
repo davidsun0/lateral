@@ -1,8 +1,4 @@
-(def distance-code
-     (quote (lambda (x1 y1 x2 y2)
-              (sqrt (+ (sq (- x1 x2))
-                       (sq (- y1 y2)))))))
-
+;;; reduces a tree to a list of lists
 (defun semi-flatten0 (in acc)
   (if in
     (if (and (list? (car in)) (list? (car (car in))))
@@ -14,6 +10,7 @@
 (defun semi-flatten (in)
   (reverse! (semi-flatten0 in nil)))
 
+;;; gensym for variables
 (def uvar 0)
 (defun uniquesym (prefix)
   (let (varc uvar)
@@ -21,10 +18,13 @@
       (def uvar (inc varc))
       (keyword (str-cat prefix (string varc))))))
 
+;;; first step in code processing
+;;; turns a tree of lisp code into a stack-based intermediate representation
 (defun ir0 (ast acc)
   (if ast
     (if (list? ast)
       (cond
+        ;; 'if' special expression
         (equal? (car ast) (quote if))
         (let (else-lab (uniquesym "lab_")
               end-lab  (uniquesym "lab_e"))
@@ -48,16 +48,17 @@
       (list (list :push ast)))
     acc))
 
+;; iterates along list, resolving nested lists with ir0
 (defun ir1 (ast acc)
   (if ast
     (if (list? (car ast))
       (ir1 (cdr ast)
-           (concat acc (ir0 (car ast) nil)
-                   ))
+           (concat acc (ir0 (car ast) nil)))
       (ir1 (cdr ast)
            (append acc (list :push (car ast)))))
     acc))
 
+;; calculates the max stack height (for Java)
 (defun max-stack0 (in max-c curr-c s-stack)
   (if in
     (let (expr (car in)
@@ -93,6 +94,9 @@
         ))
     max-c))
 
+;;; looks up argument and environment variables
+;;; finds constants
+;; stack ir -> stack ir
 (defun resolve-syms0 (ir-list arglist acc)
   (if ir-list
     (let (expr (car ir-list))
@@ -128,44 +132,10 @@
           (if (index (nth 1 expr) arglist)
             (list :push :arg-num (index (nth 1 expr) arglist))
             (list :push :envir-sym (nth 1 expr)) acc)
-          
+
           t expr)
         acc)))
     acc))
 
 (defun resolve-syms (ir-list arglist)
   (reverse! (resolve-syms0 ir-list arglist nil)))
-
-(defun ir-to-jvm (expr)
-  (let (cmd (car expr))
-    (cond
-      (equal? cmd :return)
-      (list :areturn)
-
-      (equal? cmd :push)
-      (cond
-        (equal? (nth 1 expr) :arg-num)
-        (list :aload (nth 2 expr)))
-      )))
-
-; (print (max-stack0 (ir0 (nth 2 distance-code) nil) 0 0 nil))
-; (map print (ir0 (nth 2 distance-code) nil))
-(def ast (quote (if (= (+ nil 1) 2) (+ 1 2 3) (- 4 5 6))))
-; (map print (ir0 (quote (if (= (+ 1 1) 2) (+ 1 2 3) (- 4 5 6))) nil))
-;(map print (ir0 ast nil))
-; (print (ir0 (quote x) nil))
-;(print (max-stack0 (ir0 ast nil) 0 0 nil))
-; (map print (reverse (resolve-syms0 (ir0 (quote x) nil)
-;                       (quote (x)) nil)))
-
-(defun compile (name args expr)
-  (let (ir-list (append (ir0 expr nil) (list :return))
-        stack-size (max-stack0 ir-list 0 0 nil)
-        ir-list (map ir-to-jvm (resolve-syms ir-list args)))
-    (progn
-      (map print ir-list)
-      (print stack-size))))
-
-(compile "main" (quote (a)) (quote a))
-
-
