@@ -5,10 +5,10 @@
       (semi-flatten0 (cdr in)
                      (concat (car in) acc))
       (semi-flatten0 (cdr in) (cons (car in) acc)))
-    acc))
+    (reverse! acc)))
 
 (defun semi-flatten (in)
-  (reverse! (semi-flatten0 in nil)))
+  (semi-flatten0 in nil))
 
 ;;; gensym for variables
 (def uvar 0)
@@ -58,42 +58,6 @@
            (append acc (list :push (car ast)))))
     acc))
 
-;; calculates the max stack height (for Java)
-(defun max-stack0 (in max-c curr-c s-stack)
-  (if in
-    (let (expr (car in)
-          max-c (if (< max-c curr-c) curr-c max-c))
-      (cond
-        ; push increases stack by 1
-        (equal? (car expr) :push)
-        (max-stack0 (cdr in) max-c (inc curr-c) s-stack)
-
-        ; funcall pops argc, pushes 1 result
-        (equal? (car expr) :funcall)
-        (max-stack0 (cdr in)
-                    max-c
-                    (inc (- curr-c (nth 3 expr)))
-                    s-stack)
-
-        ; jump-if-nil consumes 1 for test
-        (equal? (car expr) :jump-if-nil)
-        ; add :label, (dec curr-c) to working stack (jump-if-nil's pop)
-        ; curr-c will be restored at corresponding label
-        (max-stack0 (cdr in) max-c (dec curr-c)
-                    (cons (nth 1 expr)
-                          (cons (dec curr-c) s-stack)))
-
-        ; restore curr-c from s-stack
-        ; working curr-c can be ignored because any branch of the if statement
-        ; must push one and only one object to the stack
-        (and (equal? (car expr) :label)
-             (equal? (car s-stack) (nth 1 expr)))
-        (max-stack0 (cdr in) max-c (nth 1 s-stack) (cdr (cdr s-stack)))
-
-        t (max-stack0 (cdr in) max-c curr-c s-stack)
-        ))
-    max-c))
-
 ;;; looks up argument and environment variables
 ;;; finds constants
 ;; stack ir -> stack ir
@@ -124,11 +88,11 @@
           (list :push :true)
 
           ; integer constant
-          (equal? (type (nth 1 expr)) :int)
+          (int? (nth 1 expr))
           (list :push :int-const (nth 1 expr))
 
           ; otherwise lookup symbol in envir
-          (equal? (type (nth 1 expr)) :symbol)
+          (symbol? (nth 1 expr))
           (if (index (nth 1 expr) arglist)
             (list :push :arg-num (index (nth 1 expr) arglist))
             (list :push :envir-sym (nth 1 expr)) acc)

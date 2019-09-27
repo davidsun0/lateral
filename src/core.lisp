@@ -64,11 +64,18 @@
     (length0 in 0)))
 
 ;; using native flatten now for performance reasons
-;(defun flatten (tree)
+;(defun flatten0 (tree acc)
 ;  (if tree
 ;    (if (list? tree)
-;      (reduce concat (map flatten tree))
-;      (list tree))))
+;       (if (list? (car tree))
+;         (flatten0 (cdr tree)
+;                   (cons (flatten0 (car tree) nil) acc))
+;         (flatten0 (cdr tree) (cons (car tree) acc)))
+;       tree)
+;     acc))
+
+;(defun flatten (tree)
+;  (reverse! (flatten0 tree nil)))
 
 (defun concat0 (a b acc)
   (if a
@@ -158,6 +165,9 @@
 (defun string? (a)
   (equal? :string (type a)))
 
+(defun symbol? (a)
+  (equal? :symbol (type a)))
+
 (defun itoa0 (n acc)
   (if (= n 0)
     acc
@@ -216,3 +226,12 @@
 
 (defun index (needle haystack)
   (index0 needle haystack 0))
+
+(defun repeat0 (key times acc)
+  (if (< times 1)
+    acc
+    (repeat0 key (dec times) (cons key acc))))
+
+(defun repeat (key times)
+  (repeat0 key times nil))
+
