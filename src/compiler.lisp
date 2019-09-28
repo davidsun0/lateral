@@ -20,7 +20,7 @@
 
 ;;; first step in code processing
 ;;; turns a tree of lisp code into a stack-based intermediate representation
-(defun ir0 (ast acc)
+(defun ir0 (name ast acc tail?)
   (if ast
     (if (list? ast)
       (cond
@@ -30,21 +30,26 @@
               end-lab  (uniquesym "lab_e"))
         (semi-flatten
           (list
-            (reverse (ir0 (nth 1 ast) nil)) ; condition
+            (reverse (ir0 name (nth 1 ast) nil nil)) ; condition
             (list :jump-if-nil else-lab)
-            (reverse (ir0 (nth 2 ast) nil)) ; true branch
+            (reverse (ir0 name (nth 2 ast) nil t)) ; true branch
             (list :goto end-lab)
             (list :label else-lab)
             (if (= (length ast) 4)
-              (reverse (ir0 (nth 3 ast) nil)) ; false branch
+              (reverse (ir0 name (nth 3 ast) nil t)) ; false branch
               (list :push :nil))
             (list :label end-lab))))
 
+        (and tail? (equal? name (car ast)))
+        (concat
+          (ir1 (cdr ast) nil)
+          (list (list :tail-recur :argc (dec (length ast)))))
+
         t
         (concat
-        (ir1 (cdr ast) nil)
-             (list (list :funcall (car ast)
-                         :argc (dec (length ast))))))
+          (ir1 (cdr ast) nil)
+          (list (list :funcall (car ast)
+                      :argc (dec (length ast))))))
       (list (list :push ast)))
     acc))
 
@@ -53,10 +58,13 @@
   (if ast
     (if (list? (car ast))
       (ir1 (cdr ast)
-           (concat acc (ir0 (car ast) nil)))
+           (concat acc (ir0 name (car ast) nil nil)))
       (ir1 (cdr ast)
            (append acc (list :push (car ast)))))
     acc))
+
+(defun ir (name ast)
+  (ir0 name ast nil t))
 
 ;;; looks up argument and environment variables
 ;;; finds constants

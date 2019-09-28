@@ -7,7 +7,7 @@
 
 (defun to-u2 (x)
   (if (or (< x 0xFFFF) (= x 0xFFFF))
-    (list (bit-and (// x 0xFF) 0x100)
+    (list (bit-and (bit-asr x 8) 0xFF)
           (bit-and x 0xFF))
     "int too large for 2 bytes"))
 
@@ -81,6 +81,7 @@
       t (hashmap-set! poolmap (cons :unknown attribs))
       )))
 
+; causes all desendants of parent to map to constant pool indicies
 (defun pool-resolve (poolmap parent)
   (let (parent-type   (car parent)
         child0        (hashmap-get poolmap parent)
@@ -124,6 +125,11 @@
 (def pool-count 1)
 (def pool-list nil)
 
+(defun set-locals (n acc)
+  (if (< n 0)
+    acc
+    (set-locals (dec n) (cons (list :astore n) acc))))
+
 (defun ir-to-jvm (expr)
   (let (cmd (car expr))
     (cond
@@ -141,44 +147,22 @@
       
       (equal? cmd :jump-if-nil)
       (cons :ifnull (cdr expr))
+
+      (equal? cmd :funcall)
+      (cond
+        (equal? (nth 1 expr) (quote cdr))
+        (list :invokestatic "Lang" "cdr"
+              "(Ljava/lang/Object;)Ljava/lang/Object;")
+
+        (equal? (nth 1 expr) (quote inc))
+        (list :invokestatic "Lang" "inc"
+              "(Ljava/lang/Object;)Ljava/lang/Object;"))
+
+      (equal? cmd :tail-recur)
+      (cons (list :goto :start) (set-locals (dec (nth 2 expr)) nil))
+
       t expr
       )))
-
-;; calculates the max stack height of ir
-(defun max-stack0 (in max-c curr-c s-stack)
-  (if in
-    (let (expr (car in)
-          max-c (if (< max-c curr-c) curr-c max-c))
-      (cond
-        ; push increases stack by 1
-        (equal? (car expr) :push)
-        (max-stack0 (cdr in) max-c (inc curr-c) s-stack)
-
-        ; funcall pops argc, pushes 1 result
-        (equal? (car expr) :funcall)
-        (max-stack0 (cdr in)
-                    max-c
-                    (inc (- curr-c (nth 3 expr)))
-                    s-stack)
-
-        ; jump-if-nil consumes 1 for test
-        (equal? (car expr) :jump-if-nil)
-        ; add :label, (dec curr-c) to working stack (jump-if-nil's pop)
-        ; curr-c will be restored at corresponding label
-        (max-stack0 (cdr in) max-c (dec curr-c)
-                    (cons (nth 1 expr)
-                          (cons (dec curr-c) s-stack)))
-
-        ; restore curr-c from s-stack
-        ; working curr-c can be ignored because any branch of the if statement
-        ; must push one and only one object to the stack
-        (and (equal? (car expr) :label)
-             (equal? (car s-stack) (nth 1 expr)))
-        (max-stack0 (cdr in) max-c (nth 1 s-stack) (cdr (cdr s-stack)))
-
-        t (max-stack0 (cdr in) max-c curr-c s-stack)
-        ))
-    max-c))
 
 ; calculates max stack size and size of stack at jump targets
 (defun max-stack1 (in max-c curr-c lablist)
@@ -201,12 +185,12 @@
         (max-stack1 (cdr in) max-c (dec curr-c)
                     (cons (list (nth 1 expr) curr-c) lablist))
 
+        (equal? cmd :tail-recur)
+        (max-stack1 (cdr in) max-c curr-c
+                    (append lablist (list :start 0)))
+
         t (max-stack1 (cdr in) max-c curr-c lablist)))
     (list max-c (reverse lablist))))
-
-(print (max-stack1 (ir0 (quote (if p nil t)) nil) 0 0 nil))
-; (print (max-stack1 (ir0 (quote (sqrt (+ a b))) nil) 0 0 nil))
-(print "-----")
 
 ;; converts a single item of the form (:jvmcode args) into a list of bytes
 (defun jvm-assemble0 (in)
@@ -217,6 +201,9 @@
 
         (equal? cmd :aload)
         (cons 0x19 (to-u1 (nth 1 expr)))
+
+        (equal? cmd :astore)
+        (cons 0x3A (to-u1 (nth 1 expr)))
 
         (equal? cmd :ldc)
         (cons 0x12 (to-u1 (pool-get pool (nth 1 expr))))
@@ -264,26 +251,23 @@
 ;; resolves labels and compiles to byte lists whenever possible
 (defun jvm-assemble1 (in acc offset labelmap)
   (if in
-    (progn ; (print (car in))
     (let (expr (car in)
           binexpr (jvm-assemble0 expr)
+          ; length of command in bytes
           binexprlen (cond
-                   (int? (car binexpr)) (length binexpr)
-                   
-                   (equal? (car expr) :ifnull) 3 ; 2 bytes for offset
-                   (equal? (car expr) :goto) 3 ; 2 bytes for offset
-                   (equal? (car expr) :label) 0 ; no equivalent of label
-                   )
-          newlabels (if (equal? (car expr) :label)
-                      (hashmap-set! labelmap (nth 1 expr) offset)
-                      labelmap))
-      ; add to acc
-      ; calculate offset
-      ; add to labelmap
-      (jvm-assemble1 (cdr in)
-                     (if (= binexprlen 0) acc (cons binexpr acc))
-                     (+ offset binexprlen)
-                     newlabels)))
+                       ; non-jump related code was compiled to bytes
+                       (int? (car binexpr)) (length binexpr)
+                       ; 1 byte for command + 2 bytes for offset
+                       (equal? (car expr) :ifnull) 3
+                       (equal? (car expr) :goto) 3))
+      (if (equal? (car expr) :label)
+        ; offset does not change, but add offset to labelmap
+        (jvm-assemble1 (cdr in) acc offset
+                       (hashmap-set! labelmap (nth 1 expr) offset))
+        (jvm-assemble1 (cdr in)
+                       (cons binexpr acc)
+                       (+ offset binexprlen)
+                       labelmap)))
   (list (reverse! acc) labelmap)))
 
 ;; resolves jumps
@@ -301,6 +285,13 @@
                              acc)
                        (+ offset 3)
                        labelmap)
+
+        (equal? cmd :goto-0)
+        (progn (print (to-u2 (- offset)))
+        (jvm-assemble2 (cdr in)
+                       (cons (cons 0xA7 (to-u2 (- offset))) acc)
+                       (+ offset 3)
+                       labelmap))
 
         (equal? cmd :goto)
         (jvm-assemble2 (cdr in)
@@ -324,150 +315,108 @@
         labelmap (nth 1 bin-and-labels))
     (jvm-assemble2 bin-list nil 0 labelmap)))
 
+;; stack frame object entry of class Object
+(def objvar-info
+     (list 0x07 (to-u2 (pool-get pool (list :classref "java/lang/Object")))))
+
 (defun sframe (offset localcount stackcount)
   (if (= stackcount 0)
-    (list offset)
-     (list 0xFF ; full frame type
-           (to-u2 offset)
-           (if (= localcount 0) (quote ())
-             (list
-           (to-u2 localcount)
-           (repeat objvar-info localcount)))
-           (if (= stackcount 0) (quote ())
-             (list
-           (to-u2 stackcount)
-           (repeat objvar-info stackcount))))))
+    (list offset) ; same frame type (same locals, zero on stack)
+    (list 0xFF ; full frame type
+          (to-u2 offset)
+          (if (= localcount 0)
+            (quote ())
+            (list (to-u2 localcount) (repeat objvar-info localcount)))
+          (to-u2 stackcount)
+          (repeat objvar-info stackcount))))
 
 (defun sframe-resolve0 (argc labels label-offsets curr-offset acc)
-  ; look up offset for current label
-  ; difference between label offset and current offset
-  ; (sframe-resolve (cdr labels) label-offsets (current label offset)
-  ; (cons (sframe offset-diff argc stack size)))
   (if labels
-  (let (label-and-stack (car labels)
-        stack-size (nth 1 label-and-stack)
-        label-off (car (hashmap-get label-offsets (car label-and-stack)))
-        _ (print label-off)
-        _ (print (- label-off curr-offset))
-        offset-diff (dec (- label-off curr-offset)))
+    (let (label-and-stack (car labels)
+          stack-size (nth 1 label-and-stack)
+          label-off (car (hashmap-get label-offsets (car label-and-stack)))
+          offset-diff (dec (- label-off curr-offset)))
     (sframe-resolve0 argc (cdr labels) label-offsets label-off ; curr-offset
                     (cons (sframe offset-diff argc stack-size) acc)))
   (reverse! acc)))
 
 (defun sframe-resolve (argc labels label-offsets)
-  ; first offset doesn't automatically add one
+  ; first offset doesn't implicitly add one
   (sframe-resolve0 argc labels label-offsets (- 1) nil))
 
-(defun compile (name args expr)
-  (let (ir-list (append (ir0 expr nil) (list :return))
-        max-stack (max-stack0 ir-list 0 0 nil)
-        max-locals (length args)
-        bytecode (flatten
-                   (jvm-assemble
-                   (map ir-to-jvm
-                        (resolve-syms ir-list args))))
-        code-size (length bytecode)
-        code-attribute-size (+ 12 code-size))
-    (list
-      0x00 0x09 ; public static
-      (to-u2 (pool-get pool (list :utf8 name)))
-      (to-u2 (pool-get pool (list :utf8 "(Ljava/lang/Object;)Ljava/lang/Object;")))
-      0x00 0x01 ; attribute size of 1
-      (to-u2 (pool-get pool (list :utf8 "Code")))
-      (to-u4 code-attribute-size)
-      (to-u2 max-stack)
-      (to-u2 max-locals)
-      (to-u4 code-size)
-      bytecode
-      0x00 0x00 0x00 0x00 ; 0 exceptions, 0 attributes
-      )))
+(defun check-tco0 (ir acc)
+  (if ir
+    (if (equal? (car (car ir)) :tail-recur)
+      (check-tco0 (cdr (cdr ir))
+                  (cons (car ir)
+                        (append acc (list :label :start))))
+      (check-tco0 (cdr ir) (cons (car ir) acc)))
+  (reverse acc)))
 
-(defun compile1 (name args expr bin-stack-frames)
-  (let (ir-list (append (ir0 expr nil) (list :return))
-        ; max-stack (max-stack0 ir-list 0 0 nil)
-        jvm-asm (map ir-to-jvm (resolve-syms ir-list args))
+(defun method-type (argc)
+  (reduce str-cat (cons "(" (repeat0 "Ljava/lang/Object;" argc
+                                     (list ")Ljava/lang/Object;")))))
+
+(defun compile1 (name args expr)
+  (let (ir-list (check-tco0 (append (ir (symbol name) expr) (list :return)) nil)
+        ; human readable jvm bytecode
+        jvm-asm (semi-flatten (map ir-to-jvm (resolve-syms ir-list args)))
+        ; unresolved jump binary + label -> offset map
         bin-and-labels (jvm-assemble1 jvm-asm nil 0 (make-hashmap 32))
+        ; binary with resolved jumps
         labelmap (nth 1 bin-and-labels)
         jvm-bin (jvm-assemble2 (car bin-and-labels) nil 0 labelmap)
-        max-locals (length args)
+        bytecode (flatten jvm-bin) ; bytecode
+        code-size (length bytecode)
+
+        argc (length args)
         stack-info (max-stack1 ir-list 0 0 nil)
         max-stack (car stack-info)
-        stack-frames (sframe-resolve max-locals (nth 1 stack-info) labelmap)
-        _ (map print stack-frames)
-        _ (map print bin-stack-frames)
-        ; bytecode (flatten
-        ;           (jvm-assemble
-        ;           (map ir-to-jvm
-        ;                (resolve-syms ir-list args))))
-        bytecode (flatten jvm-bin)
-        code-size (length bytecode)
-        code-attribute-size (+ 12 code-size)
+        stack-frames (sframe-resolve argc (nth 1 stack-info) labelmap)
         flat-stack-map (flatten stack-frames)
         stack-map-frames-size (length flat-stack-map)
-        ; flat-stack-map (flatten bin-stack-frames)
-        ; stack-map-frames-size (length flat-stack-map)
         )
     (list
       0x00 0x09 ; public static
+      ; name of function
       (to-u2 (pool-get pool (list :utf8 name)))
-      (to-u2 (pool-get pool (list :utf8 "(Ljava/lang/Object;)Ljava/lang/Object;")))
+      ; type signature
+      (to-u2 (pool-get pool (list :utf8 (method-type argc))))
       0x00 0x01 ; attribute size of 1
       (to-u2 (pool-get pool (list :utf8 "Code")))
-      (to-u4 (+ code-attribute-size 8 stack-map-frames-size))
+      (if stack-frames
+        (to-u4 (+ 12 code-size 8 stack-map-frames-size))
+        (to-u4 (+ 12 code-size)))
       (to-u2 max-stack)
-      (to-u2 max-locals)
+      (to-u2 argc)
       (to-u4 code-size)
       bytecode
       0x00 0x00 ; 0 exceptions
       (if stack-frames
-        (list
-      0x00 0x01 ; 1 attributes
-      (to-u2 (pool-get pool (list :utf8 "StackMapTable")))
-      ; length in bytes = number of frames (u2) + length of binary
-      (to-u4 (+ 2 (length flat-stack-map)))
-      (to-u2 (length bin-stack-frames)) ; number of frames
-      stack-frames)
-        (list 0x00 0x00)) ; zero attributes
-      )))
-
-(def objvar-info
-     (list 0x07 (to-u2 (pool-get pool (list :classref "java/lang/Object")))))
-
-(def identity-byte (compile "identity" (quote (a)) (quote a)))
-(def not-ir (append (ir0 (quote (if p nil t)) nil) (list :return)))
-(def not-jvm (map ir-to-jvm (resolve-syms not-ir (quote (p)))))
-; (map print not-ir)
-(def not-byte (compile1 "not" (quote (p))
-                        (quote (if p nil t))
-                        (list (list 9) (sframe 2 1 1))))
-                        ; (list (sframe 9 0 1)))
+        (list 0x00 0x01 ; one StackMapTable attribute
+              (to-u2 (pool-get pool (list :utf8 "StackMapTable")))
+              ; length in bytes = number of frames (u2) + length of binary
+              (to-u4 (+ 2 (length flat-stack-map)))
+              (to-u2 (length stack-frames)) ; number of frames
+              stack-frames)
+        ; no attributes if StackMapTable is empty
+        (list 0x00 0x00)))))
 
 (defun class-headers (name parent methods)
   (progn
     ; add class and parent to constant pool
     (pool-get pool (list :classref name))
     (pool-get pool (list :classref parent))
-      (list
-        0xCA 0xFE 0xBA 0xBE ; java magic number
-        0x00 0x00 0x00 0x37 ; java version 55.0 (Java 11)
-        (to-u2 (inc (length pool-list)))
-        (flatten (map const-to-bin (reverse pool-list)))
-        0x00 0x21 ; extendable (not final) and public
-        (to-u2 (pool-get pool (list :classref name)))
-        (to-u2 (pool-get pool (list :classref parent)))
-        0x00 0x00 ; zero interfaces
-        0x00 0x00 ; zero fields
-        (to-u2 (length methods))
-        methods
-        0x00 0x00))) ; zero attributes
-
-(map print pool-list)
-(print (map const-to-bin pool-list))
-
-(def class-bin (class-headers "Lateral"
-                      "java/lang/Object"
-                      (list identity-byte ;main-bytecode
-                            not-byte
-                            )))
-
-(write-bytes "Lateral.class" (flatten class-bin))
+    (list
+      0xCA 0xFE 0xBA 0xBE ; java magic number
+      0x00 0x00 0x00 0x37 ; java version 55.0 (Java 11)
+      (to-u2 (inc (length pool-list)))
+      (flatten (map const-to-bin (reverse pool-list)))
+      0x00 0x21 ; extendable (not final) and public
+      (to-u2 (pool-get pool (list :classref name)))
+      (to-u2 (pool-get pool (list :classref parent)))
+      0x00 0x00 ; zero interfaces
+      0x00 0x00 ; zero fields
+      (to-u2 (length methods))
+      methods
+      0x00 0x00))) ; zero attributes

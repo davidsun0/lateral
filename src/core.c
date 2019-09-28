@@ -119,6 +119,18 @@ Object *la_bitand(Object *list) {
     return obj_init(intt, dat);
 }
 
+Object *la_bit_asr(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+    if(a->type != intt || b->type != intt) {
+        return err_init("type error");
+    }
+    int ai = a->data.int_val;
+    int bi = b->data.int_val;
+    union Data dat = { .int_val = ai >> bi };
+    return obj_init(intt, dat);
+}
+
 Object *la_modulo(Object *list) {
     Object *a = CAR(list);
     Object *b = CAR(CDR(list));
@@ -226,7 +238,18 @@ Object *la_to_keyword(Object *list) {
     } else if(a->type == keywordt) {
         return a;
     } else {
-        return err_init("type error\n");
+        return err_init("cannot convert to keyword");
+    }
+}
+
+Object *la_to_symbol(Object *list) {
+    Object *a = CAR(list);
+    if(a->type == strt || a->type == keywordt) {
+        return obj_init_str(symt, obj_string(a));
+    } else if(a->type == symt) {
+        return a;
+    } else {
+        return err_init("cannot convert to symbol");
     }
 }
 
@@ -583,6 +606,7 @@ void lang_init() {
     insert_function("%", la_modulo);
     insert_function("//", la_divide);
     insert_function("bit-and", la_bitand);
+    insert_function("bit-asr", la_bit_asr);
     insert_function("<", la_lt);
     insert_function("=", la_eq);
     insert_function("eq?", la_identical);
@@ -590,6 +614,7 @@ void lang_init() {
     insert_function("type", la_type);
 
     insert_function("keyword", la_to_keyword);
+    insert_function("symbol", la_to_symbol);
 
     // function functions
     insert_function("params", la_func_params);
