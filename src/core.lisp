@@ -105,6 +105,12 @@
     (last (cdr in))
     (car in)))
 
+(defun first (in)
+  (nth 0 in))
+
+(defun second (in)
+  (nth 1 in))
+
 (defun reverse0 (in acc)
   (if in
     (reverse0 (cdr in) (cons (car in) acc))
@@ -164,6 +170,9 @@
 
 (defun string? (a)
   (equal? :string (type a)))
+
+(defun char? (a)
+  (equal? :char (type a)))
 
 (defun symbol? (a)
   (equal? :symbol (type a)))
@@ -234,3 +243,26 @@
 
 (defun repeat (key times)
   (repeat0 key times nil))
+
+(defun qsort0 (comp in pivot less same greater)
+  (if in
+    (let (term (car in)
+          c (comp term pivot))
+      (cond
+        (= c 0) (qsort0 comp (cdr in) pivot less (cons term same) greater)
+        (< c 0) (qsort0 comp (cdr in) pivot (cons term less) same greater)
+        (> c 0) (qsort0 comp (cdr in) pivot less same (cons term greater))))
+    (list less same greater)))
+
+(defun qsort (comp in)
+  (let (pivot (car in)
+        asdf (cdr in)
+        terms (qsort0 comp asdf pivot nil nil nil)
+        lesser (first terms)
+        same (cons pivot (second terms))
+        greater (nth 2 terms))
+    (if (nil? asdf)
+      (list pivot)
+      (concat (qsort comp lesser) (concat same (qsort comp greater))))))
+
+(defun > (a b) (not (or (= a b) (< a b))))

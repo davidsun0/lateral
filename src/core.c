@@ -175,31 +175,43 @@ Object *la_identical(Object *list) {
     }
 }
 
-Object *la_equal(Object *list) {
-    Object *a = CAR(list);
-    Object *b = CAR(CDR(list));
-
+int la_equal0(Object *a, Object *b) {
     if(a == b) {
-        return tru_obj;
+        return 1;
     }
 
     if(a->type != b->type) {
-        return nil_obj;
+        return 0;
     }
 
-    int is_equal = 0;
     if(a->type == symt || a->type == strt || a->type == keywordt) {
-        is_equal = strcmp(obj_string(a), obj_string(b)) == 0;
+        return strcmp(obj_string(a), obj_string(b)) == 0;
     } else if(a->type == intt) {
-        is_equal = a->data.int_val == b->data.int_val;
+        return a->data.int_val == b->data.int_val;
     } else if(a->type == floatt) {
-        is_equal = a->data.float_val == b->data.float_val;
+        return a->data.float_val == b->data.float_val;
+    } else if(a->type == listt) {
+        while((a == nil_obj || b == nil_obj) &&
+                la_equal0(CAR(a), CAR(b))) {
+            a = CDR(a);
+            b = CDR(b);
+        }
+        return a == nil_obj && b == nil_obj;
     } else {
         fprintf(stderr, "la_equal not implemented for %s type\n",
                 type_to_str(a->type));
+        return 0;
     }
+}
 
-    return is_equal ? tru_obj : nil_obj;
+Object *la_equal(Object *list) {
+    Object *a = CAR(list);
+    Object *b = CAR(CDR(list));
+    if(la_equal0(a, b)) {
+        return tru_obj;
+    } else {
+        return nil_obj;
+    }
 }
 
 Object *la_type(Object *list) {
@@ -456,6 +468,34 @@ Object *la_maphash(Object *list) {
     return nil_obj;
 }
 
+Object *la_keyvals(Object *list) {
+    Object *outlist = nil_obj;
+
+    Object *hashobj = CAR(list);
+    HashMap *hashmap = hashobj->data.hashmap;
+    for(int i = 0; i < hashmap->capacity; i ++) {
+        Object* bucket = hashmap->buckets + i;
+        while(CAR(bucket) != nil_obj) {
+            Object *key = CAR(CAR(bucket));
+            Object *val = CDR(CAR(bucket));
+
+            Object *valcell = cell_init();
+            CAR(valcell) = val;
+            Object *keycell = cell_init();
+            CAR(keycell) = key;
+            CDR(keycell) = valcell;
+
+            Object* kvlist = cell_init();
+            CAR(kvlist) = keycell;
+            CDR(kvlist) = outlist;
+            outlist = kvlist;
+
+            bucket = CDR(bucket);
+        }
+    }
+    return outlist;
+}
+
 /*
  * STRING FUNCTIONS
  *
@@ -633,6 +673,7 @@ void lang_init() {
     insert_function("hashmap-get", la_hashmap_get);
     insert_function("hashmap-set!", la_hashmap_set);
     insert_function("maphash", la_maphash);
+    insert_function("keyvals", la_keyvals);
 
     // string functions
     insert_function("string0", la_to_string);

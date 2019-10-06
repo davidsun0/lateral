@@ -8,5 +8,7 @@ a.out
 
 # vim temporary files
 *.swp
+*.txt
 
 old/*
+jvm/core.lisp

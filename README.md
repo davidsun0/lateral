@@ -1,9 +1,13 @@
 # Lateral Lisp
 
-Lateral is an interpreter for a basic dialect of Lisp.
+Lateral is a simple dialect of Lisp.
+This repository contains a bootstrapping interpreter and the early stages of a
+self-hosting compiler.
 
-The goal of this project is to write a self-hosting Lisp compiler. It will use
-a C backend. JVM Bytecode is also a planned compilation target.
+Lateral is intended to be as simple as possible without sacrificing
+convinience. However, at this point, I would not consider anything in the
+core library to be set in stone at this point; programs will break as things
+change.
 
 ## Examples
 
@@ -38,6 +42,24 @@ Python3 is needed to run the tests.
 `make tests`
 
 ## Current Status
+
+### October 4
+
+The compilation target is now going to be JVM Bytecode. It's more fun than
+compiling to C. This also has the side effect of opening up the possibility of
+a JIT compiler. 
+
+Code for general compilation is in `compiler.lisp`, while JVM-specific code now
+resides in `jvmclass.lisp`. There is functionality to call native functions and
+to call other compiled functions.
+
+The only thing left to do is to be able to compile all of the special forms.
+Generating bytecode should be straightforward for everything except `let` and
+`lambda`. Compiling let involves setting local variables and resolving
+bindings in nested let statements. Lambdas are difficult because the JVM is
+not designed for first class functions. Anonymous functions are like let
+statements, but clojures and passing functions as objects will be interesting
+to compile.
 
 ### September 9
 
