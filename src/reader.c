@@ -296,5 +296,7 @@ void read_file(char *path) {
     if(hashmap_rem(curr_envir->map, prog) != 1) {
         printf("something has gone horribly wrong\n");
     }
+
+    hashmap_rem(curr_envir->map, prog);
     garbage_run();
 }
