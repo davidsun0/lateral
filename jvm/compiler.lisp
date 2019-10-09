@@ -27,17 +27,43 @@
         (concat acc (ir0 name (car expr) nil tail?)) tail?))
     acc))
 
-(defun or-deflate (expr acc)
-  (print "implement or"))
+(defun or-deflate (name end-lab expr acc)
+  (if expr
+    (or-deflate name end-lab
+      (cdr expr)
+                (concat acc (concat (ir0 name (car expr) nil nil)
+                                    (list
+                                      (list :dup)
+                                      (list :jump-not-nil end-lab)
+                                      (list :pop)
+                                    ))))
+    (concat acc (list (list :push :nil)
+                      (list :label end-lab)))
+    ))
 
-(defun and-deflate (expr acc)
-  (print "implement and"))
+(defun and-deflate (name false-lab expr acc)
+  (if expr
+    (and-deflate name false-lab
+      (cdr expr)
+                 (concat acc (append (ir0 name (car expr) nil nil)
+                                     (list :jump-if-nil false-lab))))
+    (let (end-lab (uniquesym "lab_e"))
+    (concat acc (list (list :push :true)
+                      (list :goto end-lab)
+                      (list :label false-lab)
+                      (list :push :nil)
+                      (list :label end-lab)
+                      )))
+  ))
 
 (defun cond-deflate0 (name expr acc tail? test-lab endlab)
   (if expr
     (let (test   (ir0 name (car expr) nil nil)
           branch (ir0 name (second expr) nil tail?)
           tail-recur? (equal? (first (last branch)) :tail-recur)
+          ;_ (print test)
+          ;_ (print branch)
+          ;_ (pprint "")
           ;_ (print "branch last")
           ;_ (print (last branch))
           next-lab (uniquesym "lab_")
@@ -63,7 +89,8 @@
   ))
 
 (defun cond-deflate (name expr acc tail?)
-  (cond-deflate0 name expr nil tail? nil (uniquesym "lab_e")))
+  (progn ;(print "cond expr") (print expr) (print "===")
+  (cond-deflate0 name expr nil tail? nil (uniquesym "lab_e"))))
 
 (defun let-deflate0 (bind-list acc)
   (if bind-list
@@ -122,13 +149,19 @@
 
         ;; or
         (equal? (car ast) (quote or))
-        ;(or-deflate expr nil)
-        (print "implement or ir")
+        (or-deflate name (uniquesym "lab_") (cdr ast) nil)
+        ;(print "implement or ir")
 
         ;; and
         (equal? (car ast) (quote and))
-        ;(or-deflate expr nil)
-        (print "implement and ir")
+        (and-deflate name (uniquesym "lab_") (cdr ast) nil)
+        ;(print "implement and ir")
+
+        ;; quote
+        (equal? (car ast) (quote quote))
+        (if (nth 1 ast)
+          (list (list :push :symbol (nth 1 ast)))
+          (print "don't know how to quote list"))
 
         (and tail? (equal? name (car ast)))
         (concat
@@ -183,6 +216,8 @@
           (int? (nth 1 expr))    (list :push :int-const (nth 1 expr))
           (char? (nth 1 expr))   (list :push :char-const (nth 1 expr))
           (string? (nth 1 expr)) (list :push :str-const (nth 1 expr))
+          ;(symbol? (nth 1 expr)) (list :push :symbol (nth 1 expr))
+          (equal? (nth 1 expr) :symbol) expr
 
           ; otherwise lookup symbol in envir
           (symbol? (nth 1 expr))
@@ -205,15 +240,16 @@
                                         (concat arglist letlist)
                                         nil
                                         (cons (list :let-push) acc))
-              _ (print "let-bind================")
-              _ (print (first ir-and-acc)))
+              ;_ (print "let-bind================")
+              ;_ (print (first ir-and-acc)))
+              )
           (resolve-syms1 (first ir-and-acc) arglist nil (second ir-and-acc))))
 
         (equal? (car expr) :let-set)
         (let (;_ (print "let-set")
               inlet? (index (nth 1 expr) letlist)
               letlist (if inlet? letlist (append letlist (nth 1 expr)))
-              argidx (if inlet? inlet? (dec (length letlist)))
+              argidx (+ (length arglist) (if inlet? inlet? (dec (length letlist))))
               ;_ (print (nth 1 expr))
               ;_ (print letlist)
               ;_ (print argidx)
@@ -223,7 +259,7 @@
               arglist
               letlist
               (cons (list :local-count (uniquesym "lc_") (+ (length letlist) (length arglist)))
-              (cons (list :push :arg-num argidx) acc))))
+              (cons (list :store :arg-num argidx) acc))))
 
         (equal? (car expr) :let-body)
         ;(progn (print "let-body") (print arglist) (print letlist))
