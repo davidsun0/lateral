@@ -7,9 +7,9 @@
 (def method-list (make-hashmap 32))
 
 (defun to-u1 (x)
-  (if (< x 0xFF)
+  (if (< x 0x100)
     (list x)
-    "int too large for 1 byte"))
+    (asdf "int too large for 1 byte")))
 
 (defun to-u2 (x)
   (if (or (< x 0xFFFF) (= x 0xFFFF))
@@ -83,16 +83,10 @@
 
       t (progn (print "can't pool-get") (print expr)))))
 
-; generates code to store stack onto local args for tail recursion
-(defun set-locals (n acc)
-  (if (< n 0)
-    acc
-    (set-locals (dec n) (cons (list :astore n) acc))))
-
 (def method-list
-     {
-     "rest" (list "Lang" "cdr"
-                 "(Ljava/lang/Object;)Ljava/lang/Object;")
+    {
+    "rest" (list "Lang" "cdr"
+                "(Ljava/lang/Object;)Ljava/lang/Object;")
      "cons" (list "Lang" "cons"
                   "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;")
      "equal?" (list "Lang" "isEqual"
@@ -108,7 +102,6 @@
      "println" ("Lang" "println"
                    "(Ljava/lang/Object;)Ljava/lang/Object;")
      })
-
 
 (defun insert-method (sym class name argc)
   (hashmap-set! method-list sym 
@@ -182,12 +175,18 @@
         )
     (cond
       (equal? name "list") ;(print "ADFASDFASDF")
+      (cons (list :aconst_null)
       (repeat0 (funcall-resolve (list :funcall (quote cons) :argc 2))
-               (nth 3 expr)
-               (list (list :aconst_null)))
+               (nth 3 expr) nil))
       
       exists? (cons :invokestatic call)
       t (progn (print "can't find function:") (print name)))))
+
+; generates code to store stack onto local args for tail recursion
+(defun set-locals (n i acc)
+  (if (< n i)
+    acc
+    (set-locals n (inc i) (cons (list :astore i) acc))))
 
 (defun ir-to-jvm (expr)
   (let (cmd (car expr))
@@ -204,22 +203,22 @@
                                              "TRUE"
                                              "Ljava/lang/Boolean;")
         (equal? (nth 1 expr) :int-const)
-        (list (list :invokestatic "java/lang/Integer"
-                    "valueOf" "(I)Ljava/lang/Integer;")
-              (list :iconst (nth 2 expr)))
+        (list (list :iconst (nth 2 expr))
+              (list :invokestatic "java/lang/Integer"
+                    "valueOf" "(I)Ljava/lang/Integer;"))
 
         (equal? (nth 1 expr) :char-const)
-        (list (list :invokestatic "java/lang/Character"
-                    "valueOf" "(C)Ljava/lang/Character;")
-              (list :iconst (char-int (nth 2 expr))))
+        (list (list :iconst (char-int (nth 2 expr)))
+              (list :invokestatic "java/lang/Character"
+                    "valueOf" "(C)Ljava/lang/Character;"))
 
         (equal? (nth 1 expr) :str-const)
         (list :ldc (list :string (nth 2 expr)))
 
         (equal? (nth 1 expr) :symbol)
-        (list (list :invokestatic "Symbol" "makeSymbol"
-                    "(Ljava/lang/String;)LSymbol;")
-              (list :ldc (list :string (string (nth 2 expr)))))
+        (list (list :ldc (list :string (string (nth 2 expr))))
+              (list :invokestatic "Symbol" "makeSymbol"
+                    "(Ljava/lang/String;)LSymbol;"))
 
         t (progn (print "can't push: ") (print expr)))
 
@@ -240,7 +239,8 @@
       (funcall-resolve expr)
 
       (equal? cmd :tail-recur)
-      (cons (list :goto :start) (set-locals (dec (nth 2 expr)) nil))
+      ;(cons (list :goto :start) (set-locals (dec (nth 2 expr)) nil))
+      (set-locals (dec (nth 2 expr)) 0 (list (list :goto :start)))
 
       ; t (progn (print "ir-to-jvm can't compile") (print expr) expr)
       t expr
@@ -273,10 +273,9 @@
         (or (equal? cmd :push) (equal? cmd :dup))
         (max-stack2 (cdr in) argc s-max (inc s-curr) l-max l-curr lablist)
 
-        (equal? cmd :pop)
-        (max-stack2 (cdr in) argc s-max (dec s-curr) l-max l-curr lablist)
-
+        (or (equal? cmd :pop)
         (equal? cmd :store)
+        (equal? cmd :return))
         (max-stack2 (cdr in) argc s-max (dec s-curr) l-max l-curr lablist)
 
         (equal? cmd :funcall)
@@ -323,7 +322,10 @@
       (cons 0x3A (to-u1 (nth 1 expr)))
 
       (equal? cmd :ldc)
-      (cons 0x12 (to-u1 (pool-get pool (nth 1 expr))))
+      (let (idx (pool-get pool (nth 1 expr)))
+        (if (< idx 0x100)
+          (cons 0x12 (to-u1 idx))
+          (cons 0x13 (to-u2 idx))))
 
       (equal? cmd :iconst)
       ; iconst_<> -> bipush -> sipush -> ldc
@@ -388,6 +390,7 @@
 (defun jvm-assemble1 (in acc offset labelmap)
   (if in
     (let (expr (car in)
+          _ (print expr)
           binexpr (jvm-assemble0 expr)
           ; length of command in bytes
           binexprlen (cond
@@ -416,7 +419,7 @@
                        (cons binexpr acc)
                        (+ offset binexprlen)
                        labelmap)))
-  (list (reverse! acc) labelmap)))
+  (list (reverse acc) labelmap)))
 
 ;; resolves jumps
 (defun jvm-assemble2 (in acc offset labelmap)
@@ -465,7 +468,7 @@
                          (cons expr acc)
                          (+ offset (length expr))
                          labelmap)))
-    (reverse! acc)))
+    (reverse acc)))
 
 (defun jvm-assemble (in)
   (let (bin-and-labels (jvm-assemble1 in nil 0 (make-hashmap 32))
@@ -530,7 +533,7 @@
                         (first (hashmap-get stacklabs (first (first offsets)))))
                 acc))
         (sframe-resolve0 argc (cdr offsets) stacklabs bytepos acc)))
-    (reverse! acc)))
+    (reverse acc)))
 
 (defun sframe-resolve1 (offsets stacklabs bytepos last-locals acc)
   (if offsets
@@ -546,7 +549,7 @@
           (cdr offsets) stacklabs off f-local
           (cons (sframe1 (dec (- off bytepos)) f-local f-stack last-locals) acc))
         (sframe-resolve1 (cdr offsets) stacklabs bytepos last-locals acc)))
-    (reverse! acc)))
+    (reverse acc)))
 
 (defun sframe-resolve2 (argc labels label-offsets)
   (let (offsets (keyvals label-offsets))
@@ -578,17 +581,19 @@
   (let (_ (pprint "")
         _ (print name)
         argc (length args)
+        _ (print "raw ir")
         raw-ir (ir (symbol name) expr)
         ;; allow for infinite tail recursion
-        raw-ir (if (equal? (first (last raw-ir)) :tail-recur)
-                 raw-ir (append raw-ir (list :return)))
-        ;_ (map print raw-ir)
+        ;raw-ir (if (equal? (first (last raw-ir)) :tail-recur)
+        ;         raw-ir (append raw-ir (list :return)))
+        _ (map print raw-ir)
         ;_ (pprint "")
         ;ir-list (check-tco0 raw-ir nil)
         ir-list (check-tco0 raw-ir raw-ir)
         ;_ (map print (resolve-syms ir-list args))
         ir-list (resolve-syms ir-list args)
         ;_ (map print ir-list)
+        _ (print "jvm asm")
         ; human readable jvm bytecode
         ;jvm-asm (semi-flatten (map ir-to-jvm (resolve-syms ir-list args)))
         jvm-asm (semi-flatten (map ir-to-jvm ir-list))
@@ -599,13 +604,14 @@
         ;_ (map print jvm-asm)
         ;_ (print "=====")
         ; unresolved jump binary + label -> offset map
-        ;_ (print "jvm assemble")
+        _ (print "jvm assemble")
         bin-and-labels (jvm-assemble1 jvm-asm nil 0 (make-hashmap 32))
         ;_ (print "!")
         ; binary with resolved jumps
         labelmap (nth 1 bin-and-labels)
         _ (print labelmap)
         ;_ (map print bin-and-labels)
+        _ (print "jvm bin")
         jvm-bin (jvm-assemble2 (car bin-and-labels) nil 0 labelmap)
         ;_ (print "?")
         bytecode (flatten jvm-bin) ; bytecode
@@ -616,14 +622,14 @@
         ;stack-info (max-stack ir-list 0 0 (make-hashmap 16))
         ;stack-info2 (max-stack2 ir-list argc 0 0 0 argc (make-hashmap 16))
         stack-info (max-stack2 ir-list argc 0 0 0 argc (make-hashmap 16))
-        ;_ (print "stack info:")
+        _ (print "stack info:")
         _ (print stack-info)
         ;_ (print (nth 2 stack-info))
         stack-size (first stack-info)
         max-locals (second stack-info)
         ;_ (print max-locals)
         ;max-locals argc
-        ;stack-frames (sframe-resolve argc (nth 1 stack-info) labelmap)
+        _ (print "stack frames")
         stack-frames (sframe-resolve2 argc (nth 2 stack-info) labelmap)
         ;_ (print (sframe-resolve2 argc (nth 2 stack-info2) labelmap))
         ;_ (progn (print "stack height") (print (nth 1 stack-info)))
@@ -632,6 +638,7 @@
         ;_ (print stack-frames)
         flat-stack-map (flatten stack-frames)
         stack-map-frames-size (length flat-stack-map)
+        _ (print "end")
         _ (hashmap-set! method-list (string name)
                         (list "Lateral" (string name) (method-type argc)))
         )
@@ -701,11 +708,11 @@
 
 (include "lateral.lisp")
 
-;(map print funlist)
+(map print funlist)
 (write-bytes
   "Lateral.class"
   (flatten
     (class-headers
       "Lateral"
       "java/lang/Object"
-      (reverse! funlist))))
+      (reverse funlist))))

@@ -1,8 +1,13 @@
+import java.util.NoSuchElementException;
+
 class Helper {
     public static void main(String[] args) {
+        Lang.include("core2.lisp");
         while(true) {
             try {
                 Lateral.main();
+            } catch (NoSuchElementException n) {
+                return;
             } catch (RuntimeException e) {
                 e.printStackTrace();
             }
@@ -19,8 +24,12 @@ class Helper {
             return null;
         } else if("t".equals(s)) {
             return Boolean.TRUE;
-        } else if(s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+        } else if(s.length() > 1 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
             return s.substring(1, s.length() - 1);
+        } else if(s.charAt(0) == ':') {
+            return new Keyword(s);
+        } else if(s.length() > 2 && s.charAt(0) == '0' && s.charAt(1) == 'x') {
+            return Integer.parseInt(s.substring(2), 16);
         } else if(48 <= s.charAt(0) && s.charAt(0) < 58) {
             return Integer.parseInt(s);
         } else {

@@ -1,4 +1,4 @@
-class Symbol {
+class Symbol implements Comparable<Symbol> {
     String s;
 
     public Symbol(String s) {
@@ -22,5 +22,10 @@ class Symbol {
     @Override
     public int hashCode() {
         return s.hashCode();
+    }
+
+    @Override
+    public int compareTo(Symbol sym) {
+        return s.compareTo(sym.s);
     }
 }

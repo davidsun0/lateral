@@ -1,5 +1,11 @@
 import java.util.Scanner;
 import java.util.HashMap;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 
 class Lang {
     static Scanner scanner;
@@ -8,7 +14,80 @@ class Lang {
     static {
         scanner = new Scanner(System.in);
 
-        HashMap<Object, Object> userTable = new HashMap<>();
+        HashMap<Object, Object> userTable = new HashMap<>(256);
+
+        userTable.put(new Symbol("integer"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object o = car(args);
+                if(o instanceof Character) {
+                    return Integer.valueOf(((Character)o).charValue());
+                } else if(o instanceof Integer) {
+                    return o;
+                } else {
+                    throw new TypeError();
+                }
+            }
+        });
+
+        userTable.put(new Symbol("print-env"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                HashMap map = userEnvir.map;
+                ArrayList<Symbol> keys = new ArrayList<>();
+                for(Object o : map.keySet()) {
+                    keys.add((Symbol)o);
+                }
+                Collections.sort(keys);
+                for(Object s : keys) {
+                    System.out.println(s + "\t\t" + map.get(s));
+                }
+                return null;
+            }
+        });
+
+        userTable.put(new Symbol("string"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object o;
+                StringBuilder sb = new StringBuilder();
+                while((o = car(args)) != null) {
+                    if(o instanceof Keyword) {
+                        sb.append(((Keyword)o).toString().substring(1));
+                    } else {
+                    sb.append(o);
+                    }
+                    args = (ConsCell)cdr(args);
+                }
+                return sb.toString();
+            }
+        });
+
+        userTable.put(new Symbol("keyword"), new NativeFunction () {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object o = car(args);
+                String s;
+                if(o instanceof Keyword) {
+                    return o;
+                } else if(o instanceof String) {
+                    s = ":" + (String)o;
+                } else if(o instanceof Symbol) {
+                    s = ((Symbol)o).toString();
+                } else {
+                    throw new TypeError();
+                }
+                return new Keyword(s);
+            }
+        });
+                
+        userTable.put(new Symbol("type"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                return getType(car(args));
+            }
+        });
+
         userTable.put(new Symbol("+"), new NativeFunction() {
             @Override
             public Object invoke(ConsCell args) {
@@ -23,6 +102,52 @@ class Lang {
                     args = args.getCdr();
                 }
                 return Integer.valueOf(sum);
+            }
+        });
+
+        userTable.put(new Symbol("-"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                int diff = (Integer)args.getCar();
+                if(args.getCdr() == null) {
+                    return Integer.valueOf(-diff);
+                }
+                args = args.getCdr();
+
+                Object term;
+                while(args != null) {
+                    if((term = args.getCar()) instanceof Integer) {
+                        diff -= (Integer)term;
+                    } else {
+                        throw new TypeError("addition expects integers");
+                    }
+                    args = args.getCdr();
+                }
+                return Integer.valueOf(diff);
+            }
+        });
+
+        userTable.put(new Symbol("<"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                if(!(car(args) instanceof Integer))
+                    throw new TypeError();
+
+                int lastVal = (Integer)car(args);
+                args = (ConsCell)cdr(args);
+
+                Object term;
+                while(args != null) {
+                    if((term = args.getCar()) instanceof Integer) {
+                        if(lastVal >= (Integer)term)
+                            return null;
+                        lastVal = (Integer)term;
+                    } else {
+                        throw new TypeError("addition expects integers");
+                    }
+                    args = (ConsCell)cdr(args);
+                }
+                return Boolean.TRUE;
             }
         });
 
@@ -44,6 +169,13 @@ class Lang {
             @Override
             public Object invoke(ConsCell args) {
                 return cdr(nth(0, args));
+            }
+        });
+
+        userTable.put(new Symbol("cons"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                return cons(nth(0, args), nth(1, args));
             }
         });
 
@@ -113,18 +245,29 @@ class Lang {
                 return isNumericallyEqual(nth(0, args), nth(1, args));
             }
         });
+
+        userTable.put(new Symbol("include"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                return include(nth(0, args));
+            }
+        });
+
         userEnvir = new Environment(userTable);
     }
 
     public static Object nth(int i, ConsCell list) {
-        for(int x = 0; x < i; i ++) {
-            list = list.getCdr();
+        for(int x = 0; x < i; x ++) {
+            //println(list);
+            //System.out.println(list);
+            list = (ConsCell)cdr(list);
         }
-        return list.getCar();
+        //println(list);
+        return car(list);
     }
 
     public static Object nativeInvoke(Object function, Object args) {
-        if(!(args instanceof ConsCell)) {
+        if(args != null && !(args instanceof ConsCell)) {
             throw new TypeError("args must be a list");
         } else if(function instanceof NativeFunction) {
             return ((NativeFunction)function).invoke((ConsCell)args);
@@ -192,6 +335,37 @@ class Lang {
         }
     }
 
+    // string? symbol? keyword? char? int? list? map?
+    public static Object getType(Object o) {
+        if(o == null) {
+            return null;
+        } else if(o instanceof Symbol) {
+            return new Keyword(":symbol");
+        } else if(o instanceof Integer) {
+            return new Keyword(":int");
+        } else if(o instanceof String) {
+            return new Keyword(":string");
+        } else if(o instanceof Character) {
+            return new Keyword(":char");
+        } else if(o instanceof Keyword) {
+            return new Keyword(":keyword");
+        } else if(o instanceof ConsCell) {
+            return new Keyword(":list");
+        } else if(o instanceof HashMap) {
+            return new Keyword(":hashmap");
+        } else if(o instanceof NativeFunction) {
+            return new Keyword(":function");
+        } else if(o instanceof Lambda) {
+            if(((Lambda)o).isMacro) {
+                return new Keyword(":macro");
+            } else {
+                return new Keyword(":function");
+            }
+        } else {
+            throw new RuntimeException("unknown object type");
+        }
+    }
+
     public static Object contains(Object h, Object k) {
         if(h instanceof HashMap) {
             HashMap map = (HashMap)h;
@@ -234,8 +408,15 @@ class Lang {
             map.put(k, v);
             return map;
         } else if(h instanceof Environment) {
+            /*
+            print(k);
+            System.out.print(" ");
+            println(v);
+            */
             HashMap map = ((Environment)h).map;
             map.put(k, v);
+            if(h == userEnvir) {
+            }
             return map;
         } else {
             throw new TypeError();
@@ -261,6 +442,29 @@ class Lang {
 
     public static String readLine() {
         return scanner.nextLine() + "\n";
+    }
+
+    public static Object include(Object s) {
+        if(!(s instanceof String))
+            throw new TypeError();
+
+        try {
+            String path = (String)s;
+            String content = new String(Files.readAllBytes(Paths.get(path)));
+            Object tokens = Lateral.tokenize(content, 0, 0, null, null);
+            Object envir = getUserEnvir();
+            ConsCell expr;
+            while((expr = (ConsCell)Lateral.readForm(tokens)) != null) {
+                //println(Lateral.apply(car(expr), envir));
+                //System.out.println("next form: ");
+                //println(car(expr));
+                Lateral.apply(car(expr), envir);
+                tokens = nth(1, expr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public static Object isWhitespace(Object c) {

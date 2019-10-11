@@ -1,282 +1,233 @@
 ;;; reduces a tree to a list of lists
 (defun semi-flatten0 (in acc)
   (if in
-    (if (and (list? (car in)) (list? (car (car in))))
-      (semi-flatten0 (cdr in)
-                     (concat (car in) acc))
-      (semi-flatten0 (cdr in) (cons (car in) acc)))
-    (reverse! acc)))
+    (if (and (list? (first in))
+             (list? (first (first in))))
+      (semi-flatten0 (rest in) (semi-flatten0 (first in) acc))
+      (semi-flatten0 (rest in) (cons (first in) acc)))
+    acc))
 
 (defun semi-flatten (in)
-  (semi-flatten0 in nil))
+  (reverse (semi-flatten0 in nil)))
 
-;;; gensym for variables
-(def uvar 0)
-(defun uniquesym (prefix)
-  (let (varc uvar)
-    (progn
-      (def uvar (inc varc))
-      (keyword (str-cat prefix (string varc))))))
+(def rest cdr)
+(def first car)
 
-(defun progn-deflate (name expr acc tail?)
+(def *gensym-count* 0)
+(defun gensym (prefix)
+  (keyword (str-cat prefix (string (def *gensym-count* (inc *gensym-count*))))))
+
+(defun progn-deflate (name expr acc)
   (if expr
-    (if (cdr expr)
-      (progn-deflate name (cdr expr)
-        (concat acc (append (ir0 name (car expr) nil nil) (list :pop))) tail?)
-      (progn-deflate name (cdr expr)
-        (concat acc (ir0 name (car expr) nil tail?)) tail?))
+    (progn-deflate name
+                   (rest expr)
+                   (cons (list (if (rest expr)
+                                 (list :pop)
+                                 (cons nil nil))
+                               (ir0 (if (rest expr) nil name) (first expr) nil))
+                         acc))
     acc))
 
 (defun or-deflate (name end-lab expr acc)
   (if expr
-    (or-deflate name end-lab
-      (cdr expr)
-                (concat acc (concat (ir0 name (car expr) nil nil)
-                                    (list
-                                      (list :dup)
-                                      (list :jump-not-nil end-lab)
-                                      (list :pop)
-                                    ))))
-    (concat acc (list (list :push :nil)
-                      (list :label end-lab)))
-    ))
+    (progn (print (ir0 nil (first expr) nil))
+    (or-deflate name
+                end-lab
+                (rest expr)
+                (cons
+                (list (list :pop)
+                      (list :jump-not-nil end-lab)
+                      (list :dup)
+                      (ir0 nil (first expr) nil))
+                acc)))
+    (cons (list (if name
+                  (list :return)
+                  (cons nil nil))
+                (list :label end-lab)
+                (list :push :nil))
+          acc)))
 
 (defun and-deflate (name false-lab expr acc)
   (if expr
-    (and-deflate name false-lab
-      (cdr expr)
-                 (concat acc (append (ir0 name (car expr) nil nil)
-                                     (list :jump-if-nil false-lab))))
-    (let (end-lab (uniquesym "lab_e"))
-    (concat acc (list (list :push :true)
-                      (list :goto end-lab)
-                      (list :label false-lab)
-                      (list :push :nil)
-                      (list :label end-lab)
-                      )))
-  ))
+    (and-deflate name
+                 false-lab
+                 (rest expr)
+                 (cons (list (if (rest expr)
+                               (list :jump-if-nil false-lab)
+                               (cons nil nil))
+                             (ir0 nil (first expr) nil))
+                       acc))
+    (let (end-lab (gensym "and-e"))
+      (cons (list (if name
+                    (list :return)
+                    (cons nil nil))
+                  (list :label end-lab)
+                  (list :push :nil)
+                  (list :label false-lab)
+                  (list :goto end-lab))
+            acc))))
 
-(defun cond-deflate0 (name expr acc tail? test-lab endlab)
+(defun cond-deflate0 (name expr test-lab end-lab acc)
   (if expr
-    (let (test   (ir0 name (car expr) nil nil)
-          branch (ir0 name (second expr) nil tail?)
-          tail-recur? (equal? (first (last branch)) :tail-recur)
-          ;_ (print test)
-          ;_ (print branch)
-          ;_ (pprint "")
-          ;_ (print "branch last")
-          ;_ (print (last branch))
-          next-lab (uniquesym "lab_")
-          irseg (concat test (cons (list :jump-if-nil next-lab)
-                    (if tail-recur?
-                      branch
-                    (append branch (list :goto endlab)))
-                    ))
-          irseg (if test-lab (cons (list :label test-lab) irseg) irseg)
-          )
-    (progn
-      ;(print "test:") (print test)
-      ;(print "expr:") (print branch)
-      ;(print "bytecode:")
-      ;(print irseg)
-  (cond-deflate0
-    name (cdr (cdr expr))
-    (concat acc irseg)
-  tail? next-lab endlab)))
-  (concat acc (list (list :label test-lab)
+    (let (test     (first expr)
+          branch   (second expr)
+          next-lab (gensym "cond-"))
+      (cond-deflate0 name (rest (rest expr)) next-lab end-lab
+                     (cons (list (if name
+                                   (cons nil nil)
+                                   (list :goto end-lab))
+                                 (ir0 name branch nil)
+                                 (list :jump-if-nil next-lab)
+                                 (ir0 nil test nil)
+                                 (if test-lab
+                                   (list :label test-lab)
+                                   (cons nil nil)))
+                           acc)))
+    (cons (list (if name
+                  (list :return)
+                  (cons nil nil))
+                (list :label end-lab)
                 (list :push :nil)
-                    (list :label endlab)))
-  ))
-
-(defun cond-deflate (name expr acc tail?)
-  (progn ;(print "cond expr") (print expr) (print "===")
-  (cond-deflate0 name expr nil tail? nil (uniquesym "lab_e"))))
+                (list :label test-lab))
+          acc)))
 
 (defun let-deflate0 (bind-list acc)
   (if bind-list
-  (let-deflate0 (cdr (cdr bind-list))
-                (concat acc
-  (list (ir0 nil (second bind-list) nil nil)
-        (list :let-set (car bind-list)))))
-  (reverse acc)))
-
-(defun let-deflate (name expr acc tail?)
-  (list 
-    (list :let-bind)
-    (semi-flatten (let-deflate0 (car expr) nil))
-    (list :let-body)
-    (reverse (ir0 name (second expr) nil tail?))
-    (list :let-pop)))
-
-;;; first step in code processing
-;;; turns a tree of lisp code into a stack-based intermediate representation
-(defun ir0 (name ast acc tail?)
-  (if ast
-    (if (list? ast)
-      (cond
-        ;; if
-        (equal? (car ast) (quote if))
-        (let (else-lab (uniquesym "lab_")
-              end-lab  (uniquesym "lab_e")
-              t-branch (reverse (ir0 name (nth 2 ast) nil tail?))
-              true-recur? (equal? (car (car t-branch)) :tail-recur))
-              ; _ (print true-recur?)
-              ; _ (progn (print "[") (print t-branch) (print "]")))
-        (semi-flatten
-          (list
-            (reverse (ir0 name (nth 1 ast) nil nil)) ; condition
-            (list :jump-if-nil else-lab)
-            t-branch ; true branch
-            (if (not true-recur?) (list :goto end-lab))
-            (list :label else-lab)
-            (if (= (length ast) 4)
-              (reverse (ir0 name (nth 3 ast) nil tail?)) ; false branch
-              (list :push :nil))
-            (if (not true-recur?) (list :label end-lab))
-            )))
-
-        ;; progn
-        (equal? (car ast) (quote progn))
-        (progn-deflate name (cdr ast) nil tail?)
-
-        ;; cond
-        (equal? (car ast) (quote cond))
-        (cond-deflate name (cdr ast) nil tail?)
-
-        ;; let
-        (equal? (car ast) (quote let))
-        (semi-flatten (let-deflate name (cdr ast) nil tail?))
-
-        ;; or
-        (equal? (car ast) (quote or))
-        (or-deflate name (uniquesym "lab_") (cdr ast) nil)
-        ;(print "implement or ir")
-
-        ;; and
-        (equal? (car ast) (quote and))
-        (and-deflate name (uniquesym "lab_") (cdr ast) nil)
-        ;(print "implement and ir")
-
-        ;; quote
-        (equal? (car ast) (quote quote))
-        (if (nth 1 ast)
-          (list (list :push :symbol (nth 1 ast)))
-          (print "don't know how to quote list"))
-
-        (and tail? (equal? name (car ast)))
-        (concat
-          (ir1 (cdr ast) nil)
-          (list (list :tail-recur :argc (dec (length ast)))))
-
-        t
-        (concat
-          (ir1 (cdr ast) nil)
-          (list (list :funcall (car ast)
-                      :argc (dec (length ast))))))
-      (list (list :push ast)))
+    (let-deflate0 (rest (rest bind-list))
+                 (cons (list (list :let-set (first bind-list))
+                             (ir0 nil (second bind-list) nil))
+                       acc))
     acc))
+
+(defun let-deflate (name expr)
+  (list
+    (list :let-pop)
+    (ir0 name (second expr) nil)
+    (list :let-body)
+    (let-deflate0 (first expr) nil)
+    (list :let-bind)))
 
 ;; iterates along list, resolving nested lists with ir0
 (defun ir1 (ast acc)
   (if ast
-    (if (list? (car ast))
-      (ir1 (cdr ast)
-           (concat acc (ir0 name (car ast) nil nil)))
-      (ir1 (cdr ast)
-           (append acc (list :push (car ast)))))
+    (if (list? (first ast))
+      (ir1 (rest ast)
+           (concat (ir0 nil (first ast) nil) acc))
+      (ir1 (rest ast)
+           (cons (list :push (first ast)) acc)))
     acc))
 
 (defun ir (name ast)
-  (ir0 name ast nil t))
+  (reverse (semi-flatten (ir0 name ast nil))))
 
-;;; looks up argument and environment variables
-;;; finds constants
-;; stack ir -> stack ir
-(defun resolve-syms0 (ir-list arglist acc)
+;; first step in code processing
+;; turns a tree of lisp code into a stack-based intermediate representation
+;; name doubles as a flag for if the expression is in the tail position
+(defun ir0 (name ast acc)
+  (cond
+    (nil? ast) (reverse acc)
+    (and (not (list? ast)) name) (list (list :return) (list :push ast))
+    (not (list? ast)) (list (list :push ast))
+
+    (equal? (first ast) (quote if))
+    (let (false-label (gensym "if-f")
+          end-label (if name (gensym "if-e")))
+      (list
+        (if (not name) (list :label end-label) (cons nil nil))
+        (if (= (length ast) 4)
+          ;; has an else branch
+          (list (ir0 name (nth 3 ast) nil)
+                (if (not name)
+                  (list :goto end-label)
+                  (cons nil nil)))
+          ;; no else branch
+          (list (if name
+                  (list :return)
+                  (cons nil nil))
+                (list :push :nil)))
+        (list :label false-label)
+        (ir0 name (nth 2 ast) nil)
+        (list :jump-if-nil false-label)
+        (ir0 nil (nth 1 ast) nil)))
+
+    (equal? (first ast) (quote and))
+    (and-deflate name (gensym "and-f") (rest ast) nil)
+
+    (equal? (first ast) (quote or))
+    (or-deflate name (gensym "or-e") (rest ast) nil)
+
+    (equal? (first ast) (quote cond))
+    (cond-deflate0 name (rest ast) nil (gensym "cond-e") nil)
+
+    (equal? (first ast) (quote progn))
+    (progn-deflate name (rest ast) nil)
+
+    (equal? (first ast) (quote let))
+    (let-deflate name (rest ast))
+
+    (equal? (first ast) (quote quote))
+    (list (list :push :symbol (second ast)))
+
+    (equal? (first ast) name)
+    (cons (list :tail-recur :argc (dec (length ast)))
+          (ir1 (rest ast) nil))
+
+    name (cons (list :return) (ir0 nil ast acc))
+
+    t
+    (cons (list :funcall (first ast) :argc (dec (length ast)))
+          (ir1 (rest ast) nil))))
+
+;; arglist is local variables of the environment just outside the let expression
+;; letlist is the local variables of the let expression
+(defun resolve-syms0 (ir-list arglist letlist acc)
   (if ir-list
-    (let (expr (car ir-list))
-      (resolve-syms0
-        (cdr ir-list)
-        arglist
-        (cons
-        (cond
-          ;function lookup
-          ;(equal? :funcall (car expr))
-          ;expr
-
-          (not (equal? :push (car expr)))
-          expr
-
-          ; push nil
-          (equal? (nth 1 expr) (quote nil)) (list :push :nil)
-          ; push true
-          (equal? (nth 1 expr) (quote t)) (list :push :true)
-
-          ; push literal constants
-          (int? (nth 1 expr))    (list :push :int-const (nth 1 expr))
-          (char? (nth 1 expr))   (list :push :char-const (nth 1 expr))
-          (string? (nth 1 expr)) (list :push :str-const (nth 1 expr))
-          ;(symbol? (nth 1 expr)) (list :push :symbol (nth 1 expr))
-          (equal? (nth 1 expr) :symbol) expr
-
-          ; otherwise lookup symbol in envir
-          (symbol? (nth 1 expr))
-          (if (index (nth 1 expr) arglist)
-            (list :push :arg-num (index (nth 1 expr) arglist))
-            (list :push :envir-sym (nth 1 expr)))
-
-          t expr)
-        acc)))
-    acc))
-
-(defun resolve-syms1 (ir-list arglist letlist acc)
-  (if ir-list
-    (let (expr (car ir-list))
-          ;_ (print "resolve-syms1"))
+    (let (expr (first ir-list))
       (cond
-        (equal? (car expr) :let-bind);(resolve-syms2 (cdr ir-list) arglist acc)
-        (progn ;(print "let-bind???")
-        (let (ir-and-acc (resolve-syms1 (cdr ir-list)
+        ;; resolve symbols in inner let symbol
+        (equal? (first expr) :let-bind)
+        (let (ir-and-acc (resolve-syms0 (rest ir-list)
                                         (concat arglist letlist)
                                         nil
-                                        (cons (list :let-push) acc))
-              ;_ (print "let-bind================")
-              ;_ (print (first ir-and-acc)))
-              )
-          (resolve-syms1 (first ir-and-acc) arglist nil (second ir-and-acc))))
+                                        (cons (list :let-push) acc)))
+          (resolve-syms0 (first ir-and-acc) arglist nil (second ir-and-acc)))
 
-        (equal? (car expr) :let-set)
-        (let (;_ (print "let-set")
-              inlet? (index (nth 1 expr) letlist)
+        ;; storing a local variable in a let binding
+        (equal? (first expr) :let-set)
+        ;; update letlist and get local var's index
+        (let (inlet? (index (nth 1 expr) letlist)
               letlist (if inlet? letlist (append letlist (nth 1 expr)))
-              argidx (+ (length arglist) (if inlet? inlet? (dec (length letlist))))
-              ;_ (print (nth 1 expr))
-              ;_ (print letlist)
-              ;_ (print argidx)
-              )
-            (resolve-syms1
-              (cdr ir-list)
+              argidx (+ (length arglist)
+                        (if inlet? inlet? (dec (length letlist)))))
+            (resolve-syms0
+              (rest ir-list)
               arglist
               letlist
-              (cons (list :local-count (uniquesym "lc_") (+ (length letlist) (length arglist)))
+              ;; store marker for number of local variables at current position
+              (cons (list :local-count
+                          (gensym "letc")
+                          (+ (length letlist) (length arglist)))
               (cons (list :store :arg-num argidx) acc))))
 
-        (equal? (car expr) :let-body)
-        ;(progn (print "let-body") (print arglist) (print letlist))
-        (resolve-syms1 (cdr ir-list) arglist letlist acc)
+        ;; ignore let-body
+        (equal? (first expr) :let-body)
+        (resolve-syms0 (rest ir-list) arglist letlist acc)
 
-        (equal? (car expr) :let-pop)
-        (list (cdr ir-list) (cons (list :let-pop (uniquesym "lp_") (length arglist)) acc))
-        ;(progn (print "===================="))
+        ;; return (unprocessed-syms, processed-syms)
+        (equal? (first expr) :let-pop)
+        (list (rest ir-list) (cons (list :let-pop
+                                         (gensym "letp")
+                                         (length arglist))
+                                   acc))
 
         t
-        (resolve-syms1
-          (cdr ir-list)
+        (resolve-syms0
+          (rest ir-list)
           arglist
           letlist
           (cons
             (cond
-              (not (equal? :push (car expr))) expr
+              (not (equal? :push (first expr))) expr
               (equal? (nth 1 expr) (quote nil)) (list :push :nil)
               (equal? (nth 1 expr) (quote t)) (list :push :true)
               (int? (nth 1 expr)) (list :push :int-const (nth 1 expr))
@@ -288,8 +239,7 @@
                     idx (if letidx
                           (+ (length arglist) letidx)
                           (index (nth 1 expr) arglist)))
-              (if ;(index (nth 1 expr) arglist) ;TODO change to last index
-                idx
+              (if idx
                 (list :push :arg-num idx)
                 (list :push :envir-sym (nth 1 expr))))
 
@@ -298,8 +248,5 @@
     (list :asdfasdf acc)))
 
 (defun resolve-syms (ir-list arglist)
-  (let (a (resolve-syms1 ir-list arglist nil nil)
-        ;_ (print (first a))
-        ;_ (print (second a))
-        )
-  (reverse! (second a))))
+  (let (a (resolve-syms0 ir-list arglist nil nil))
+    (reverse (second a))))

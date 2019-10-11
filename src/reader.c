@@ -39,14 +39,35 @@ int read_token(char **buf, Object **obj) {
     } else if(*end == '"') {
         // read string
         end ++;
+        char temp[128];
+        int temp_i = 0;
+        temp[temp_i++] = '"';
         while(*end != '"') {
-            end ++;
             if(*end == '\0') {
                 printf("error: unmatched quotation mark\n");
                 return -1;
+            } else if(*end == '\\') {
+                if(end[1] == '"') {
+                    temp[temp_i++] = '"';
+                } else if(end[1] == 'n') {
+                    temp[temp_i++] = '\n';
+                } else {
+                    temp[temp_i++] = *end;
+                    end ++;
+                    continue;
+                }
+                end += 2;
+            } else {
+                temp[temp_i++] = *end;
+                end ++;
             }
         }
         end ++;
+        temp[temp_i++] = '"';
+        temp[temp_i++] = '\0';
+        *obj = obj_init_str_len(strt, temp, temp_i);
+        *buf = end;
+        return 0;
     } else {
         while(*end != '\0' && !is_white_space(*end) && !is_special_char(*end)) {
             end ++;

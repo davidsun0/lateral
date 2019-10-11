@@ -47,20 +47,47 @@
 (defun tokenize (in-string tok-start idx acc state)
   (if (char-at in-string idx)
     (cond
+      ; detect end of comment
+      (and (equal? state "comment") (equal? (char-at in-string idx) "\n"))
+      (tokenize in-string (inc idx) (inc idx) acc nil)
+
+      ; ignore all characters in comment
+      (equal? state "comment")
+      (tokenize in-string (inc idx) (inc idx) acc state)
+
+      ; detect start of comment
+      (equal? (char-at in-string idx) ";")
+      (tokenize in-string (inc idx) (inc idx) acc "comment")
+
+      ; end of comment
+      (and (equal? state "quote") (equal? (char-at in-string idx) "\""))
+      (tokenize in-string (inc idx) (inc idx)
+                (make-token in-string tok-start (inc idx) acc) nil)
+     
+      ; continue quote
+      (equal? state "quote")
+      (tokenize in-string tok-start (inc idx) acc "quote")
+
+      ; start of comment
+      (equal? (char-at in-string idx) "\"")
+      (tokenize in-string tok-start (inc idx) acc "quote")
+
+      ; ignore whitespace
       (whitespace? (char-at in-string idx))
       (tokenize in-string (inc idx) (inc idx)
-                (make-token in-string tok-start idx acc))
+                (make-token in-string tok-start idx acc) state)
 
+      ; left paren
       (equal? (char-at in-string idx) "(")
       (tokenize in-string (inc idx) (inc idx)
-                (cons "(" (make-token in-string tok-start idx acc)))
-      
+                (cons "(" (make-token in-string tok-start idx acc)) state)
+     
+      ; right paren
       (equal? (char-at in-string idx) ")")
       (tokenize in-string (inc idx) (inc idx)
-                (cons ")" (make-token in-string tok-start idx acc)))
+                (cons ")" (make-token in-string tok-start idx acc)) state)
       
-      t (tokenize in-string tok-start (inc idx) acc)
-      )
+      t (tokenize in-string tok-start (inc idx) acc state))
     (reverse acc)))
 
 ;; hacky way of forward defining functions for mutual recursion
@@ -73,17 +100,28 @@
       (list (read-atom (first token-list))
             (rest token-list)))))
 
+(defun readForm (token-list)
+  (read-form token-list))
+
 (defun read-list (token-list acc)
   (if (equal? (first token-list) ")")
     (list (reverse acc) (rest token-list))
-    (let (res-and-tokens (read-form token-list)
+    (let (;_ (print "read-list let")
+          res-and-tokens (read-form token-list)
           result (first res-and-tokens)
+          ;_ (print result)
           new-tokens-list (second res-and-tokens))
-      (read-list new-tokens-list (cons result acc)))))
+          ;_ (print (first res-and-tokens))
+          ;_ (print "read-list"))
+      (if res-and-tokens
+        (read-list new-tokens-list (cons result acc))
+        (progn ;(print "read-list end?")
+               ;(print acc)
+               (list acc nil))))))
 
 (defun read ()
   (let (_ (pprint "user> ")
-        form (read-form (tokenize (readline) 0 0 nil)))
+        form (read-form (tokenize (readline) 0 0 nil nil)))
     (first form)))
 
 (hashmap-set! method-list "apply" (list "Lateral" "apply" (method-type 2)))
@@ -104,22 +142,11 @@
     env))
 
 ;; TODO: check for even number of val/bindings
-;; This code causes a bug in the compiler
-;(defun apply-cond (exprs env)
-;  (if exprs
-;    (if (apply (first exprs) env)
-;      (apply (second exprs) env)
-;      (apply-cond (rest (rest exprs)) env))))
 (defun apply-cond (exprs env)
   (cond
     (not exprs) nil
     (apply (first exprs) env) (apply (second exprs) env)
     t (apply-cond (rest (rest exprs)) env)))
-
-;(defun apply-and (exprs env)
-;  (if exprs
-;    (if (apply (first exprs) env)
-;      (apply-and (rest exprs) env))))
 
 (defun apply-and (exprs env)
   (cond
@@ -127,22 +154,11 @@
     (apply (first exprs) env) (apply-and (rest exprs) env)
     t nil))
 
-;(defun apply-or (exprs env)
-;  (if exprs
-;    (let (res (apply (first exprs) env))
-;      (if res
-;        res
-;        (apply-or (rest exprs) env)))))
 (defun apply-or (exprs env)
   (cond
     (not exprs) nil
     (apply (first exprs) env) t
     t (apply-or (rest exprs) env)))
-
-(defun lambda-apply (func args env)
-  (let (sym-binds (interleave (get-args func) args)
-        bind-envir (apply-bind sym-binds (make-envir env)))
-    (apply (get-expr func) bind-envir)))
 
 ;; TODO: check for even number of val/bindings
 (defun apply-bind-macro (exprs env)
@@ -152,7 +168,7 @@
       (apply-bind-macro (rest (rest exprs)) env))
     env))
 
-(defun macro-apply (func args env)
+(defun lambda-apply (func args env)
   (let (sym-binds (interleave (get-args func) args)
         bind-envir (apply-bind-macro sym-binds (make-envir env)))
     (apply (get-expr func) bind-envir)))
@@ -165,7 +181,7 @@
 (defun macro-expand (ast env)
   (if (macro-call? ast env)
     (macro-expand
-      (macro-apply (first (get env (first ast))) (rest ast) env)
+      (lambda-apply (first (get env (first ast))) (rest ast) env)
       env)
     ast))
 
@@ -179,12 +195,12 @@
 
 (defun apply (ast env)
   (cond
+    ;(print ast) nil
+
     (not ast) nil
 
     (macro-call? ast env)
-    (progn
-      (print "macro expand")
-    (apply (macro-expand ast env) env))
+    (apply (macro-expand ast env) env)
 
     (not (list? ast)) (eval ast env nil)
 
@@ -205,11 +221,11 @@
       (print "quote expects one argument"))
 
     ;; def
-    (equal? (first ast) (quote def!))
+    (equal? (first ast) (quote def))
     (if (= (length ast) 3)
       (let (val (apply (nth 2 ast) env))
         (progn
-          (insert! env (second ast) (apply (nth 2 ast) env))
+          (insert! (user-envir) (second ast) (apply (nth 2 ast) env))
           val))
       (print "def expects two arguments"))
 
