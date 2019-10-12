@@ -31,8 +31,10 @@ Object *la_apply(Object *list) {
 }
 
 Object *la_read_file(Object* list) {
+    obj_debug(CAR(list));
     Object *str = CAR(list);
     char *file_name = obj_string(str);
+    printf("file: %s %p\n", file_name, file_name);
     read_file(file_name);
     return nil_obj;
 }

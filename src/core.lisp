@@ -3,6 +3,9 @@
         name
         (list (quote lambda) args expr)))
 
+(def first car)
+(def rest cdr)
+
 ;; tail recursive map helper function
 (defun map0 (fn in acc)
   (if in
@@ -255,14 +258,15 @@
     (list less same greater)))
 
 (defun qsort (comp in)
-  (let (pivot (car in)
-        asdf (cdr in)
-        terms (qsort0 comp asdf pivot nil nil nil)
-        lesser (first terms)
-        same (cons pivot (second terms))
-        greater (nth 2 terms))
-    (if (nil? asdf)
-      (list pivot)
-      (concat (qsort comp lesser) (concat same (qsort comp greater))))))
+  (if in
+    (let (pivot (car in)
+          asdf (cdr in)
+          terms (qsort0 comp asdf pivot nil nil nil)
+          lesser (first terms)
+          same (cons pivot (second terms))
+          greater (nth 2 terms))
+      (if (nil? asdf)
+        (list pivot)
+        (concat (qsort comp lesser) (concat same (qsort comp greater)))))))
 
 (defun > (a b) (not (or (= a b) (< a b))))

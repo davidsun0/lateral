@@ -11,4 +11,3 @@ a.out
 *.txt
 
 old/*
-jvm/core.lisp

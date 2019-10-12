@@ -51,7 +51,10 @@ int read_token(char **buf, Object **obj) {
                     temp[temp_i++] = '"';
                 } else if(end[1] == 'n') {
                     temp[temp_i++] = '\n';
+                } else if(end[1] == '\\') {
+                    temp[temp_i++] = '\\';
                 } else {
+                    printf("unknown escape sequence\n");
                     temp[temp_i++] = *end;
                     end ++;
                     continue;
@@ -287,6 +290,7 @@ void read_file(char *path) {
     Object *obj = NULL;
     char *lbuf = buffer;
     while(read_token(&lbuf, &obj) >= 0) {
+        // printf("buffer: %s\n", lbuf);
         curr = list_append(curr, obj);
         if(tokens == NULL) {
             tokens = curr;

@@ -12,7 +12,8 @@
 
 (def *gensym-count* 0)
 (defun gensym (prefix)
-  (keyword (string prefix (def *gensym-count* (inc *gensym-count*)))))
+;  (keyword (string prefix (def *gensym-count* (inc *gensym-count*)))))
+   (keyword (str-cat prefix (string (def *gensym-count* (inc *gensym-count*))))))
 
 (defun progn-deflate (name expr acc)
   (if expr
@@ -115,8 +116,7 @@
     acc))
 
 (defun ir (name ast)
-  (filter first
-  (reverse (semi-flatten (ir0 name ast nil)))))
+  (reverse (semi-flatten (ir0 name ast nil))))
 
 ;; first step in code processing
 ;; turns a tree of lisp code into a stack-based intermediate representation

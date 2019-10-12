@@ -5,7 +5,10 @@ class Helper {
         Lang.include("core2.lisp");
         while(true) {
             try {
-                Lateral.main();
+                if(args.length > 0)
+                    LateralB.main();
+                else
+                    Lateral.main();
             } catch (NoSuchElementException n) {
                 return;
             } catch (RuntimeException e) {
@@ -20,12 +23,12 @@ class Helper {
             throw new TypeError("readAtom expects non-null string argument");
         }
         String s = (String)a;
-        if("nil".equals(s)) {
-            return null;
-        } else if("t".equals(s)) {
-            return Boolean.TRUE;
-        } else if(s.length() > 1 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
-            return s.substring(1, s.length() - 1);
+        if(s.length() > 1 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+            s = s.substring(1, s.length() - 1);
+            s = s.replace("\\\\", "\\");
+            s = s.replace("\\n", "\n");
+            s = s.replace("\\\"", "\"");
+            return s;
         } else if(s.charAt(0) == ':') {
             return new Keyword(s);
         } else if(s.length() > 2 && s.charAt(0) == '0' && s.charAt(1) == 'x') {

@@ -22,4 +22,40 @@ class ConsCell {
     public void setCdr(ConsCell cdr) {
         this.cdr = cdr;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("(");
+        ConsCell cell = this;
+        while(cell != null) {
+            sb.append(cell.car);
+            if(cell.cdr != null) {
+                sb.append(" ");
+            }
+            cell = cell.cdr;
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(o instanceof ConsCell) {
+            ConsCell c = (ConsCell)o;
+            return (car.equals(c.car) &&
+                    ((cdr == null && c.cdr == null) ||
+                     (cdr.equals(c.cdr))));
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = car.hashCode();
+        if(cdr != null) {
+            hash += cdr.hashCode();
+        }
+        return hash;
+    }
 }

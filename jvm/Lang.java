@@ -3,9 +3,11 @@ import java.util.HashMap;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-
+import java.util.Map;
 
 class Lang {
     static Scanner scanner;
@@ -16,6 +18,158 @@ class Lang {
 
         HashMap<Object, Object> userTable = new HashMap<>(256);
 
+        userTable.put(new Symbol("nil"), null);
+        userTable.put(new Symbol("t"), Boolean.TRUE);
+
+        userTable.put(new Symbol("write-bytes"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object p = car(args);
+                Object b = nth(1, args);
+                if(p instanceof String && b instanceof ConsCell) {
+                    String path = (String)p;
+                    ConsCell byteList = (ConsCell)b;
+                    try (OutputStream ostream = new FileOutputStream(path)) {
+                        while(byteList != null) {
+                            if(car(byteList) instanceof Integer) {
+                                int writeByte = (Integer)car(byteList);
+                                ostream.write(writeByte);
+                            } else {
+                                System.out.format("can't write %s as byte\n",
+                                        car(byteList));
+                            }
+                            byteList = byteList.getCdr();
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }
+                throw new TypeError();
+            }
+        });
+
+        userTable.put(new Symbol("flatten"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object tree = car(args);
+                if(tree == null || !(tree instanceof ConsCell)) {
+                    return tree;
+                }
+                Object[] treeStack = new Object[256];
+                int stackTop = 0;
+                ConsCell output = new ConsCell(null, null);
+                ConsCell curr = output;
+                while(stackTop != 0 || tree != null) {
+                    if(tree == null) {
+                        stackTop --;
+                        if(stackTop < 0) {
+                            System.out.println("flatten stack underflow");
+                            break;
+                        }
+                        else
+                            tree = treeStack[stackTop];
+                    } else if(car(tree) != null && car(tree) instanceof ConsCell) {
+                        treeStack[stackTop] = cdr(tree);
+                        stackTop ++;
+                        tree = car(tree);
+                    } else {
+                        curr.setCdr(new ConsCell(null, null));
+                        curr = curr.getCdr();
+                        curr.setCar(car(tree));
+
+                        tree = cdr(tree);
+                    }
+                }
+                return cdr(output);
+            }
+        });
+
+        userTable.put(new Symbol("keyvals"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                if(!(car(args) instanceof HashMap)) {
+                    throw new TypeError("keyvals");
+                }
+
+                HashMap<Object, Object> h = (HashMap<Object, Object>)car(args);
+                ConsCell outList = new ConsCell(null, null);
+                ConsCell curr = outList;
+                for(Map.Entry<Object, Object> entry : h.entrySet()) {
+                    ConsCell c = new ConsCell(entry.getKey(),
+                            new ConsCell(entry.getValue(), null));
+                    curr.setCdr(new ConsCell(null, null));
+                    curr = curr.getCdr();
+                    curr.setCar(c);
+                }
+                return cdr(outList);
+            }
+        });
+
+        userTable.put(new Symbol("symbol"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object a = car(args);
+                if(a instanceof String) {
+                    return new Symbol((String)a);
+                } else if(a instanceof Symbol) {
+                    return a;
+                } else {
+                    throw new TypeError("symbol");
+                }
+            }
+        });
+
+        userTable.put(new Symbol("//"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object a = car(args);
+                Object b = nth(1, args);
+                if(a instanceof Integer && b instanceof Integer) {
+                    int result = ((Integer)a).intValue() / ((Integer)b).intValue();
+                    return Integer.valueOf(result);
+                } else {
+                    throw new TypeError("int division");
+                }
+            }
+        });
+
+        userTable.put(new Symbol("bit-and"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object a = car(args);
+                Object b = nth(1, args);
+                if(a instanceof Integer && b instanceof Integer) {
+                    int result = ((Integer)a).intValue() & ((Integer)b).intValue();
+                    return Integer.valueOf(result);
+                } else {
+                    throw new TypeError("bit-and");
+                }
+            }
+        });
+
+        userTable.put(new Symbol("bit-asr"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                Object a = car(args);
+                Object b = nth(1, args);
+                if(a instanceof Integer && b instanceof Integer) {
+                    int result = ((Integer)a).intValue() >> ((Integer)b).intValue();
+                    return Integer.valueOf(result);
+                } else {
+                    throw new TypeError("bit-asr");
+                }
+            }
+        });
+
+
+        userTable.put(new Symbol("eval"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                return car(Lateral.eval(args, userEnvir, null));
+            }
+        });
+
         userTable.put(new Symbol("integer"), new NativeFunction() {
             @Override
             public Object invoke(ConsCell args) {
@@ -25,7 +179,7 @@ class Lang {
                 } else if(o instanceof Integer) {
                     return o;
                 } else {
-                    throw new TypeError();
+                    throw new TypeError("integer");
                 }
             }
         });
@@ -55,7 +209,7 @@ class Lang {
                     if(o instanceof Keyword) {
                         sb.append(((Keyword)o).toString().substring(1));
                     } else {
-                    sb.append(o);
+                        sb.append(o);
                     }
                     args = (ConsCell)cdr(args);
                 }
@@ -75,7 +229,7 @@ class Lang {
                 } else if(o instanceof Symbol) {
                     s = ((Symbol)o).toString();
                 } else {
-                    throw new TypeError();
+                    throw new TypeError("keyword");
                 }
                 return new Keyword(s);
             }
@@ -97,6 +251,7 @@ class Lang {
                     if((term = args.getCar()) instanceof Integer) {
                         sum += (Integer)term;
                     } else {
+                        println(car(args));
                         throw new TypeError("addition expects integers");
                     }
                     args = args.getCdr();
@@ -130,8 +285,10 @@ class Lang {
         userTable.put(new Symbol("<"), new NativeFunction() {
             @Override
             public Object invoke(ConsCell args) {
-                if(!(car(args) instanceof Integer))
-                    throw new TypeError();
+                if(!(car(args) instanceof Integer)) {
+                    println(car(args));
+                    throw new TypeError("first arg of < is not int");
+                }
 
                 int lastVal = (Integer)car(args);
                 args = (ConsCell)cdr(args);
@@ -143,7 +300,7 @@ class Lang {
                             return null;
                         lastVal = (Integer)term;
                     } else {
-                        throw new TypeError("addition expects integers");
+                        throw new TypeError("less than expects integers");
                     }
                     args = (ConsCell)cdr(args);
                 }
@@ -253,6 +410,13 @@ class Lang {
             }
         });
 
+        userTable.put(new Symbol("char-at"), new NativeFunction() {
+            @Override
+            public Object invoke(ConsCell args) {
+                return charAt(car(args), nth(1, args));
+            }
+        });
+
         userEnvir = new Environment(userTable);
     }
 
@@ -337,8 +501,8 @@ class Lang {
 
     // string? symbol? keyword? char? int? list? map?
     public static Object getType(Object o) {
-        if(o == null) {
-            return null;
+        if(o == null || o == Boolean.TRUE) {
+            return o;
         } else if(o instanceof Symbol) {
             return new Keyword(":symbol");
         } else if(o instanceof Integer) {
@@ -362,6 +526,7 @@ class Lang {
                 return new Keyword(":function");
             }
         } else {
+            System.out.println(o.getClass());
             throw new RuntimeException("unknown object type");
         }
     }
