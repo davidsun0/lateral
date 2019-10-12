@@ -61,19 +61,19 @@
            (not (equal? state "quote")))
       (tokenize in-string (inc idx) (inc idx) acc "comment")
 
+      ; end of comment
+      (and (equal? state "quote")
+           (equal? (char-at in-string idx) "\""))
+      (tokenize in-string (inc idx) (inc idx)
+                (make-token in-string tok-start (inc idx) acc) nil)
+    
+      ; continue quote
       (equal? state "quote")
-      (cond
-        (and (equal? (char-at in-string idx) "\\")
-             (or (equal? (char-at in-string (inc idx)) "n")
-                 (equal? (char-at in-string (inc idx)) "\\")
-                 (equal? (char-at in-string (inc idx)) "\"")))
+      (if (and (equal? (char-at in-string idx) "\\")
+               (or (equal? (char-at in-string (inc idx)) "n")
+                   (equal? (char-at in-string (inc idx)) "\\")
+                   (equal? (char-at in-string (inc idx)) "\"")))
         (tokenize in-string tok-start (inc (inc idx)) acc "quote")
-
-        (equal? (char-at in-string idx) "\"")
-        (tokenize in-string (inc idx) (inc idx)
-                  (make-token in-string tok-start (inc idx) acc) nil)
-        
-        t
         (tokenize in-string tok-start (inc idx) acc "quote"))
 
       ; start of comment
@@ -99,7 +99,7 @@
     (reverse acc)))
 
 ;; hacky way of forward defining functions for mutual recursion
-(hashmap-set! method-list "read-list" (list "Lateral" "read-list" (method-type 2)))
+(insert-method "read-list" "Lateral" "read-list" 2)
 
 (defun read-form (token-list)
   (if token-list
@@ -129,10 +129,11 @@
 
 (defun read ()
   (let (_ (pprint "user> ")
-        form (read-form (tokenize (readline) 0 0 nil nil)))
+        form (read-form (tokenize (readline) 0 0 nil nil))
+        )
     (first form)))
 
-(hashmap-set! method-list "apply" (list "Lateral" "apply" (method-type 2)))
+(insert-method "apply" "Lateral" "apply" 2)
 
 (defun apply-progn (exprs env)
   (if (rest exprs)
@@ -198,13 +199,11 @@
     (not ast) (reverse acc)
     (symbol? ast) (first (get env ast))
     (not (list? ast)) ast
-    
+   
     t (eval (rest ast) env (cons (apply (first ast) env) acc))))
 
 (defun apply (ast env)
   (cond
-    ;(print ast) nil
-
     (not ast) nil
 
     (macro-call? ast env)

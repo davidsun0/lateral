@@ -2,13 +2,10 @@ import java.util.NoSuchElementException;
 
 class Helper {
     public static void main(String[] args) {
-        Lang.include("core2.lisp");
+        Lang.include("core.lisp");
         while(true) {
             try {
-                if(args.length > 0)
-                    LateralB.main();
-                else
-                    Lateral.main();
+                Lateral.main();
             } catch (NoSuchElementException n) {
                 return;
             } catch (RuntimeException e) {

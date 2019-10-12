@@ -1,4 +1,4 @@
-(include "compiler2.lisp")
+(include "compiler.lisp")
 
 (def pool (hashmap))
 (def pool-count 1)
@@ -630,7 +630,7 @@
         stack-map-frames-size (length flat-stack-map)
         _ (print "end")
         _ (insert! method-list (string name)
-                        (list "LateralB" (string name) (method-type argc)))
+                        (list "Lateral" (string name) (method-type argc)))
         )
     (list
       0x00 0x09 ; public static
@@ -696,7 +696,7 @@
         (list (quote quote) args)
         (list (quote quote) expr)))
 
-(include "lateral2.lisp")
+(include "lateral.lisp")
 
 (print "writing binary...")
 ;(map print funlist)
@@ -705,6 +705,6 @@
 ;(print
   (flatten
     (class-headers
-      "LateralB"
+      "Lateral"
       "java/lang/Object"
       (reverse funlist))))
