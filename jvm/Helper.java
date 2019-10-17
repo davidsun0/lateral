@@ -36,20 +36,4 @@ class Helper {
             return new Symbol(s);
         }
     }
-
-    public static Object isList(Object a) {
-        if(a instanceof ConsCell) {
-            return Boolean.TRUE;
-        } else {
-            return null;
-        }
-    }
-
-    public static Object isSymbol(Object a) {
-        if(a instanceof Symbol) {
-            return Boolean.TRUE;
-        } else {
-            return null;
-        }
-    }
 }

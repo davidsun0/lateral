@@ -103,14 +103,14 @@
 (insert! method-list "cons"
          (list "Lang" "cons" "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;"))
 
-(insert-method "contains?" "Lang" "contains" 2)
+(insert-method "contains?" "Lang" "contains_p" 2)
 
-(insert-method "equal?" "Lang" "isEqual" 2)
+(insert-method "equal?" "Lang" "equal_p" 2)
 
-(insert-method "char" "Lang" "toChar" 1)
-(insert-method "char-at" "Lang" "charAt" 2)
+(insert-method "char" "Lang" "to_char" 1)
+(insert-method "char-at" "Lang" "char_at" 2)
 (insert-method "substr" "Lang" "substr" 3)
-(insert-method "whitespace?" "Lang" "isWhitespace" 1)
+(insert-method "whitespace?" "Lang" "whitespace_p" 1)
 
 (insert-method "pprint" "Lang" "pprint" 1)
 (insert-method "println" "Lang" "println" 1)
@@ -120,32 +120,28 @@
 (insert-method "inc" "Lang" "inc" 1)
 (insert-method "=" "Lang" "isNumericallyEqual" 2)
 
-;(insert-method "readline" "Lang" "readLine" 0)
-(insert! method-list "readline" (list "Lang" "readLine" "()Ljava/lang/String;"))
+(insert-method "readline" "Lang" "readLine" 0)
+;(insert! method-list "readline" (list "Lang" "readLine" "()Ljava/lang/String;"))
 ;(insert-method "read-atom" "Lang" "readAtom" 1)
 (insert-method "read-atom" "Helper" "readAtom" 1)
-(insert-method "make-lambda" "Lang" "makeLambda" 2)
-(insert-method "make-macro" "Lang" "makeMacro" 2)
+(insert-method "make-lambda" "Lang" "lambda" 2)
+(insert-method "make-macro" "Lang" "macro" 2)
 
-(insert-method "make-envir" "Lang" "makeEnvir" 1)
-(insert-method "user-envir" "Lang" "getUserEnvir" 0)
+(insert-method "make-envir" "Lang" "make_envir" 1)
+(insert-method "user-envir" "Runtime" "getUserEnvir" 0)
 (insert-method "native-invoke" "Lang" "nativeInvoke" 2)
 
-(insert-method "list?" "Helper" "isList" 1)
-(insert-method "symbol?" "Helper" "isSymbol" 1)
-(insert-method "lambda?" "Lang" "isLambda" 1)
-(insert-method "native-fn?" "Lang" "isNativeFunction" 1)
-(insert-method "macro?" "Lang" "isMacro" 1)
+(insert-method "list?" "Lang" "list_p" 1)
+(insert-method "symbol?" "Lang" "symbol_p" 1)
+(insert-method "lambda?" "Lang" "lambda_p" 1)
+(insert-method "native-fn?" "Lang" "native_p" 1)
+(insert-method "macro?" "Lang" "macro_p" 1)
 
-(insert-method "insert!" "Lang" "insert" 3)
+(insert-method "insert!" "Lang" "insert_b" 3)
 (insert-method "get" "Lang" "get" 2)
 
 (insert-method "get-args" "Lang" "getArgs" 1)
 (insert-method "get-expr" "Lang" "getExpr" 1)
-
-(print "test")
-(print method-list)
-(print "Test")
 
 (defun funcall-resolve (expr)
   (let (name (string (second expr)) ; function name
@@ -202,6 +198,11 @@
               (list :invokestatic "Symbol" "makeSymbol"
                     "(Ljava/lang/String;)LSymbol;"))
 
+        (equal? (nth 1 expr) :keyword)
+        (list (list :ldc (list :string (string (nth 2 expr))))
+              (list :invokestatic "Keyword" "makeKeyword"
+                    "(Ljava/lang/String;)LKeyword;"))
+
         t (progn (print "can't push: ") (print expr)))
 
       (equal? cmd :store)
@@ -221,20 +222,17 @@
       (funcall-resolve expr)
 
       (equal? cmd :tail-recur)
-      ;(cons (list :goto :start) (set-locals (dec (nth 2 expr)) nil))
       (set-locals (dec (nth 2 expr)) 0 (list (list :goto :start)))
 
-      ; t (progn (print "ir-to-jvm can't compile") (print expr) expr)
-      t expr
-      )))
+      t expr)))
 
 ; calculates max stack size and size of stack at jump targets
 (defun max-stack2 (in argc s-max s-curr l-max l-curr lablist)
   (if in
     (let (expr (first in)
           cmd (first expr)
-          _ (print s-curr)
-          _ (print expr)
+          ;_ (print s-curr)
+          ;_ (print expr)
           ;_ (print lablist)
           s-max (if (< s-max s-curr) s-curr s-max)
           l-max (if (< l-max l-curr) l-curr l-max))
@@ -294,14 +292,11 @@
 (defun jvm-assemble0 (in)
   (let (cmd (first in))
     (cond
-      (equal? cmd :aconst_null)
-      (list 0x01)
+      (equal? cmd :aconst_null) (list 0x01)
 
-      (equal? cmd :aload)
-      (cons 0x19 (to-u1 (nth 1 expr)))
+      (equal? cmd :aload) (cons 0x19 (to-u1 (nth 1 expr)))
 
-      (equal? cmd :astore)
-      (cons 0x3A (to-u1 (nth 1 expr)))
+      (equal? cmd :astore) (cons 0x3A (to-u1 (nth 1 expr)))
 
       (equal? cmd :ldc)
       (let (idx (pool-get pool (nth 1 expr)))
@@ -321,52 +316,36 @@
 
           t (print "can't iconst value:" val)))
 
-      (equal? cmd :pop)
-      (list 0x57)
+      (equal? cmd :pop) (list 0x57)
 
-      (equal? cmd :dup)
-      (list 0x59)
+      (equal? cmd :dup) (list 0x59)
 
-      (equal? cmd :areturn)
-      (list 0xB0)
+      (equal? cmd :areturn) (list 0xB0)
 
-      (equal? cmd :return)
-      (list 0xB1)
+      (equal? cmd :return) (list 0xB1)
 
       (equal? cmd :getstatic)
-      (cons 0xB2
-            (to-u2
-              (pool-get pool
-                        (list :fieldref
-                              (list :classref (nth 1 expr))
-                              (list :nametyperef (nth 2 expr)
-                                    (nth 3 expr))))))
+      (cons 0xB2 (to-u2 (pool-get pool (list :fieldref
+                                             (list :classref (nth 1 expr))
+                                             (list :nametyperef (nth 2 expr)
+                                             (nth 3 expr))))))
 
       (equal? cmd :invokevirtual)
-      (cons 0xB6
-            (to-u2
-              (pool-get pool
-                        (list :methodref
-                              (list :classref (nth 1 expr))
-                              (list :nametyperef (nth 2 expr)
-                                    (nth 3 expr))))))
+      (cons 0xB6 (to-u2 (pool-get pool (list :methodref
+                                             (list :classref (nth 1 expr))
+                                             (list :nametyperef (nth 2 expr)
+                                             (nth 3 expr))))))
 
       (equal? cmd :invokestatic)
-      (cons 0xB8
-            (to-u2
-              (pool-get pool
-                        (list :methodref
-                              (list :classref (nth 1 expr))
-                              (list :nametyperef (nth 2 expr)
-                                    (nth 3 expr))))))
+      (cons 0xB8 (to-u2 (pool-get pool (list :methodref
+                                             (list :classref (nth 1 expr))
+                                             (list :nametyperef (nth 2 expr)
+                                             (nth 3 expr))))))
 
       (equal? cmd :checkcast)
-      (cons 0xC0
-            (to-u2
-              (pool-get pool (list :classref (nth 1 expr)))))
-      ;t (progn (print "jvm-assmble can't assemble") (print expr) expr)
-      t expr
-      )))
+      (cons 0xC0 (to-u2 (pool-get pool (list :classref (nth 1 expr)))))
+      
+      t expr)))
 
 ;; resolves labels and compiles to byte lists whenever possible
 (defun jvm-assemble1 (in acc offset labelmap)
@@ -469,22 +448,6 @@
 ;; stack frame object entry of class Object
 (def objvar-info
      (list 0x07 (to-u2 (pool-get pool (list :classref "java/lang/Object")))))
-
-(defun sframe (offset localcount stackcount)
-  (if (= stackcount 0)
-    (progn
-      ;(print "same frame") (print offset)
-    (list offset) ; same frame type (same locals, zero on stack)
-    )
-    (progn
-      ;(print "full frame") (print localcount) (print stackcount)
-    (list 0xFF ; full frame type
-          (to-u2 offset)
-          (if (= localcount 0)
-            (quote ())
-            (list (to-u2 localcount) (repeat objvar-info localcount)))
-          (to-u2 stackcount)
-          (repeat objvar-info stackcount)))))
 
 (defun sframe1 (offset l-count s-count last-local)
   (cond
@@ -699,10 +662,8 @@
 (include "lateral.lisp")
 
 (print "writing binary...")
-;(map print funlist)
 (write-bytes
   "LateralB.class"
-;(print
   (flatten
     (class-headers
       "Lateral"

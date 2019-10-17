@@ -89,14 +89,14 @@
                 "(Ljava/lang/Object;)Ljava/lang/Object;")
      "cons" (list "Lang" "cons"
                   "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;")
-     "equal?" (list "Lang" "isEqual"
+     "equal?" (list "Lang" "equal_p"
                     "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
      "inc" (list "Lang" "inc"
                  "(Ljava/lang/Object;)Ljava/lang/Object;")
-     "char-at" (list "Lang" "charAt"
+     "char-at" (list "Lang" "char_at"
                      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
      "readline" (list "Lang" "readLine"
-                      "()Ljava/lang/String;")
+                      "()Ljava/lang/Object;")
      "print" (list "Lang" "println"
                    "(Ljava/lang/Object;)Ljava/lang/Object;")
      "println" ("Lang" "println"
@@ -108,9 +108,9 @@
                 (list class name (method-type argc))))
 
 (insert-method "println" "Lang" "println" 1)
-(insert-method "char" "Lang" "toChar" 1)
+(insert-method "char" "Lang" "to_char" 1)
 (insert-method "substr" "Lang" "substr" 3)
-(insert-method "whitespace?" "Lang" "isWhitespace" 1)
+(insert-method "whitespace?" "Lang" "whitespace_p" 1)
 
 (hashmap-set! method-list 
               "pprint"
@@ -130,38 +130,30 @@
 
 (hashmap-set! method-list 
               "symbol?"
-              (list "Helper" "isSymbol" "(Ljava/lang/Object;)Ljava/lang/Object;"))
-
-(hashmap-set! method-list 
-              "list?"
-              (list "Helper" "isList" "(Ljava/lang/Object;)Ljava/lang/Object;"))
+              (list "Lang" "symbol_p" "(Ljava/lang/Object;)Ljava/lang/Object;"))
 
 (hashmap-set! method-list 
               "get"
               (list "Lang" "get"
                     "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"))
 
-(hashmap-set! method-list 
-              "user-envir"
-              (list "Lang" "getUserEnvir" "()Ljava/lang/Object;"))
-
-(insert-method "list?" "Helper" "isList" 1)
-(insert-method "user-envir" "Lang" "getUserEnvir" 0)
+(insert-method "list?" "Lang" "list_p" 1)
+(insert-method "user-envir" "Runtime" "getUserEnvir" 0)
 (insert-method "native-invoke" "Lang" "nativeInvoke" 2)
 (insert-method "=" "Lang" "isNumericallyEqual" 2)
-(insert-method "insert!" "Lang" "insert" 3)
+(insert-method "insert!" "Lang" "insert_b" 3)
 (insert-method "get" "Lang" "get" 2)
-(insert-method "make-envir" "Lang" "makeEnvir" 1)
+(insert-method "make-envir" "Lang" "make_envir" 1)
 
 (insert-method "get-args" "Lang" "getArgs" 1)
 (insert-method "get-expr" "Lang" "getExpr" 1)
 
-(insert-method "make-lambda" "Lang" "makeLambda" 2)
-(insert-method "lambda?" "Lang" "isLambda" 1)
-(insert-method "native-fn?" "Lang" "isNativeFunction" 1)
-(insert-method "make-macro" "Lang" "makeMacro" 2)
-(insert-method "macro?" "Lang" "isMacro" 1)
-(insert-method "contains?" "Lang" "contains" 2)
+(insert-method "make-lambda" "Lang" "lambda" 2)
+(insert-method "lambda?" "Lang" "lambda_p" 1)
+(insert-method "native-fn?" "Lang" "native_p" 1)
+(insert-method "make-macro" "Lang" "macro" 2)
+(insert-method "macro?" "Lang" "macro_p" 1)
+(insert-method "contains?" "Lang" "contains_p" 2)
 
 ;(print method-list)
 
