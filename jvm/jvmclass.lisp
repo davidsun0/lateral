@@ -83,14 +83,7 @@
 
       t (progn (print "can't pool-get") (print expr)))))
 
-(pool-get pool (list :classref "java/lang/Object"))
-(print pool)
-(pool-get pool (list :classref "java/lang/Object"))
-(print pool)
-
-(print "after this")
 (def method-list (hashmap))
-(print "and before this")
 (defun insert-method (sym class name argc)
   (insert! method-list sym 
                 (list class name (method-type argc))))
@@ -653,19 +646,19 @@
 (defun compile-function0 (name args expr)
   (def funlist (cons (compile1 (string name) args expr) funlist)))
 
-(defmacro defun (name args expr)
-  (list (quote compile-function0)
-        (list (quote quote) name)
-        (list (quote quote) args)
-        (list (quote quote) expr)))
+;(defmacro defun (name args expr)
+;  (list (quote compile-function0)
+;        (list (quote quote) name)
+;        (list (quote quote) args)
+;        (list (quote quote) expr)))
 
-(include "lateral.lisp")
+;(include "lateral.lisp")
 
-(print "writing binary...")
-(write-bytes
-  "LateralB.class"
-  (flatten
-    (class-headers
-      "Lateral"
-      "java/lang/Object"
-      (reverse funlist))))
+;(print "writing binary...")
+;(write-bytes
+;  "LateralB.class"
+;  (flatten
+;    (class-headers
+;      "Lateral"
+;      "java/lang/Object"
+;      (reverse funlist))))

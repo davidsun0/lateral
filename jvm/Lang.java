@@ -14,7 +14,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.InvocationTargetException;
 
-class Lang {
+public class Lang {
     static Scanner scanner;
 
     static {
@@ -22,11 +22,7 @@ class Lang {
     }
 
     protected static Object nativeInvoke(Object function, Object args) {
-        if(args != null && !(args instanceof ConsCell)) {
-            throw new TypeError("args must be a list");
-        } else if(function instanceof NativeFunction) {
-            return ((NativeFunction)function).invoke((ConsCell)args);
-        } else if(function instanceof Method) {
+        if(function instanceof Method) {
             Method m = (Method)function;
             ConsCell a = (ConsCell)args;
             Object[] arglist;
@@ -184,7 +180,8 @@ class Lang {
     public static Object lambda_p(Object l) {
         if(l instanceof Lambda && !((Lambda)l).isMacro) {
             return Boolean.TRUE;
-        } else if(l instanceof NativeFunction) {
+        //} else if(l instanceof NativeFunction) {
+        } else if(l instanceof Method) {
             return Boolean.TRUE;
         } else {
             return null;
@@ -193,9 +190,7 @@ class Lang {
 
     // native?
     public static Object native_p(Object fn) {
-        if(fn instanceof NativeFunction) {
-            return Boolean.TRUE;
-        } else if(fn instanceof Method) {
+        if(fn instanceof Method) {
             return Boolean.TRUE;
         } else {
             return null;
@@ -253,8 +248,6 @@ class Lang {
             return new Keyword(":list");
         } else if(o instanceof HashMap) {
             return new Keyword(":hashmap");
-        } else if(o instanceof NativeFunction) {
-            return new Keyword(":function");
         } else if(o instanceof Lambda) {
             if(((Lambda)o).isMacro) {
                 return new Keyword(":macro");

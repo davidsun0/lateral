@@ -14,25 +14,13 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.InvocationTargetException;
 
-class Runtime {
+public class Runtime {
     static Environment userEnvir;
-
-    private static String toLispName(String name) {
-        String lispName = name;
-        if("_p".equals(name.substring(name.length() - 2))) {
-            name = name.substring(0, name.length() - 2) + "?";
-        } else if("_b".equals(name.substring(name.length() - 2))) {
-            name = name.substring(0, name.length() - 2) + "!";
-        }
-        return name.replace('_', '-');
-    }
-
-
-    public static Object getUserEnvir() {
-        return userEnvir;
-    }
+    static FunctionLoader classLoader;
 
     static {
+        classLoader = new FunctionLoader();
+
         HashMap<Object, Object> userTable = new HashMap<>(256);
 
         for (Method m : Lang.class.getMethods()) {
@@ -67,10 +55,62 @@ class Runtime {
                         Object[].class));
             userTable.put(new Symbol("eval"), Runtime.class.getMethod("eval",
                         Object.class));
+            userTable.put(new Symbol("load-class"), Runtime.class.getMethod(
+                        "load_class", Object.class));
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
         userEnvir = new Environment(userTable);
+    }
+
+    private static String toLispName(String name) {
+        String lispName = name;
+        if("_p".equals(name.substring(name.length() - 2))) {
+            name = name.substring(0, name.length() - 2) + "?";
+        } else if("_b".equals(name.substring(name.length() - 2))) {
+            name = name.substring(0, name.length() - 2) + "!";
+        }
+        return name.replace('_', '-');
+    }
+
+
+    public static Object getUserEnvir() {
+        return userEnvir;
+    }
+
+    public static Object load_class(Object bl) {
+        if(!(bl instanceof ConsCell)) {
+            throw new TypeError();
+        }
+
+        System.out.println(Lateral.class.getClassLoader());
+        System.out.println(Lang.class.getClassLoader());
+
+        ConsCell byteList = (ConsCell)bl;
+        int length = (Integer)Lateral.length(byteList);
+
+        byte[] bytes = new byte[length];
+        int i = 0;
+
+        while(byteList != null) {
+            if(byteList.getCar() instanceof Integer) {
+                bytes[i] = ((Integer)byteList.getCar()).byteValue();
+                i++;
+            } else {
+                throw new TypeError();
+            }
+            byteList = byteList.getCdr();
+        }
+
+        Class c = classLoader.defineClass(bytes);
+
+        for (Method m : c.getMethods()) {
+            int mod = m.getModifiers();
+            if(Modifier.isStatic(mod) && Modifier.isPublic(mod)) {
+                Lang.insert_b(userEnvir, new Symbol(toLispName(m.getName())), m);
+            }
+        }
+       return null;
     }
 
     public static Object eval(Object expr) {

@@ -233,8 +233,8 @@
               (string? (nth 1 expr)) (list :push :str-const (nth 1 expr))
               
               ; be sure not to capture quoted symbols
-              (and (keyword? (nth 1 expr)) (= (length expr) 2))
-              (list :push :keyword (nth 1 expr))
+              ;(and (keyword? (nth 1 expr)) (= (length expr) 2))
+              ;(list :push :keyword (nth 1 expr))
 
               (symbol? (nth 1 expr))
               (let (letidx (index (nth 1 expr) letlist)

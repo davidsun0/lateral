@@ -28,7 +28,6 @@
 ;    (char? a)    :char
 ;    (symbol? a)  :symbol
 ;    t            :unkown))
-
 (defun list? (o) (equal? (type o) :list))
 (defun int? (o) (equal? (type o) :int))
 (defun keyword? (o) (equal? (type o) :keyword))
