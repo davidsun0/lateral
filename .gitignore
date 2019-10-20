@@ -2,6 +2,7 @@
 lateral
 a.out
 *.class
+!jvm/Lateral.class
 
 # c files
 *.o

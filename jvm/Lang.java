@@ -152,7 +152,7 @@ public class Lang {
         }
     }
 
-    protected static Object getArgs(Object l) {
+    public static Object get_args(Object l) {
         if(l instanceof Lambda) {
             return ((Lambda)l).args;
         } else {
@@ -160,7 +160,7 @@ public class Lang {
         }
     }
 
-    protected static Object getExpr(Object l) {
+    public static Object get_expr(Object l) {
         if(l instanceof Lambda) {
             return ((Lambda)l).expr;
         } else {
@@ -343,11 +343,7 @@ public class Lang {
         StringBuilder sb = new StringBuilder();
         for(int i = 0; i < args.length; i ++) {
             Object o = args[i];
-            if(o instanceof Keyword) {
-                sb.append(((Keyword)o).toString().substring(1));
-            } else {
-                sb.append(o);
-            }
+            sb.append(o);
         }
         return sb.toString();
     }

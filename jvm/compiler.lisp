@@ -41,7 +41,7 @@
                   (list :return)
                   (cons nil nil))
                 (list :label end-lab)
-                (list :push :nil))
+                (list :push nil))
           acc)))
 
 (defun and-deflate (name false-lab expr acc)
@@ -59,7 +59,7 @@
                     (list :return)
                     (cons nil nil))
                   (list :label end-lab)
-                  (list :push :nil)
+                  (list :push nil)
                   (list :label false-lab)
                   (list :goto end-lab))
             acc))))
@@ -84,7 +84,7 @@
                   (list :return)
                   (cons nil nil))
                 (list :label end-lab)
-                (list :push :nil)
+                (list :push nil)
                 (list :label test-lab))
           acc)))
 
@@ -142,7 +142,7 @@
           (list (if name
                   (list :return)
                   (cons nil nil))
-                (list :push :nil)))
+                (list :push nil)))
         (list :label false-label)
         (ir0 name (nth 2 ast) nil)
         (list :jump-if-nil false-label)
@@ -226,15 +226,21 @@
           (cons
             (cond
               (not (equal? :push (first expr))) expr
-              (equal? (nth 1 expr) (quote nil)) (list :push :nil)
+
+              (or (equal? (nth 1 expr) (quote nil))
+                  (nil? (nth 1 expr)))
+              (list :push :nil)
+
               (equal? (nth 1 expr) (quote t)) (list :push :true)
               (int? (nth 1 expr)) (list :push :int-const (nth 1 expr))
               (char? (nth 1 expr)) (list :push :char-const (nth 1 expr))
               (string? (nth 1 expr)) (list :push :str-const (nth 1 expr))
               
               ; be sure not to capture quoted symbols
-              ;(and (keyword? (nth 1 expr)) (= (length expr) 2))
-              ;(list :push :keyword (nth 1 expr))
+              (and (keyword? (nth 1 expr)) (= (length expr) 2))
+              (progn
+                (print "push keyword") (print expr)
+              (list :push :keyword (nth 1 expr)))
 
               (symbol? (nth 1 expr))
               (let (letidx (index (nth 1 expr) letlist)

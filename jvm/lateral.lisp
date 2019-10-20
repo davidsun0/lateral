@@ -27,6 +27,9 @@
 
 (defun interleave0 (lista listb acc)
   (cond
+    (equal? :rest (first lista))
+    (reverse (cons listb (cons (second lista) acc)))
+
     (and lista listb)
     (interleave0 (rest lista) (rest listb)
                  (cons (first listb) (cons (first lista) acc)))
@@ -114,23 +117,17 @@
 (defun read-list (token-list acc)
   (if (equal? (first token-list) ")")
     (list (reverse acc) (rest token-list))
-    (let (;_ (print "read-list let")
-          res-and-tokens (read-form token-list)
+    (let (res-and-tokens (read-form token-list)
           result (first res-and-tokens)
-          ;_ (print result)
           new-tokens-list (second res-and-tokens))
-          ;_ (print (first res-and-tokens))
-          ;_ (print "read-list"))
       (if res-and-tokens
-        (read-list new-tokens-list (cons result acc))
-        (progn ;(print "read-list end?")
-               ;(print acc)
-               (list acc nil))))))
+        (read-list new-tokens-list
+                   (cons result acc))
+                   (list acc nil)))))
 
 (defun read ()
   (let (_ (pprint "user> ")
-        form (read-form (tokenize (readline) 0 0 nil nil))
-        )
+        form (read-form (tokenize (readline) 0 0 nil nil)))
     (first form)))
 
 (insert-method "apply" "Lateral" "apply" 2)
@@ -143,11 +140,11 @@
     (apply (first exprs) env)))
 
 ;; TODO: check for even number of val/bindings
-(defun apply-bind (exprs env)
+(defun let-bind (exprs env)
   (if exprs
     (progn
       (insert! env (first exprs) (apply (second exprs) env))
-      (apply-bind (rest (rest exprs)) env))
+      (let-bind (rest (rest exprs)) env))
     env))
 
 ;; TODO: check for even number of val/bindings
@@ -170,16 +167,16 @@
     t (apply-or (rest exprs) env)))
 
 ;; TODO: check for even number of val/bindings
-(defun apply-bind-macro (exprs env)
+(defun lambda-bind (exprs env)
   (if exprs
     (progn
       (insert! env (first exprs) (second exprs))
-      (apply-bind-macro (rest (rest exprs)) env))
+      (lambda-bind (rest (rest exprs)) env));)
     env))
 
 (defun lambda-apply (func args env)
   (let (sym-binds (interleave (get-args func) args)
-        bind-envir (apply-bind-macro sym-binds (make-envir env)))
+        bind-envir (lambda-bind sym-binds (make-envir env)))
     (apply (get-expr func) bind-envir)))
 
 (defun macro-call? (ast env)
@@ -242,7 +239,7 @@
 
     ;; let
     (equal? (first ast) (quote let))
-    (let (bind-envir (apply-bind (second ast) (make-envir env)))
+    (let (bind-envir (let-bind (second ast) (make-envir env)))
       (if (= (length ast) 3)
         (apply (nth 2 ast) bind-envir)
         (print "let expects two arguments")))
@@ -279,15 +276,8 @@
           func (first eval-list))
       (cond
         (native-fn? func) (native-invoke func (rest eval-list))
-
-        (lambda? func)
-        (lambda-apply func (rest eval-list) env)
-        ;(let (x (interleave (get-args func) (rest eval-list))
-        ;      bind-envir (apply-bind x (make-envir env)))
-        ;  (apply (get-expr func) bind-envir))
-
-        t (progn (print "error: ") (print func) (print "isn't function"))
-        ))))
+        (lambda? func) (lambda-apply func (rest eval-list) env)
+        t (progn (print "error: ") (print func) (print "isn't function"))))))
 
 (defun main ()
   (progn

@@ -89,8 +89,11 @@ to compile.
 ## Resources
 
 - [Make a Lisp](https://github.com/kanaka/mal)
-- [Lateral lisp](https://en.wikipedia.org/wiki/Lisp#Types)
 - [Crafting Interpreters](https://craftinginterpreters.com/contents.html)
+
+- [JVM Specification (SE11)](https://docs.oracle.com/javase/specs/jvms/se11/html/index.html)
+
+- [Lateral lisp](https://en.wikipedia.org/wiki/Lisp#Types)
 
 ## License
 

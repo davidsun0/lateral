@@ -133,8 +133,8 @@
 (insert-method "insert!" "Lang" "insert_b" 3)
 (insert-method "get" "Lang" "get" 2)
 
-(insert-method "get-args" "Lang" "getArgs" 1)
-(insert-method "get-expr" "Lang" "getExpr" 1)
+(insert-method "get-args" "Lang" "get_args" 1)
+(insert-method "get-expr" "Lang" "get_expr" 1)
 
 (defun funcall-resolve (expr)
   (let (name (string (second expr)) ; function name
@@ -532,13 +532,12 @@
         ;; allow for infinite tail recursion
         ;raw-ir (if (equal? (first (last raw-ir)) :tail-recur)
         ;         raw-ir (append raw-ir (list :return)))
-        _ (map print raw-ir)
+        ;_ (map print raw-ir)
         ;_ (pprint "")
         ;ir-list (check-tco0 raw-ir nil)
         ir-list (check-tco0 raw-ir raw-ir)
         ;_ (map print (resolve-syms ir-list args))
         ir-list (resolve-syms ir-list args)
-        ;_ (map print ir-list)
         _ (print "jvm asm")
         ; human readable jvm bytecode
         ;jvm-asm (semi-flatten (map ir-to-jvm (resolve-syms ir-list args)))
@@ -646,19 +645,19 @@
 (defun compile-function0 (name args expr)
   (def funlist (cons (compile1 (string name) args expr) funlist)))
 
-;(defmacro defun (name args expr)
-;  (list (quote compile-function0)
-;        (list (quote quote) name)
-;        (list (quote quote) args)
-;        (list (quote quote) expr)))
+(defmacro defun (name args expr)
+  (list (quote compile-function0)
+        (list (quote quote) name)
+        (list (quote quote) args)
+        (list (quote quote) expr)))
 
-;(include "lateral.lisp")
+(include "lateral.lisp")
 
 ;(print "writing binary...")
-;(write-bytes
-;  "LateralB.class"
-;  (flatten
-;    (class-headers
-;      "Lateral"
-;      "java/lang/Object"
-;      (reverse funlist))))
+(write-bytes
+  "LateralB.class"
+  (flatten
+    (class-headers
+      "Lateral"
+      "java/lang/Object"
+      (reverse funlist))))

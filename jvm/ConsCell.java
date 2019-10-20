@@ -52,7 +52,10 @@ class ConsCell {
 
     @Override
     public int hashCode() {
-        int hash = car.hashCode();
+        int hash = 0;
+        if(car != null) {
+            hash += car.hashCode();
+        }
         if(cdr != null) {
             hash += cdr.hashCode();
         }

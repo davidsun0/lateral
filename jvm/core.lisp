@@ -142,6 +142,13 @@
 ;      tree)
 ;    acc))
 
+;(defun flatten0 (tree acc)
+;  (cond
+;    (nil? tree) acc
+;    (not (list? tree)) tree
+;    (list? (first tree)) (flatten0 (rest tree) (flatten0 (first tree) acc))
+;    t (flatten0 (rest tree) (cons (first tree) acc))))
+
 ;(defun flatten (tree)
 ;  (reverse (flatten0 tree nil)))
 
