@@ -27,7 +27,8 @@ class Helper {
             s = s.replace("\\\"", "\"");
             return s;
         } else if(s.charAt(0) == ':') {
-            return new Keyword(s);
+            return new Keyword(s.substring(1));
+            //return new Keyword(s);
         } else if(s.length() > 2 && s.charAt(0) == '0' && s.charAt(1) == 'x') {
             return Integer.parseInt(s.substring(2), 16);
         } else if(48 <= s.charAt(0) && s.charAt(0) < 58) {

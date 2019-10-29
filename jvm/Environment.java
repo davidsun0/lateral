@@ -2,7 +2,7 @@ import java.util.HashMap;
 
 class Environment {
     HashMap<Object, Object> map;
-    Environment outer;
+    private Environment outer;
 
     public Environment() {
         map = new HashMap<>();
@@ -19,14 +19,31 @@ class Environment {
         this.outer = e;
     }
 
+    public HashMap<Object, Object> getMap() {
+        return map;
+    }
+
     public Object get(Object key) {
-        if(map.containsKey(key)) {
-            return new ConsCell(map.get(key), new ConsCell(Boolean.TRUE, null));
-        } else if(outer != null) {
-            return outer.get(key);
-        } else {
-            throw new RuntimeException(
-                    String.format("Key %s not found in environment", key));
+        Environment e = this;
+        while(e != null) {
+            if(e.map.containsKey(key)) {
+                return new ConsCell(e.map.get(key),
+                        new ConsCell(Boolean.TRUE, null));
+            }
+            e = e.outer;
         }
+        throw new RuntimeException(
+                String.format("Key %s not found in environment", key));
+    }
+
+    public boolean contains(Object key) {
+        Environment e = this;
+        while(e != null) {
+            if(e.map.containsKey(key)) {
+                return true;
+            }
+            e = e.outer;
+        }
+        return false;
     }
 }

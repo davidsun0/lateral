@@ -35,13 +35,11 @@ public class Lang {
                 arglist = arglist0.toArray();
             } else {
                 arglist = new Object[m.getParameterCount()];
-                // System.out.println(m.getParameterCount());
                 for(int i = 0; i < m.getParameterCount(); i ++) {
                     arglist[i] = car(a);
                     a = (ConsCell)cdr(a);
                 }
             }
-
             try{
                 if(m.isVarArgs())
                     return m.invoke(null, (Object) arglist);
@@ -58,7 +56,7 @@ public class Lang {
                 System.out.println("error occured while invoking method " + m);
                 c.printStackTrace();
             }
-            throw new RuntimeException("failed to invoke method");
+            throw new RuntimeException("failed to invoke method " + m);
         } else {
             throw new TypeError(String.format("can't invoke %s as function",
                         function));
@@ -86,6 +84,40 @@ public class Lang {
             return null;
         }
         throw new TypeError();
+    }
+
+    public static Object slurp(Object s) {
+        if(!(s instanceof String))
+            throw new TypeError();
+
+        try{
+            String path = (String)s;
+            String content = new String(Files.readAllBytes(Paths.get(path)));
+            return content;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static Object include(Object s) {
+        if(!(s instanceof String))
+            throw new TypeError();
+
+        try {
+            String path = (String)s;
+            String content = new String(Files.readAllBytes(Paths.get(path)));
+            Object tokens = Lateral.tokenize(content, 0, 0, null, null);
+            Object envir = Runtime.getUserEnvir();
+            ConsCell expr;
+            while((expr = (ConsCell)Lateral.readForm(tokens)) != null) {
+                Lateral.apply(car(expr), envir);
+                tokens = Lateral.nth(1, expr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public static Object flatten(Object tree) {
@@ -235,24 +267,24 @@ public class Lang {
         if(o == null || o == Boolean.TRUE) {
             return o;
         } else if(o instanceof Symbol) {
-            return new Keyword(":symbol");
+            return new Keyword("symbol");
         } else if(o instanceof Integer) {
-            return new Keyword(":int");
+            return new Keyword("int");
         } else if(o instanceof String) {
-            return new Keyword(":string");
+            return new Keyword("string");
         } else if(o instanceof Character) {
-            return new Keyword(":char");
+            return new Keyword("char");
         } else if(o instanceof Keyword) {
-            return new Keyword(":keyword");
+            return new Keyword("keyword");
         } else if(o instanceof ConsCell) {
-            return new Keyword(":list");
+            return new Keyword("list");
         } else if(o instanceof HashMap) {
-            return new Keyword(":hashmap");
+            return new Keyword("hashmap");
         } else if(o instanceof Lambda) {
             if(((Lambda)o).isMacro) {
-                return new Keyword(":macro");
+                return new Keyword("macro");
             } else {
-                return new Keyword(":function");
+                return new Keyword("function");
             }
         } else {
             System.out.println(o.getClass());
@@ -260,7 +292,7 @@ public class Lang {
         }
     }
 
-    protected static Object contains_p(Object h, Object k) {
+    public static Object contains_p(Object h, Object k) {
         if(h instanceof HashMap) {
             HashMap map = (HashMap)h;
             if(map.containsKey(k)) {
@@ -270,7 +302,7 @@ public class Lang {
             }
         } else if(h instanceof Environment) {
             Environment e = (Environment)h;
-            if(e.map.containsKey(k)) {
+            if(e.contains(k)) {
                 return Boolean.TRUE;
             } else {
                 return null;
@@ -282,7 +314,7 @@ public class Lang {
         }
     }
 
-    public static Object get(Object h, Object k) {
+    public static Object get0(Object h, Object k) {
         if(h instanceof HashMap) {
             HashMap map = (HashMap)h;
             if(map.containsKey(k)) {
@@ -296,6 +328,11 @@ public class Lang {
         } else {
             throw new TypeError();
         }
+    }
+
+    // remove when not needed by lateral
+    public static Object get(Object h, Object k) {
+        return get0(h, k);
     }
 
     public static Object insert_b(Object h, Object k, Object v) {
@@ -312,6 +349,16 @@ public class Lang {
         }
     }
 
+    public static Object insert(Object h, Object k, Object v) {
+        if(h instanceof HashMap) {
+            HashMap map = (HashMap)h;
+            HashMap newMap = (HashMap)map.clone();
+            newMap.put(k, v);
+            return newMap;
+        } else {
+            throw new TypeError();
+        }
+    }
 
     public static Object make_envir(Object e) {
         if(e == null || e instanceof Environment) {
@@ -330,7 +377,7 @@ public class Lang {
         if(o instanceof Keyword) {
             return o;
         } else if(o instanceof String) {
-            s = ":" + (String)o;
+            s = (String)o;
         } else if(o instanceof Symbol) {
             s = ((Symbol)o).toString();
         } else {
@@ -350,29 +397,6 @@ public class Lang {
 
     public static Object readLine() {
         return scanner.nextLine() + "\n";
-    }
-
-    public static Object include(Object s) {
-        if(!(s instanceof String))
-            throw new TypeError();
-
-        try {
-            String path = (String)s;
-            String content = new String(Files.readAllBytes(Paths.get(path)));
-            Object tokens = Lateral.tokenize(content, 0, 0, null, null);
-            Object envir = Runtime.getUserEnvir();
-            ConsCell expr;
-            while((expr = (ConsCell)Lateral.readForm(tokens)) != null) {
-                //println(Lateral.apply(car(expr), envir));
-                //System.out.println("next form: ");
-                //println(car(expr));
-                Lateral.apply(car(expr), envir);
-                tokens = Lateral.nth(1, expr);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 
     public static Object whitespace_p(Object c) {
@@ -440,8 +464,10 @@ public class Lang {
             System.out.printf("'%c'", ((Character)o).charValue());
         } else if(o instanceof String) {
             System.out.print("\"" + o + "\"");
+        } else if(o instanceof Keyword) {
+            System.out.print(":" + o);
         } else if(o instanceof Method) {
-            System.out.print("<native-fn-m>");
+            System.out.print("<native-fn>");
         } else {
             System.out.print(o.toString());
         }
@@ -449,45 +475,42 @@ public class Lang {
         return null;
     }
 
-    public static Object pprint(Object o) {
+    public static Object pprint0(Object o) {
         if(o == null) {
             System.out.print("nil");
         } else if(o instanceof ConsCell) {
             ConsCell c = (ConsCell) o;
             System.out.print("(");
             while(c != null) {
-                print(c.getCar());
+                pprint0(c.getCar());
                 if(c.getCdr() != null)
                     System.out.print(" ");
                 c = c.getCdr();
             }
             System.out.print(")");
+        } else if(o instanceof Keyword) {
+            System.out.print(":" + o);
         } else if(o instanceof Method) {
-            System.out.print("<native-fn-m>");
+            System.out.print("<native-fn>");
         } else {
             System.out.print(o.toString());
         }
         return null;
     }
 
-    public static Object printV(Object... objs) {
-        System.out.println("printV " + objs.length);
-        for(int i = 0; i < objs.length; i ++) {
-            pprint(objs[i]);
-            if(i != objs.length - 1) {
-                System.out.print(" ");
-            }
-        }
-        System.out.println();
-        return null;
+    // to delete when not used by Lateral
+    public static Object pprint(Object o) {
+        return pprint0(o);
     }
 
+    // to delete when not used by Lateral
     public static Object print(Object o) {
         print0(o);
         System.out.println();
         return null;
     }
 
+    // to delete when not used by Lateral
     public static Object println(Object o) {
         return print(o);
     }
@@ -653,11 +676,16 @@ public class Lang {
         }
     }
 
-    public static ConsCell cons(Object c, Object l) {
+    public static Object cons0(Object c, Object l) {
         if(l == null || l instanceof ConsCell) {
             return new ConsCell(c, (ConsCell)l);
         } else {
             throw new TypeError("cons expects type ConsCell, but got " + l.getClass());
         }
+    }
+
+    // to delete when not used by Lateral
+    public static Object cons(Object c, Object l) {
+        return cons0(c, l);
     }
 }

@@ -35,7 +35,8 @@
                  (cons (first listb) (cons (first lista) acc)))
 
     (or lista listb)
-    (print "error: unmatched interleave arguments")
+    (progn (print lista) (print listb) (print acc)
+    (print "error: unmatched interleave arguments"))
 
     t (reverse acc)))
 
@@ -175,7 +176,9 @@
     env))
 
 (defun lambda-apply (func args env)
-  (let (sym-binds (interleave (get-args func) args)
+  (let (;_ (print func)
+        ;_ (print args)
+        sym-binds (interleave (get-args func) args)
         bind-envir (lambda-bind sym-binds (make-envir env)))
     (apply (get-expr func) bind-envir)))
 
@@ -229,7 +232,7 @@
     (if (= (length ast) 3)
       (let (val (apply (nth 2 ast) env))
         (progn
-          (insert! (user-envir) (second ast) (apply (nth 2 ast) env))
+          (insert! (user-envir) (second ast) val)
           val))
       (print "def expects two arguments"))
 
