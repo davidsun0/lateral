@@ -569,11 +569,21 @@ public class Lang {
         return Integer.valueOf(sum);
     }
 
+    public static Object add0(Object a, Object b) {
+        if(a instanceof Integer && b instanceof Integer) {
+            return Integer.valueOf(((Integer)a) + ((Integer)b));
+        } else {
+            throw new TypeError("add0" + a + " " + b);
+        }
+    }
+
     public static Object integer(Object o) {
         if(o instanceof Character) {
             return Integer.valueOf(((Character)o).charValue());
         } else if(o instanceof Integer) {
             return o;
+        } else if(o instanceof String) {
+            return Integer.parseInt((String)o);
         } else {
             throw new TypeError("integer");
         }

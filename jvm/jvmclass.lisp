@@ -62,7 +62,7 @@
 (defun pool-get (constpool expr)
   (let (expr (if (string? expr) (list :utf8 expr) expr)
         tag (first expr)
-        ;_ (print expr))
+        _ (print expr)
         )
     (cond
       (equal? tag :utf8)
@@ -92,9 +92,9 @@
 (insert-method "first" "Lang" "car" 1)
 ;(insert-method "rest" "Lang" "rest" 1)
 (insert-method "rest" "Lang" "cdr" 1)
-;(insert-method "cons" "Lang" "cons" 2)
-(insert! method-list "cons"
-         (list "Lang" "cons" "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;"))
+(insert-method "cons" "Lang" "cons" 2)
+;(insert! method-list "cons"
+;         (list "Lang" "cons" "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;"))
 
 (insert-method "contains?" "Lang" "contains_p" 2)
 
@@ -625,7 +625,8 @@
     ; add class and parent to constant pool
     (pool-get pool (list :classref name))
     (pool-get pool (list :classref parent))
-    ; (map print (reverse pool-list))
+    (map print (reverse pool-list))
+    (print pool)
     (list
       0xCA 0xFE 0xBA 0xBE ; java magic number
       0x00 0x00 0x00 0x37 ; java version 55.0 (Java 11)

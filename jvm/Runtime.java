@@ -41,6 +41,9 @@ public class Runtime {
         userTable.put(new Symbol("t"), Boolean.TRUE);
 
         try {
+            userTable.put(new Symbol("read-atom0"),
+                    Helper.class.getMethod("readAtom", Object.class));
+
             userTable.put(new Symbol("+"), Lang.class.getMethod("add",
                         Object[].class));
             userTable.put(new Symbol("-"), Lang.class.getMethod("subtract",
@@ -79,6 +82,14 @@ public class Runtime {
 
     public static Object getUserEnvir() {
         return userEnvir;
+    }
+
+    public static Object envir_set(Object name, Object val) {
+        return Lang.insert_b(userEnvir, name, val);
+    }
+
+    public static Object envir_get(Object name) {
+        return Lang.car(Lang.get0(userEnvir, name));
     }
 
     public static Object load_class(Object bl) {

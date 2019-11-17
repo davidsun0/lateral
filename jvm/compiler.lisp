@@ -10,24 +10,23 @@
 (defun semi-flatten (in)
   (reverse (semi-flatten0 in nil)))
 
-(def *gensym-count* 0)
-(defun gensym (prefix)
-  (keyword (string prefix (def *gensym-count* (inc *gensym-count*)))))
-
 (defun progn-deflate (name expr acc)
   (if expr
-    (progn-deflate name
-                   (rest expr)
-                   (cons (list (if (rest expr)
-                                 (list :pop)
-                                 (cons nil nil))
-                               (ir0 (if (rest expr) nil name) (first expr) nil))
-                         acc))
+    (progn-deflate
+      name
+      (rest expr)
+      (cons
+        (list
+          (if (rest expr)
+            (list :pop)
+            (cons nil nil))
+          (ir0 (if (rest expr) nil name)
+               (first expr) nil))
+         acc))
     acc))
 
 (defun or-deflate (name end-lab expr acc)
   (if expr
-    (progn (print (ir0 nil (first expr) nil))
     (or-deflate name
                 end-lab
                 (rest expr)
@@ -36,7 +35,7 @@
                       (list :jump-not-nil end-lab)
                       (list :dup)
                       (ir0 nil (first expr) nil))
-                acc)))
+                acc))
     (cons (list (if name
                   (list :return)
                   (cons nil nil))
@@ -64,22 +63,22 @@
                   (list :goto end-lab))
             acc))))
 
-(defun cond-deflate0 (name expr test-lab end-lab acc)
+(defun cond-deflate (name expr test-lab end-lab acc)
   (if expr
     (let (test     (first expr)
           branch   (second expr)
           next-lab (gensym "cond-"))
-      (cond-deflate0 name (rest (rest expr)) next-lab end-lab
-                     (cons (list (if name
-                                   (cons nil nil)
-                                   (list :goto end-lab))
-                                 (ir0 name branch nil)
-                                 (list :jump-if-nil next-lab)
-                                 (ir0 nil test nil)
-                                 (if test-lab
-                                   (list :label test-lab)
-                                   (cons nil nil)))
-                           acc)))
+      (cond-deflate name (rest (rest expr)) next-lab end-lab
+                    (cons (list (if name
+                                  (cons nil nil)
+                                  (list :goto end-lab))
+                                (ir0 name branch nil)
+                                (list :jump-if-nil next-lab)
+                                (ir0 nil test nil)
+                                (if test-lab
+                                  (list :label test-lab)
+                                  (cons nil nil)))
+                          acc)))
     (cons (list (if name
                   (list :return)
                   (cons nil nil))
@@ -155,7 +154,7 @@
     (or-deflate name (gensym "or-e") (rest ast) nil)
 
     (equal? (first ast) (quote cond))
-    (cond-deflate0 name (rest ast) nil (gensym "cond-e") nil)
+    (cond-deflate name (rest ast) nil (gensym "cond-e") nil)
 
     (equal? (first ast) (quote progn))
     (progn-deflate name (rest ast) nil)
@@ -164,7 +163,12 @@
     (let-deflate name (rest ast))
 
     (equal? (first ast) (quote quote))
-    (list (list :push :symbol (second ast)))
+    (list (list :push :quote (second ast)))
+
+    (equal? (first ast) (quote def))
+    (progn (print "def deflate")
+    (cons (list :evir-store (second ast))
+          (ir0 nil (nth 2 ast) nil)))
 
     (equal? (first ast) name)
     (cons (list :tail-recur :argc (dec (length ast)))
@@ -247,14 +251,18 @@
                     idx (if letidx
                           (+ (length arglist) letidx)
                           (index (nth 1 expr) arglist)))
-              (if idx
-                (list :push :arg-num idx)
-                (list :push :envir-sym (nth 1 expr))))
+                (if idx
+                  (list :push :arg-num idx)
+                  (list :push :envir-sym (nth 1 expr))))
 
               t expr)
             acc))))
     (list :asdfasdf acc)))
 
 (defun resolve-syms (ir-list arglist)
+  (let (a (resolve-syms0 ir-list arglist nil nil))
+    (reverse (second a))))
+
+(defun resolve-syms2 (arglist ir-list)
   (let (a (resolve-syms0 ir-list arglist nil nil))
     (reverse (second a))))
