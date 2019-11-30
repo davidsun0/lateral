@@ -163,7 +163,8 @@
     (let-deflate name (rest ast))
 
     (equal? (first ast) (quote quote))
-    (list (list :push :quote (second ast)))
+    ;(list (list :push :quote (second ast)))
+    (list (list :push :symbol (second ast)))
 
     (equal? (first ast) (quote def))
     (progn (print "def deflate")

@@ -63,6 +63,30 @@ public class Lang {
         }
     }
 
+    protected static Object readAtom(Object a) {
+        if(a == null || !(a instanceof String)) {
+            throw new TypeError("readAtom expects non-null string argument");
+        }
+        String s = (String)a;
+        if(s.length() > 1 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+            s = s.substring(1, s.length() - 1);
+            s = s.replace("\\\\", "\\");
+            s = s.replace("\\n", "\n");
+            s = s.replace("\\\"", "\"");
+            return s;
+        } else if(s.charAt(0) == ':') {
+            return new Keyword(s.substring(1));
+        } else if(s.length() == 3 && "#\\".equals(s.substring(0, 2))) {
+            return Character.valueOf(s.charAt(2));
+        } else if(s.length() > 2 && s.charAt(0) == '0' && s.charAt(1) == 'x') {
+            return Integer.parseInt(s.substring(2), 16);
+        } else if(48 <= s.charAt(0) && s.charAt(0) < 58) {
+            return Integer.parseInt(s);
+        } else {
+            return new Symbol(s);
+        }
+    }
+
     public static Object write_bytes(Object p, Object b) {
         if(p instanceof String && b instanceof ConsCell) {
             String path = (String)p;
@@ -200,9 +224,18 @@ public class Lang {
         }
     }
 
-    protected static Object lambda(Object a, Object e) {
-        if(a == null || a instanceof ConsCell) {
-            return new Lambda((ConsCell)a, e, false);
+    protected static Object lambda(Object params, Object expr) {
+        if(params == null || params instanceof ConsCell) {
+            return new Lambda((ConsCell)params, expr, false);
+        } else {
+            throw new TypeError();
+        }
+    }
+
+    protected static Object lambda(Object params, Object expr,
+            Environment envir) {
+        if(params == null || params instanceof ConsCell) {
+            return new Lambda((ConsCell)params, expr, false);
         } else {
             throw new TypeError();
         }
@@ -395,6 +428,20 @@ public class Lang {
         return sb.toString();
     }
 
+    public static Object string0(Object args) {
+        if(args instanceof ConsCell) {
+            ConsCell arglist = (ConsCell)args;
+            StringBuilder sb = new StringBuilder();
+            while(arglist != null) {
+                sb.append(arglist.getCar());
+                arglist = arglist.getCdr();
+            }
+            return sb.toString();
+        } else {
+            throw new TypeError();
+        }
+    }
+
     public static Object readLine() {
         return scanner.nextLine() + "\n";
     }
@@ -498,19 +545,19 @@ public class Lang {
         return null;
     }
 
-    // to delete when not used by Lateral
+    // TODO: to delete when not used by Lateral
     public static Object pprint(Object o) {
         return pprint0(o);
     }
 
-    // to delete when not used by Lateral
+    // TODO: to delete when not used by Lateral
     public static Object print(Object o) {
         print0(o);
         System.out.println();
         return null;
     }
 
-    // to delete when not used by Lateral
+    // TODO: delete when not used by Lateral
     public static Object println(Object o) {
         return print(o);
     }
@@ -539,6 +586,18 @@ public class Lang {
         return Boolean.TRUE;
     }
 
+    public static Object less_than0(Object a, Object b) {
+        if(!(a instanceof Integer && b instanceof Integer)) {
+            throw new TypeError();
+        }
+
+        if((Integer)a >= (Integer)b) {
+            return null;
+        } else {
+            return Boolean.TRUE;
+        }
+    }
+
     public static Object subtract(Object ... args) {
         int diff = (Integer)args[0];
         if(args.length == 1) {
@@ -563,6 +622,7 @@ public class Lang {
             if(term instanceof Integer) {
                 sum += (Integer)term;
             } else {
+                System.out.print(term.getClass());
                 throw new TypeError("addition expects integers");
             }
         }
@@ -572,6 +632,14 @@ public class Lang {
     public static Object add0(Object a, Object b) {
         if(a instanceof Integer && b instanceof Integer) {
             return Integer.valueOf(((Integer)a) + ((Integer)b));
+        } else {
+            throw new TypeError("add0" + a + " " + b);
+        }
+    }
+
+    public static Object subtract0(Object a, Object b) {
+        if(a instanceof Integer && b instanceof Integer) {
+            return Integer.valueOf(((Integer)a) - ((Integer)b));
         } else {
             throw new TypeError("add0" + a + " " + b);
         }
@@ -616,6 +684,7 @@ public class Lang {
         }
     }
 
+    //TODO: remove after no longer needed by lateral.lisp
     public static Object inc(Object o) {
         if(o instanceof Integer) {
             return Integer.valueOf(((Integer)o).intValue() + 1);
@@ -624,6 +693,7 @@ public class Lang {
         }
     }
 
+    //TODO: remove after no longer needed by lateral.lisp
     public static Object dec(Object o) {
         if(o instanceof Integer) {
             return Integer.valueOf(((Integer)o).intValue() - 1);

@@ -1,4 +1,5 @@
 ; runtime list
+; TODO: move to Runtime.java
 (def list (lambda (:rest l) l))
 
 (defmacro defun (name args expr)
@@ -6,11 +7,16 @@
         name
         (list (quote lambda) args expr)))
 
+;(defmacro defun (name args expr)
+;  `(def ,name (lambda ,args ,expr))
+
+; TODO: move to Runtime.java
 (defun cons1 (in acc)
   (if in
     (cons1 (rest in) (cons0 (first in) acc))
     acc))
 
+; TODO: move to Runtime.java
 (defun cons (:rest l)
   (let (rl (reverse l))
     (cons1 (rest rl) (first rl))))
@@ -55,6 +61,7 @@
                    (cons (list (quote equal?) (first exprs) term)
                          acc)))))
 
+;; bug in case when nil in a case list
 (defun case0 (term exprs acc)
   (cond
     (not exprs) (reverse acc)
@@ -114,12 +121,16 @@
     (map (lambda (x) (progn (pprint0 x) (pprint0 " "))) args)
     (pprint0 "\n")))
 
+(defun print-iden (x)
+  (progn
+    (print x)
+    x))
 ; optional arguments?
 (defun get (hmap key :rest missing)
   (cond
     (nil? missing) (get0 hmap key)
     (second (get0 hmap key)) (first (get0 hmap key))
-    t (car missing)))
+    t (first missing)))
 
 ;(defun write-bytes (path bytes)
 ;  (print
@@ -145,9 +156,7 @@
 
 (defun map0 (fn in acc)
   (if in
-    (map0 fn
-          (rest in)
-          (cons (fn (first in)) acc))
+    (map0 fn (rest in) (cons (fn (first in)) acc))
     acc))
 
 (defun map (fn in)
@@ -158,9 +167,7 @@
 
 (defun reduce0 (fn in acc)
   (if in
-    (reduce0 fn
-             (rest in)
-             (fn acc (first in)))
+    (reduce0 fn (rest in) (fn acc (first in)))
     acc))
 
 (defun reduce (fn in)
@@ -169,22 +176,34 @@
            (fn (first in) (nth 1 in))))
 
 (defun filter0 (pred in acc)
-  (if in
-    (if (not (pred (first in)))
-      (filter0 pred (rest in) acc)
-      (filter0 pred (rest in) (cons (first in) acc)))
-  acc))
+  (cond
+    (not in) acc
+    (pred (first in)) (filter0 pred (rest in) (cons (first in) acc))
+    t (filter0 pred (rest in) acc)))
 
 (defun filter (pred in)
   (reverse (filter0 pred in nil)))
 
+(defun foldl (fun acc in)
+  (if in
+    (foldl fun (fun acc (first in)) (rest in))
+    acc))
+
+(defun max (:rest in)
+  (if (rest in)
+    (reduce (lambda (a b) (if (< a b) b a)) in)
+    (first in)))
+
 ;; list functions
 
 (defun second (in)
-  (nth 1 in))
+  (first (rest in)))
 
 (defun third (in)
-  (nth 2 in))
+  (first (rest (rest in))))
+
+(defun fourth (in)
+  (first (rest (rest (rest in)))))
 
 (defun length0 (in acc)
   (if in

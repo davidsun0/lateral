@@ -1,14 +1,67 @@
+;; expands macros, part1
+(defun ast-analysis0 (in)
+  (if (list? in)
+    (ast-analysis1 in nil)
+    in))
+
+;; expands macros, part2
+(defun ast-analysis1 (in acc)
+  (cond
+    (nil? in) (reverse acc)
+
+    (and (nil? acc) (contains? macros (first in)))
+    (ast-analysis0 (macro-expand (get macros nil) in))
+
+    t (ast-analysis1 (rest in) (cons (ast-analysis0 (first in)) acc))))
+
+;; extracts lambdas
+(defun lambda-extr0 (in lambdas)
+  (if (list? in)
+    (lambda-extr1 in nil nil)
+    (list in nil)))
+
+;; extracts lambdas, part2
+(defun lambda-extr1 (in acc lambdas)
+  (cond
+    (nil? in) (cons (reverse acc) lambdas)
+    (and (nil? acc) (equal? (quote quote) (first in))) (list in)
+
+    (and (nil? acc) (equal? (quote lambda) (first in)))
+    (let (l-name (gensym "lambda"))
+      ;; TODO: handle nested lambdas
+      (cons l-name (cons l-name (rest in)) lambdas))
+
+    t
+    (let (e-l (lambda-extr0 (first in) nil)
+          expr (first e-l)
+          lamb (second e-l))
+      (lambda-extr1 (rest in)
+                    (cons expr acc)
+                    (if (nil? lamb)
+                      lambdas
+                      (cons lamb lambdas))))))
+
 ;;; reduces a tree to a list of lists
 (defun semi-flatten0 (in acc)
-  (if in
-    (if (and (list? (first in))
-             (list? (first (first in))))
-      (semi-flatten0 (rest in) (semi-flatten0 (first in) acc))
-      (semi-flatten0 (rest in) (cons (first in) acc)))
-    acc))
+  (cond
+    (nil? in) acc
+
+    (and (list? (first in)) (list? (first (first in))))
+    (semi-flatten0 (rest in) (semi-flatten0 (first in) acc))
+
+    t (semi-flatten0 (rest in) (cons (first in) acc))))
 
 (defun semi-flatten (in)
   (reverse (semi-flatten0 in nil)))
+
+;; macro for x-deflate
+;`(defun ,fname (name args largs expr acc ,@(vars))
+;   (if expr
+;     (,fname name args largs
+;             ,expr-mod
+;             ,acc-mod
+;             ,@(vars-mod))
+;     (cons ,acc-add acc)))
 
 (defun progn-deflate (name args largs expr acc)
   (if expr
@@ -109,11 +162,7 @@
     (list :let-pop (gensym "letp") (length args))
     (ir0 name args largs (second expr) nil)
     (list :local-count (gensym "letc") (+ (length args) (length largs)))
-    ;(list :let-body)
-    ;(let-deflate0 args largs (first expr) nil)
-    bind-ir
-    ;(list :let-bind)
-    )))
+    bind-ir)))
 
 ;; iterates along list, resolving nested lists with ir0
 (defun ir1 (args largs ast acc)
@@ -138,10 +187,9 @@
                (index (first ast) args)
                (list :push :arg-num (index (first ast) args))
 
-               t ;(list :push :envir (first ast))
+               t
                (list (list :funcall :envir-get :argc 1)
-                     (list :push :symbol (first ast)))
-               )
+                     (list :push :symbol (first ast))))
            (list
              :push
              (cond
@@ -199,13 +247,15 @@
     (progn-deflate name args largs (rest ast) nil)
 
     (equal? (first ast) (quote let))
-    ;(let-deflate name args largs (rest ast))
     (let-deflate name (concat args largs) nil (rest ast))
 
     (equal? (first ast) (quote quote))
     ;(list (list :push :quote (second ast)))
     (list (if name (list :return) (list nil))
       (list :push :symbol (second ast)))
+
+    (equal? (first ast) (quote lambda))
+    (list (list :lambda ast))
 
     ;; TODO: check arg is symbol
     (equal? (first ast) (quote def))
@@ -230,5 +280,6 @@
           (ir1 args largs (rest ast) nil))))
 
 (defun ir (name args ast)
+  ; remove '(nil) generated in ir0
   (filter first
     (reverse (semi-flatten (ir0 name args nil ast nil)))))

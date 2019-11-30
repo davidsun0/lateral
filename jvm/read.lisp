@@ -2,14 +2,14 @@
 (def *read-tail* 0)
 (def *read-str* nil)
 
-;(defun r-peek (off)
-;  (if *read-str*
-;    (->> (+ *read-pos* off)
-;         (char-at *read-str*))))
-
 (defun r-peek (off)
   (if *read-str*
-    (char-at *read-str* (+ *read-pos* off))))
+    (->> (+ *read-pos* off)
+         (char-at *read-str*))))
+
+;(defun r-peek (off)
+;  (if *read-str*
+;    (char-at *read-str* (+ *read-pos* off))))
 
 (defun r-next! ()
   (let (x (r-peek 0))
@@ -73,6 +73,7 @@
   (let (ch (r-peek 0))
     (cond
       (nil? ch) (print "unexpected eof")
+      (whitespace? ch) (progn (r-next!) (read-list acc))
       (equal? ch ")") (progn (r-next!) (reverse acc))
       t (read-list (cons (read-form) acc)))))
 

@@ -3,6 +3,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.NoSuchElementException;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -63,6 +64,8 @@ public class Runtime {
                         Object.class));
             userTable.put(new Symbol("load-class"), Runtime.class.getMethod(
                         "load_class", Object.class));
+            userTable.put(new Symbol("user-envir"), Runtime.class.getMethod(
+                        "getUserEnvir"));
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
@@ -116,7 +119,8 @@ public class Runtime {
             byteList = byteList.getCdr();
         }
 
-        Class c = classLoader.defineClass(bytes);
+        //Class c = classLoader.defineClass(bytes);
+        Class c = new FunctionLoader().defineClass(bytes);
 
         ConsCell output = new ConsCell(null, null);
         ConsCell curr = output;
@@ -137,5 +141,18 @@ public class Runtime {
 
     public static Object eval(Object expr) {
         return Lateral.apply(expr, userEnvir);
+    }
+
+    public static void main(String[] args) {
+        Lang.include("core.lisp");
+        while(true) {
+            try {
+                Lateral.main();
+            } catch (NoSuchElementException n) {
+                return;
+            } catch (RuntimeException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
