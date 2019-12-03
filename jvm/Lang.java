@@ -130,60 +130,6 @@ public class Lang {
         return null;
     }
 
-    /*
-    public static Object include(Object s) {
-        if(!(s instanceof String))
-            throw new TypeError();
-
-        try {
-            String path = (String)s;
-            String content = new String(Files.readAllBytes(Paths.get(path)));
-            Object tokens = Lateral.tokenize(content, 0, 0, null, null);
-            Object envir = Runtime.getUserEnvir();
-            ConsCell expr;
-            while((expr = (ConsCell)Lateral.readForm(tokens)) != null) {
-                Lateral.apply(car(expr), envir);
-                tokens = Lateral.nth(1, expr);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-    */
-
-    public static Object flatten(Object tree) {
-        if(tree == null || !(tree instanceof ConsCell)) {
-            return tree;
-        }
-        Object[] treeStack = new Object[256];
-        int stackTop = 0;
-        ConsCell output = new ConsCell(null, null);
-        ConsCell curr = output;
-        while(stackTop != 0 || tree != null) {
-            if(tree == null) {
-                stackTop --;
-                if(stackTop < 0) {
-                    System.out.println("flatten stack underflow");
-                    break;
-                }
-                else
-                    tree = treeStack[stackTop];
-            } else if(car(tree) != null && car(tree) instanceof ConsCell) {
-                treeStack[stackTop] = cdr(tree);
-                stackTop ++;
-                tree = car(tree);
-            } else {
-                curr.setCdr(new ConsCell(null, null));
-                curr = curr.getCdr();
-                curr.setCar(car(tree));
-
-                tree = cdr(tree);
-            }
-        }
-        return cdr(output);
-    }
-
     public static Object hashmap() {
         return new HashMap<Object, Object>();
     }
@@ -253,7 +199,6 @@ public class Lang {
     public static Object lambda_p(Object l) {
         if(l instanceof Lambda && !((Lambda)l).isMacro) {
             return Boolean.TRUE;
-        //} else if(l instanceof NativeFunction) {
         } else if(l instanceof Method) {
             return Boolean.TRUE;
         } else {
@@ -263,11 +208,7 @@ public class Lang {
 
     // native?
     public static Object native_p(Object fn) {
-        if(fn instanceof Method) {
-            return Boolean.TRUE;
-        } else {
-            return null;
-        }
+        return fn instanceof Method ? Boolean.TRUE : null;
     }
 
     protected static Object macro(Object a, Object e) {
@@ -288,19 +229,11 @@ public class Lang {
     }
 
     public static Object list_p(Object a) {
-        if(a instanceof ConsCell) {
-            return Boolean.TRUE;
-        } else {
-            return null;
-        }
+        return a instanceof ConsCell ? Boolean.TRUE : null;
     }
 
     public static Object symbol_p(Object a) {
-        if(a instanceof Symbol) {
-            return Boolean.TRUE;
-        } else {
-            return null;
-        }
+        return a instanceof Symbol ? Boolean.TRUE : null;
     }
 
     public static Object int_p(Object a) {
@@ -381,11 +314,6 @@ public class Lang {
         } else {
             throw new TypeError();
         }
-    }
-
-    // remove when not needed by lateral
-    public static Object get(Object h, Object k) {
-        return get0(h, k);
     }
 
     public static Object insert_b(Object h, Object k, Object v) {
@@ -687,24 +615,6 @@ public class Lang {
         }
     }
 
-    //TODO: remove after no longer needed by lateral.lisp
-    public static Object inc(Object o) {
-        if(o instanceof Integer) {
-            return Integer.valueOf(((Integer)o).intValue() + 1);
-        } else {
-            throw new TypeError("inc expects Integer, but got " + o.getClass());
-        }
-    }
-
-    //TODO: remove after no longer needed by lateral.lisp
-    public static Object dec(Object o) {
-        if(o instanceof Integer) {
-            return Integer.valueOf(((Integer)o).intValue() - 1);
-        } else {
-            throw new TypeError("dec expects Integer, but got " + o.getClass());
-        }
-    }
-
     public static Object equal_p(Object a, Object b) {
         if(a == b) {
             return Boolean.TRUE;
@@ -755,7 +665,8 @@ public class Lang {
         } else if(o instanceof ConsCell) {
             return ((ConsCell)o).getCdr();
         } else {
-            throw new TypeError("cdr expects type ConsCell, but got " + o.getClass());
+            throw new TypeError("cdr expects type ConsCell, but got " + o.getClass()
+                    + " " + o);
         }
     }
 
@@ -765,10 +676,5 @@ public class Lang {
         } else {
             throw new TypeError("cons expects type ConsCell, but got " + l.getClass());
         }
-    }
-
-    // to delete when not used by Lateral
-    public static Object cons(Object c, Object l) {
-        return cons0(c, l);
     }
 }

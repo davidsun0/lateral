@@ -47,7 +47,7 @@
   (cond
     (nil? haystack) nil
     (equal? needle (first haystack)) acc
-    (index0 needle (rest haystack) (inc acc))))
+    t (index0 needle (rest haystack) (inc acc))))
 
 (defun index (needle haystack)
   (index0 needle haystack 0))
@@ -58,6 +58,16 @@
 ;(defun cons (:rest l)
 ;  (let (rl (reverse l))
 ;    (reverse0 (rest rl) (first rl))))
+
+(defun flatten0 (tree acc)
+  (cond
+    (nil? tree) acc
+    (not (list? tree)) tree
+    (list? (first tree)) (flatten0 (rest tree) (flatten0 (first tree) acc))
+    t (flatten0 (rest tree) (cons (first tree) acc))))
+
+(defun flatten (tree)
+  (reverse (flatten0 tree nil)))
 
 (defun print1 (in)
   (if in
@@ -358,7 +368,7 @@
 ;       (map (lambda (x) (list 'quote x)))
 ;       (cons fun)
 ;       (eval)))
-
+(include "core.lisp")
 (defun main ()
   (progn
     (pprint0 "user>> ")
@@ -512,8 +522,7 @@
   (if bind-list
     (let (largs-new (if (index (first bind-list) largs)
                       largs
-                      (append largs (first bind-list)))
-          _ (print (first bind-list) largs-new))
+                      (append largs (first bind-list))))
       (let-deflate0 args
                     largs-new
                     (rest (rest bind-list))

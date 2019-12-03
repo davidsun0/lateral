@@ -1,9 +1,9 @@
-;(include "ir.lisp")
 (defun ir (name args ast)
   (->> (ir0 name args nil ast)
        (semi-flatten)
        (reverse)
        (filter first)))
+;(include "ir.lisp")
 
 (include "jvmtable.lisp")
 
@@ -31,8 +31,8 @@
 
 (defun const-to-bin (const-list)
   (case (first const-list)
-    :utf8 (concat (cons 0x01 (u2 (length (second const-list))))
-                  (map integer (to-chars (second const-list))))
+    :utf8 (cons 0x01 (u2 (length (to-chars (second const-list))))
+                (map integer (to-chars (second const-list))))
     :classref    (cons 0x07 (len1-attribs const-list))
     :string      (cons 0x08 (len1-attribs const-list))
     :fieldref    (cons 0x09 (len2-attribs const-list))
@@ -279,8 +279,6 @@
     (case (first expr)
       ;; set based on local tag info
       (:local-count :let-pop)
-      ;(list (if (< mloc (third expr))
-      ;        (third expr)
       (list (third expr)
             (insert! lablist (second expr) (third expr)))
 
@@ -303,8 +301,6 @@
                  cstack
                  (first acc))
         lablist (third acc)
-        ;_ (print cstack)
-        ;_ (print expr)
         )
     (case (first expr)
       ;; stack +1
@@ -583,17 +579,12 @@
                                  "([Ljava/lang/String;)V");)
         ;x (throw asdf)
         )
-    (write-bytes
-      (string classname ".class") ;"MyClass.class"
-      (flatten
-        (class-headers
-          cpool
-          classname
-          "java/lang/Object"
-          (cons cinitbin mainbin
-            (map 
-              (lambda (x) (compile1! cpool method-list x))
-              funs)))))))
+    (->> funs
+         (map (lambda (x) (compile1! cpool method-list x)))
+         (cons cinitbin mainbin)
+         (class-headers cpool classname "java/lang/Object")
+         (flatten)
+         (write-bytes (string classname ".class")))))
 
 (defun comp-expand (in macros)
   (if (list? in)

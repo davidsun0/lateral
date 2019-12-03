@@ -21,15 +21,6 @@
   (let (rl (reverse l))
     (cons1 (rest rl) (first rl))))
 
-(def *gensym-count* 0)
-(defun gensym (:rest prefix)
-  (->> (inc *gensym-count*)
-       (def *gensym-count*)
-       (string (if prefix
-                 (first prefix)
-                 "gsym"))
-       (symbol)))
-
 ;; clojure threading macros
 (defun ->0 (exprs acc)
   (if exprs
@@ -61,7 +52,7 @@
                    (cons (list (quote equal?) (first exprs) term)
                          acc)))))
 
-;; bug in case when nil in a case list
+;; bug when nil in a case list
 (defun case0 (term exprs acc)
   (cond
     (not exprs) (reverse acc)
@@ -74,9 +65,9 @@
     (case0 term
            (rest (rest exprs))
            (cons (second exprs)
-                 (cons (list (quote list-contains?)
-                             (list (quote quote) (first exprs))
-                             term)
+                 (cons (list (quote index)
+                             term
+                             (list (quote quote) (first exprs)))
                        acc)))
 
     ;; single term
@@ -109,6 +100,7 @@
   (progn
     (print x)
     x))
+
 ; optional arguments?
 (defun get (hmap key :rest missing)
   (cond
@@ -116,24 +108,6 @@
     (second (get0 hmap key)) (first (get0 hmap key))
     t (first missing)))
 
-;(defun write-bytes (path bytes)
-;  (print
-;    (string "write " (length bytes) "bytes to " path)))
-
-;(defun type (a)
-;  (cond
-;    (list? a)    :list
-;    (int? a)     :int
-;    (keyword? a) :keyword
-;    (string? a)  :string
-;    (char? a)    :char
-;    (symbol? a)  :symbol
-;    t            :unkown))
-(defun list? (o) (equal? (type o) :list))
-(defun int? (o) (equal? (type o) :int))
-(defun keyword? (o) (equal? (type o) :keyword))
-(defun string? (o) (equal? (type o) :string))
-(defun symbol? (o) (equal? (type o) :symbol))
 (defun char? (o) (equal? (type o) :char))
 
 ;; functional favorites
@@ -179,34 +153,6 @@
     (first in)))
 
 ;; list functions
-
-(defun second (in)
-  (first (rest in)))
-
-(defun third (in)
-  (first (rest (rest in))))
-
-(defun fourth (in)
-  (first (rest (rest (rest in)))))
-
-(defun length0 (in acc)
-  (if in
-    (length0 (rest in) (inc acc))
-    acc))
-
-(defun length (in)
-  (if (string? in)
-    (length0 (to-chars in) 0)
-    (length0 in 0)))
-
-(defun append (in obj)
-  (reverse (cons obj (reverse in))))
-
-(defun nth (n in)
-  (if (= n 0)
-    (first in)
-    (nth (dec n) (rest in))))
-
 (defun last (in)
   (if (rest in)
     (last (rest in))
@@ -217,20 +163,8 @@
     (reverse0 (rest in) (cons0 (first in) acc))
     acc))
 
-(defun reverse (in)
-  (reverse0 in nil))
-
 (defun concat (a b)
   (reverse0 (reverse a) b))
-
-(defun index0 (needle haystack acc)
-  (if haystack
-    (if (equal? needle (first haystack))
-      acc
-      (index0 needle (rest haystack) (inc acc)))))
-
-(defun index (needle haystack)
-  (index0 needle haystack 0))
 
 (defun repeat0 (key times acc)
   (if (< times 1)
@@ -251,36 +185,7 @@
 (defun xflatten (tree)
   (reverse (flatten0 tree nil)))
 
-(defun list-contains? (hay needle)
-  (cond
-    (nil? hay) nil
-    (equal? (first hay) needle) (first hay)
-    t (list-contains? (rest hay) needle)))
-
 ;; other functions, they might be useful
-
-(defun qsort0 (comp in pivot less same greater)
-  (if in
-    (let (term (first in)
-          c (comp term pivot))
-      (cond
-        (= c 0) (qsort0 comp (rest in) pivot less (cons term same) greater)
-        (< c 0) (qsort0 comp (rest in) pivot (cons term less) same greater)
-        (> c 0) (qsort0 comp (rest in) pivot less same (cons term greater))))
-    (list less same greater)))
-
-(defun qsort (comp in)
-  (if in
-    (let (pivot (first in)
-          asdf (rest in)
-          terms (qsort0 comp asdf pivot nil nil nil)
-          lesser (first terms)
-          same (cons pivot (second terms))
-          greater (nth 2 terms))
-      (if (nil? asdf)
-        (list pivot)
-        (concat (qsort comp lesser) (concat same (qsort comp greater)))))))
-
 (defun split0 (lst n acc)
   (if (> n 0)
     (split0 (rest lst) (dec n) (cons (first lst) acc))
