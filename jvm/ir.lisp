@@ -143,15 +143,20 @@
 
 (defun let-deflate0 (args largs bind-list acc)
   (if bind-list
-    (let (largs (if (list-contains? largs (first bind-list))
-                  largs
-                  (append largs (first bind-list))))
-    (let-deflate0 args
-                  largs
-                  (rest (rest bind-list))
-                  (cons (list :store (+ (length args) (index (first bind-list) largs)))
-                        (ir0 nil args largs (second bind-list) nil)
-                       acc)))
+    (let (largs-new (if (index (first bind-list) largs)
+                      largs
+                      (append largs (first bind-list))))
+      (let-deflate0 args
+                    largs-new
+                    (rest (rest bind-list))
+                    ;; store expression into local var
+                    (cons (list :store (+ (length args)
+                                          (index (first bind-list) largs-new)))
+                          ;; ir0 uses old largs because current bind var hasn't
+                          ;; been assigned yet
+                          ;; ir for expression
+                          (ir0 nil args largs (second bind-list) nil)
+                         acc)))
     (list largs acc)))
 
 (defun let-deflate (name args largs expr)

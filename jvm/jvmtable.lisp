@@ -89,21 +89,15 @@
 (insert-method "substr" "Lang" "substr" 3)
 (insert-method "whitespace?" "Lang" "whitespace_p" 1)
 
-;(insert-method "pprint" "Lang" "pprint" 1)
 (insert-method "pprint0" "Lang" "pprint0" 1)
-;(insert-method "println" "Lang" "println" 1)
-;(insert-method "print" "Lang" "println" 1)
 (insert-method "print0" "Lang" "print0" 1)
 
-;(insert-method "dec" "Lang" "dec" 1)
-;(insert-method "inc" "Lang" "inc" 1)
 (insert-method "=" "Lang" "isNumericallyEqual" 2)
 (insert-method "<" "Lang" "less_than0" 2)
 (insert-method "//" "Lang" "divide" 2)
 
 (insert-method "slurp" "Lang" "slurp" 1)
 (insert-method "readline" "Lang" "readLine" 0)
-;(insert-method "read-atom" "Helper" "readAtom" 1)
 (insert-method "read-atom0" "Helper" "readAtom" 1)
 (insert-method "make-lambda" "Lang" "lambda" 2)
 (insert-method "make-macro" "Lang" "macro" 2)
@@ -115,8 +109,11 @@
 
 (insert-method "native-invoke" "Lang" "nativeInvoke" 2)
 
-(insert-method "list?" "Lang" "list_p" 1)
+(insert-method "int?" "Lang" "int_p" 1)
+(insert-method "string?" "Lang" "string_p" 1)
+(insert-method "keyword?" "Lang" "keyword_p" 1)
 (insert-method "symbol?" "Lang" "symbol_p" 1)
+(insert-method "list?" "Lang" "list_p" 1)
 (insert-method "lambda?" "Lang" "lambda_p" 1)
 (insert-method "native-fn?" "Lang" "native_p" 1)
 (insert-method "macro?" "Lang" "macro_p" 1)

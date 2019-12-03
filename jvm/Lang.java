@@ -88,18 +88,24 @@ public class Lang {
     }
 
     public static Object write_bytes(Object p, Object b) {
+        System.out.println("writing bytes...");
         if(p instanceof String && b instanceof ConsCell) {
             String path = (String)p;
             ConsCell byteList = (ConsCell)b;
+            while(byteList != null) {
+                if(!(car(byteList) instanceof Integer)) {
+                    System.out.format("can't write %s as byte\n",
+                            car(byteList));
+                    return null;
+                }
+                byteList = byteList.getCdr();
+            }
+
+            byteList = (ConsCell)b;
             try (OutputStream ostream = new FileOutputStream(path)) {
                 while(byteList != null) {
-                    if(car(byteList) instanceof Integer) {
-                        int writeByte = (Integer)car(byteList);
-                        ostream.write(writeByte);
-                    } else {
-                        System.out.format("can't write %s as byte\n",
-                                car(byteList));
-                    }
+                    int writeByte = (Integer)car(byteList);
+                    ostream.write(writeByte);
                     byteList = byteList.getCdr();
                 }
             } catch (IOException e) {
@@ -124,6 +130,7 @@ public class Lang {
         return null;
     }
 
+    /*
     public static Object include(Object s) {
         if(!(s instanceof String))
             throw new TypeError();
@@ -143,6 +150,7 @@ public class Lang {
         }
         return null;
     }
+    */
 
     public static Object flatten(Object tree) {
         if(tree == null || !(tree instanceof ConsCell)) {
@@ -295,6 +303,18 @@ public class Lang {
         }
     }
 
+    public static Object int_p(Object a) {
+        return a instanceof Integer ? Boolean.TRUE : null;
+    }
+
+    public static Object string_p(Object a) {
+        return a instanceof String ? Boolean.TRUE : null;
+    }
+
+    public static Object keyword_p(Object a) {
+        return a instanceof Keyword ? Boolean.TRUE : null;
+    }
+
     // type
     public static Object type(Object o) {
         if(o == null || o == Boolean.TRUE) {
@@ -341,7 +361,7 @@ public class Lang {
                 return null;
             }
         } else {
-            println(h);
+            System.out.println(h);
             System.out.println(h.getClass());
             throw new TypeError();
         }
@@ -545,29 +565,12 @@ public class Lang {
         return null;
     }
 
-    // TODO: to delete when not used by Lateral
-    public static Object pprint(Object o) {
-        return pprint0(o);
-    }
-
-    // TODO: to delete when not used by Lateral
-    public static Object print(Object o) {
-        print0(o);
-        System.out.println();
-        return null;
-    }
-
-    // TODO: delete when not used by Lateral
-    public static Object println(Object o) {
-        return print(o);
-    }
-
     /*
      * NUMERICAL FUNCTIONS
      */
     public static Object less_than(Object ... args) {
         if(!(args[0] instanceof Integer)) {
-            println(args[0]);
+            System.out.println(args[0]);
             throw new TypeError("first arg of < is not int");
         }
 
@@ -633,7 +636,7 @@ public class Lang {
         if(a instanceof Integer && b instanceof Integer) {
             return Integer.valueOf(((Integer)a) + ((Integer)b));
         } else {
-            throw new TypeError("add0" + a + " " + b);
+            throw new TypeError("add0 " + a + " " + b);
         }
     }
 
@@ -641,7 +644,7 @@ public class Lang {
         if(a instanceof Integer && b instanceof Integer) {
             return Integer.valueOf(((Integer)a) - ((Integer)b));
         } else {
-            throw new TypeError("add0" + a + " " + b);
+            throw new TypeError("subtract0 " + a + " " + b);
         }
     }
 

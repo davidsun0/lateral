@@ -17,12 +17,10 @@ import java.lang.reflect.InvocationTargetException;
 
 public class Runtime {
     static Environment userEnvir;
-    static FunctionLoader classLoader;
 
     static {
-        classLoader = new FunctionLoader();
-
         HashMap<Object, Object> userTable = new HashMap<>(256);
+        userEnvir = new Environment(userTable);
 
         for (Method m : Lateral.class.getMethods()) {
             int mod = m.getModifiers();
@@ -60,8 +58,10 @@ public class Runtime {
             userTable.put(new Symbol("rest"), Lang.class.getMethod("cdr",
                         Object.class));
 
+            /*
             userTable.put(new Symbol("eval"), Runtime.class.getMethod("eval",
                         Object.class));
+                        */
             userTable.put(new Symbol("load-class"), Runtime.class.getMethod(
                         "load_class", Object.class));
             userTable.put(new Symbol("user-envir"), Runtime.class.getMethod(
@@ -69,7 +69,6 @@ public class Runtime {
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
-        userEnvir = new Environment(userTable);
     }
 
     private static String toLispName(String name) {
@@ -88,7 +87,10 @@ public class Runtime {
     }
 
     public static Object envir_set(Object name, Object val) {
-        return Lang.insert_b(userEnvir, name, val);
+        // behavior of insert_b is to return the hashmap/environment
+        // lisp behavior of def is to return the value
+        Lang.insert_b(userEnvir, name, val);
+        return val;
     }
 
     public static Object envir_get(Object name) {
@@ -119,7 +121,6 @@ public class Runtime {
             byteList = byteList.getCdr();
         }
 
-        //Class c = classLoader.defineClass(bytes);
         Class c = new FunctionLoader().defineClass(bytes);
 
         ConsCell output = new ConsCell(null, null);
@@ -139,12 +140,14 @@ public class Runtime {
        return output.getCdr();
     }
 
+    /*
     public static Object eval(Object expr) {
         return Lateral.apply(expr, userEnvir);
     }
+    */
 
     public static void main(String[] args) {
-        Lang.include("core.lisp");
+        // Lang.include("core.lisp");
         while(true) {
             try {
                 Lateral.main();

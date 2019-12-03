@@ -99,27 +99,11 @@
 (defmacro case (:rest terms)
   (case1 terms))
 
-;; basic utilities
-(defun not (p)
-  (if p nil t))
-
-(def nil? not)
-
-(defun inc (n)
-  (+ n 1))
-
-(defun dec (n)
-  (- n 1))
-
 (defun print (:rest args)
-  (progn
-    (map (lambda (x) (progn (print0 x) (pprint0 " "))) args)
-    (pprint0 "\n")))
+  (print1 args))
 
 (defun pprint (:rest args)
-  (progn
-    (map (lambda (x) (progn (pprint0 x) (pprint0 " "))) args)
-    (pprint0 "\n")))
+  (pprint1 args))
 
 (defun print-iden (x)
   (progn
@@ -215,13 +199,8 @@
     (length0 (to-chars in) 0)
     (length0 in 0)))
 
-(defun append0 (in obj acc)
-  (if in
-    (append0 (rest in) obj (cons (first in) acc))
-    (cons obj acc)))
-
 (defun append (in obj)
-  (reverse (append0 in obj nil)))
+  (reverse (cons obj (reverse in))))
 
 (defun nth (n in)
   (if (= n 0)
