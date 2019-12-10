@@ -1,9 +1,8 @@
 (defun ir (name args ast)
-  (->> (ir0 name args nil ast)
+  (->> (ir0 name args ast)
        (semi-flatten)
        (reverse)
        (filter first)))
-;(include "ir.lisp")
 
 (include "jvmtable.lisp")
 
@@ -32,7 +31,7 @@
 (defun const-to-bin (const-list)
   (case (first const-list)
     :utf8 (cons 0x01 (u2 (length (to-chars (second const-list))))
-                (map integer (to-chars (second const-list))))
+                (string-bytes (second const-list)))
     :classref    (cons 0x07 (len1-attribs const-list))
     :string      (cons 0x08 (len1-attribs const-list))
     :fieldref    (cons 0x09 (len2-attribs const-list))
@@ -125,7 +124,8 @@
       :jump-not-nil (cons :ifnonnull (rest expr))
       :tail-recur   (set-locals (dec (nth 2 expr)) 0 (list (list :goto :start)))
       ;TODO: figure out how to call function objects
-      ;:dynamcall    (funcall-resolve (cons :funcall "invoke" (rest expr)))
+      :dynamcall    (list (list :funcall 'list :argc (dec (third expr)))
+                          (cons :funcall 'invoke :argc (rest expr)))
       expr))
 
 ;; prepends start label to ir if there are tail recursive calls
@@ -196,7 +196,6 @@
                (list :nametyperef
                      (third in)
                      (fourth in)))
-         ;(print-iden)
          (pool-get! pool)
          (u2)
          (cons (first (get *bytecodes* (first in)))))
@@ -300,16 +299,15 @@
         mstack (if (< (first acc) cstack)
                  cstack
                  (first acc))
-        lablist (third acc)
-        )
+        lablist (third acc))
     (case (first expr)
       ;; stack +1
       (:aload :aconst_null :iconst :dup :getstatic :ldc)
       (list mstack (inc cstack) lablist)
 
       ;; stack -1
-      ;; gotos decrease the stack when jumping to another branch
-      ;; gotos to start keep the stack the same
+      ;; goto decreases the stack when jumping to another branch
+      ;; goto to start keeps the stack the same
       (:areturn :pop :astore :ifnull :ifnonnull :goto)
       (list mstack
             (if (equal? expr (quote (:goto :start)))
@@ -350,32 +348,43 @@
        (cons 0x07)))
 
 (defun sframe1 (offset last-local l-count s-count)
+  ;; https://docs.oracle.com/javase/specs/jvms/se11/html/jvms-4.html#jvms-4.7.4
   (let (obj (objvar-info pool))
-  (cond
-    ; same frame
-    (and (= last-local l-count) (= s-count 0) (< offset 64))
-    (list offset)
+    (cond
+      ;; same frame
+      (and (= s-count 0) (= last-local l-count) (< offset 64))
+      (list offset)
 
-    ;; these work in theory but not in practice
-    ; same locals 1 stack item
-    ;(and (= last-local l-count) (= s-count 1) (< offset 64))
-    ;(list (+ offset 64) objvar-info)
+      ;; same frame extended
+      (and (= s-count 0) (= last-local l-count))
+      (list 251 (u2 offset))
 
-    ; same locals 1 stack item extended
-    ;(and (= last-local l-count) (= s-count 1))
-    ;(list 247 (to-u2 offset) objvar-info)
+      ;; same locals 1 stack item
+      (and (= s-count 1) (= last-local l-count) (< offset 64))
+      (list (+ offset 64) obj)
 
-    ; chop frame
-    ;(and (= s-count 0) (< (- last-local l-count)
+      ;; same locals 1 stack item extended
+      (and (= s-count 1) (= last-local l-count))
+      (list 247 (u2 offset) obj)
 
-    ; full frame
-    t (list 0xFF (u2 offset)
-            (if (= l-count 0)
-              (list (u2 0))
-              (list (u2 l-count) (repeat obj l-count)))
-            (if (= s-count 0)
-              (list (u2 0))
-              (list (u2 s-count) (repeat obj s-count)))))))
+      ;; chop frame
+      (and (= s-count 0) (< l-count last-local) (< (- last-local l-count) 4))
+      (list (- 251 (- last-local l-count)) (u2 offset))
+
+      ;; append frame
+      (and (= s-count 0) (< last-local l-count) (< (- l-count last-local) 4))
+      (list (+ 251 (- l-count last-local))
+            (u2 offset)
+            (repeat obj (- l-count last-local)))
+
+      ;; full frame
+      t (list 0xFF (u2 offset)
+              (if (= l-count 0)
+                (list (u2 0))
+                (list (u2 l-count) (repeat obj l-count)))
+              (if (= s-count 0)
+                (list (u2 0))
+                (list (u2 s-count) (repeat obj s-count)))))))
 
 (defun sframe-resolve0 (poff ploc acc lstat)
   (progn ;(print poff ploc acc lstat)
@@ -473,6 +482,7 @@
       args
       (->> (ir name (filter symbol? args) expr)
            (check-tco)
+           (map print-iden)
            (map ir-to-jvm)
            (semi-flatten)
            (map (lambda (x) (funcall-resolve method-list x)))
@@ -560,6 +570,7 @@
                          (eval (list (quote lambda) (third x) (nth 3 x))))
                 ))
             macros)
+        _ (print "???")
         _ (print macro-list)
         ;; macroexpand
         funs (first splits)
@@ -569,15 +580,18 @@
         cpool (hashmap)
         ;; insert all functions into method-list
         _ (map (lambda (x) (insert-lambda! method-list classname x)) funs)
+        _ (print "cinitbin")
+        _ (print (cons 'progn etc))
         cinitbin (compile-special! cpool method-list "<clinit>" nil
                            (cons (quote progn) etc)
                            "()V")
+        _ (print "mainbin")
         mainbin 
         ;(if (get method-list "main" nil)
           (compile-special! cpool method-list "main" (quote (0))
                                  (quote (main))
                                  "([Ljava/lang/String;)V");)
-        ;x (throw asdf)
+        _ (print "Ready")
         )
     (->> funs
          (map (lambda (x) (compile1! cpool method-list x)))

@@ -52,6 +52,18 @@
 (defun index (needle haystack)
   (index0 needle haystack 0))
 
+(defun last-index0 (needle haystack curr idx)
+  (cond
+    (nil? haystack) idx
+
+    (equal? needle (first haystack))
+    (last-index0 needle (rest haystack) (inc curr) curr)
+
+    t (last-index0 needle (rest haystack) (inc curr) idx)))
+
+(defun last-index (needle haystack)
+  (last-index0 needle haystack 0 nil))
+
 (defun append (in obj)
   (reverse (cons obj (reverse in))))
 
@@ -354,8 +366,14 @@
           func (first eval-list))
       (cond
         (native-fn? func) (native-invoke func (rest eval-list))
-        (lambda? func) (lambda-apply func (rest eval-list) env)
-        t (progn (print "error: ") (print func) (print "isn't function"))))))
+        (lambda? func)    (lambda-apply func (rest eval-list) env)
+        t                 (print "error: " func " isn't a function")))))
+
+(defun lambda-invoke (fn args)
+  (cond
+    (native-fn? fn) (native-invoke fn args)
+    (lambda? fn) (lambda-apply fn args (user-envir))
+    t (print "can't invoke " fn " as lambda")))
 
 (defun eval (ast)
   (apply0 ast (user-envir)))
@@ -368,6 +386,7 @@
 ;       (map (lambda (x) (list 'quote x)))
 ;       (cons fun)
 ;       (eval)))
+
 (include "core.lisp")
 (defun main ()
   (progn
@@ -375,48 +394,66 @@
     (print (apply0 (read (readline)) (user-envir)))
     (main)))
 
-;; expands macros, part1
-(defun ast-analysis0 (in)
-  (if (list? in)
-    (ast-analysis1 in nil)
-    in))
-
-;; expands macros, part2
-(defun ast-analysis1 (in acc)
+(defun quote-flatten0 (ast acc)
   (cond
-    (nil? in) (reverse acc)
+    (nil? ast) (reverse acc)
 
-    (and (nil? acc) (contains? macros (first in)))
-    (ast-analysis0 (macro-expand (get macros nil) in))
+    (list? ast)
+    (quote-flatten0 (rest ast)
+                    (cons (quote-flatten (first ast)) acc))
 
-    t (ast-analysis1 (rest in) (cons (ast-analysis0 (first in)) acc))))
+    t (list :push
+            (cond
+              (symbol? ast) :symbol
+              (keyword? ast) :keyword
+              (string? ast) :str-const
+              (int? ast) :int-const
+              t (print "can't quote flatten " ast))
+            ast)))
 
-;; extracts lambdas
-(defun lambda-extr0 (in lambdas)
-  (if (list? in)
-    (lambda-extr1 in nil nil)
-    (list in nil)))
+(defun quote-flatten (ast)
+  (semi-flatten
+    (if (list? ast)
+      (cons (quote-flatten0 ast nil)
+            (list (list :funcall 'list :argc (length ast))))
+      (quote-flatten0 ast nil))))
 
-;; extracts lambdas, part2
-(defun lambda-extr1 (in acc lambdas)
+(defun closure-flatten0 (args ast acc)
   (cond
-    (nil? in) (cons (reverse acc) lambdas)
-    (and (nil? acc) (equal? (quote quote) (first in))) (list in)
+    (nil? ast) acc
 
-    (and (nil? acc) (equal? (quote lambda) (first in)))
-    (let (l-name (gensym "lambda"))
-      ;; TODO: handle nested lambdas
-      (cons l-name (cons l-name (rest in)) lambdas))
+    (list? ast)
+    (closure-flatten0
+      args
+      (rest ast)
+      (cons (closure-flatten1 args (first ast)) acc))
 
-    t
-    (let (e-l (lambda-extr0 (first in) nil)
-          expr (first e-l)
-          lamb (second e-l))
-      (lambda-extr1 (rest in)
-                    (cons expr acc)
-                    (if (nil? lamb)
-                      lambdas
-                      (cons lamb lambdas))))))
+    (index ast args) (list :push :symbol ast)
+
+    (int? ast) (list :push :int-const ast)
+    (string? ast) (list :push :str-const)
+    (keyword? ast) (list :push keyword-const)
+
+    (symbol? ast)
+    (list (list :funcall 'list :argc 2)
+          (list :funcall 'envir-get :argc 1)
+          (list :push :symbol ast)
+          (list :push :symbol 'quote))
+
+    t (print "closure-flatten0 can't handle " ast)))
+
+(defun closure-flatten1 (args ast)
+  (if (list? ast)
+    (list (closure-flatten0 args ast nil)
+          (list :funcall 'list :argc (length ast)))
+    (closure-flatten0 args ast nil)))
+
+(defun closure-flatten (args ast)
+   (list
+         (list :funcall 'make-lambda :argc 2)
+         (reverse (closure-flatten1 args ast))
+         (reverse (quote-flatten args))
+   ))
 
 ;;; reduces a tree to a list of lists
 (defun semi-flatten0 (in acc)
@@ -432,18 +469,18 @@
   (reverse (semi-flatten0 in nil)))
 
 ;; macro for x-deflate
-;`(defun ,fname (name args largs expr acc ,@(vars))
+;`(defun ,fname (name args expr acc ,@(vars))
 ;   (if expr
-;     (,fname name args largs
+;     (,fname name args 
 ;             ,expr-mod
 ;             ,acc-mod
 ;             ,@(vars-mod))
 ;     (cons ,acc-add acc)))
 
-(defun progn-deflate (name args largs expr acc)
+(defun progn-deflate (name args expr acc)
   (if expr
     (progn-deflate
-      name args largs
+      name args
       (rest expr)
       (cons
         (list
@@ -451,20 +488,20 @@
             (list :pop)
             (cons nil nil))
           (ir0 (if (rest expr) nil name)
-               args largs
+               args
                (first expr) nil))
          acc))
     acc))
 
-(defun or-deflate (name args largs end-lab expr acc)
+(defun or-deflate (name args end-lab expr acc)
   (if expr
-    (or-deflate name args largs end-lab
+    (or-deflate name args end-lab
                 (rest expr)
                 (cons
                 (list (list :pop)
                       (list :jump-not-nil end-lab)
                       (list :dup)
-                      (ir0 nil args largs (first expr) nil))
+                      (ir0 nil args (first expr) nil))
                 acc))
     (cons (list (if name
                   (list :return)
@@ -473,15 +510,15 @@
                 (list :push :nil))
           acc)))
 
-(defun and-deflate (name args largs false-lab expr acc)
+(defun and-deflate (name args false-lab expr acc)
   (if expr
-    (and-deflate name args largs
+    (and-deflate name args
                  false-lab
                  (rest expr)
                  (cons (list (if (rest expr)
                                (list :jump-if-nil false-lab)
                                (cons nil nil))
-                             (ir0 nil args largs (first expr) nil))
+                             (ir0 nil args (first expr) nil))
                        acc))
     (let (end-lab (gensym "and-e"))
       (cons (list (if name
@@ -493,19 +530,19 @@
                   (list :goto end-lab))
             acc))))
 
-(defun cond-deflate (name args largs expr test-lab end-lab acc)
+(defun cond-deflate (name args expr test-lab end-lab acc)
   (if expr
     (let (test     (first expr)
           branch   (second expr)
           next-lab (gensym "cond-"))
-      (cond-deflate name args largs
+      (cond-deflate name args
                     (rest (rest expr)) next-lab end-lab
                     (cons (list (if name
                                   (cons nil nil)
                                   (list :goto end-lab))
-                                (ir0 name args largs branch nil)
+                                (ir0 name args branch nil)
                                 (list :jump-if-nil next-lab)
-                                (ir0 nil args largs test nil)
+                                (ir0 nil args test nil)
                                 (if test-lab
                                   (list :label test-lab)
                                   (cons nil nil)))
@@ -528,42 +565,39 @@
                     (rest (rest bind-list))
                     (cons (list :store (+ (length args)
                                           (index (first bind-list) largs-new)))
-                          (ir0 nil args largs (second bind-list) nil)
+                          (ir0 nil (concat args largs) (second bind-list) nil)
                           acc)))
-    (list largs acc)))
+    (list (concat args largs) acc)))
 
-(defun let-deflate (name args largs expr)
-  (let (x (let-deflate0 args largs (first expr) nil)
+(defun let-deflate (name args expr)
+  (let (x (let-deflate0 args nil (first expr) nil)
         largs (first x)
         bind-ir (second x))
   (list
     (list :let-pop (gensym "letp") (length args))
-    (ir0 name args largs (second expr) nil)
-    (list :local-count (gensym "letc") (+ (length args) (length largs)))
+    (ir0 name largs (second expr) nil)
+    (list :local-count (gensym "letc") (length largs))
     bind-ir)))
 
 ;; iterates along list, resolving nested lists with ir0
-(defun ir1 (args largs ast acc)
+(defun ir1 (args ast acc)
   (cond
     (nil? ast) acc
 
     (list? (first ast))
-    (ir1 args largs (rest ast)
-         (concat (ir0 nil args largs (first ast) nil) acc))
+    (ir1 args (rest ast)
+         (concat (ir0 nil args (first ast) nil) acc))
 
     t
-    (ir1 args largs (rest ast)
+    (ir1 args (rest ast)
          (cons
            (if (symbol? (first ast))
              (cond
                (equal? (first ast) (quote nil)) (list :push :nil)
                (equal? (first ast) (quote t)) (list :push :true)
 
-               (index (first ast) largs)
-               (list :push :arg-num (+ (length args) (index (first ast) largs)))
-
-               (index (first ast) args)
-               (list :push :arg-num (index (first ast) args))
+               (last-index (first ast) args)
+               (list :push :arg-num (last-index (first ast) args))
 
                t
                (list (list :funcall :envir-get :argc 1)
@@ -583,13 +617,13 @@
 ;; first step in code processing
 ;; turns a tree of lisp code into a stack-based intermediate representation
 ;; name doubles as a flag for if the expression is in the tail position
-(defun ir0 (name args largs ast acc)
+(defun ir0 (name args ast acc)
   (cond
     (nil? ast) (reverse acc)
 
     (not (list? ast))
     (list (if name (list :return) (list nil))
-          (ir1 args largs (list ast) nil))
+          (ir1 args (list ast) nil))
 
     (equal? (first ast) (quote if))
     (let (false-label (gensym "if-f")
@@ -598,7 +632,7 @@
         (if (not name) (list :label end-label) (cons nil nil))
         (if (= (length ast) 4)
           ;; has an else branch
-          (ir0 name args largs (nth 3 ast) nil)
+          (ir0 name args (nth 3 ast) nil)
           ;; no else branch
           (list (if name
                   (list :return)
@@ -608,51 +642,51 @@
         (if (nil? name)
           (list :goto end-label)
           (list nil))
-        (ir0 name args largs (third ast) nil)
+        (ir0 name args (third ast) nil)
         (list :jump-if-nil false-label)
-        (ir0 nil args largs (second ast) nil)))
+        (ir0 nil args (second ast) nil)))
 
     (equal? (first ast) (quote and))
-    (and-deflate name args largs (gensym "and-f") (rest ast) nil)
+    (and-deflate name args (gensym "and-f") (rest ast) nil)
 
     (equal? (first ast) (quote or))
-    (or-deflate name args largs (gensym "or-e") (rest ast) nil)
+    (or-deflate name args (gensym "or-e") (rest ast) nil)
 
     (equal? (first ast) (quote cond))
-    (cond-deflate name args largs (rest ast) nil (gensym "cond-e") nil)
+    (cond-deflate name args (rest ast) nil (gensym "cond-e") nil)
 
     (equal? (first ast) (quote progn))
-    (progn-deflate name args largs (rest ast) nil)
+    (progn-deflate name args (rest ast) nil)
 
     (equal? (first ast) (quote let))
-    (let-deflate name (concat args largs) nil (rest ast))
+    (let-deflate name args (rest ast))
 
     (equal? (first ast) (quote quote))
-    ;(list (list :push :quote (second ast)))
     (list (if name (list :return) (list nil))
-      (list :push :symbol (second ast)))
+          (quote-flatten (second ast)))
 
     (equal? (first ast) (quote lambda))
-    (list (list :lambda ast))
+    (list (if name (list :return) (list nil))
+          (closure-flatten (second ast) (third ast)))
 
     ;; TODO: check arg is symbol
     (equal? (first ast) (quote def))
     (list (if name (list :return) (list nil))
           (list :funcall :envir-set :argc 2)
-          (ir0 nil args largs (third ast) nil)
+          (ir0 nil args (third ast) nil)
           (list :push :symbol (second ast)))
 
     (equal? (first ast) name)
     (cons (list :tail-recur :argc (dec (length ast)))
-          (ir1 args largs (rest ast) nil))
+          (ir1 args (rest ast) nil))
 
-    name (cons (list :return) (ir0 nil args largs ast acc))
+    name (cons (list :return) (ir0 nil args ast acc))
 
-    (or (index (first ast) args)
-        (index (first ast) largs))
+    (last-index (first ast) args)
     (cons (list :dynamcall :argc (length ast))
-          (ir1 args largs ast nil))
+          (ir1 args ast nil))
 
     t
     (cons (list :funcall (first ast) :argc (dec (length ast)))
-          (ir1 args largs (rest ast) nil))))
+          (ir1 args (rest ast) nil))))
+

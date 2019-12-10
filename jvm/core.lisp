@@ -96,6 +96,9 @@
 (defun pprint (:rest args)
   (pprint1 args))
 
+(defun string (:rest args)
+  (string0 args))
+
 (defun print-iden (x)
   (progn
     (print x)
@@ -153,6 +156,15 @@
     (first in)))
 
 ;; list functions
+(defun concat0 (head llist acc)
+  (cond
+    (and (nil? head) (nil? llist)) (reverse acc)
+    (nil? head) (concat0 (first llist) (rest llist) acc)
+    t (concat0 (rest head) llist (cons (first head) acc))))
+
+(defun concat (:rest args)
+  (concat0 (first args) (rest args) nil))
+
 (defun last (in)
   (if (rest in)
     (last (rest in))
@@ -163,9 +175,6 @@
     (reverse0 (rest in) (cons0 (first in) acc))
     acc))
 
-(defun concat (a b)
-  (reverse0 (reverse a) b))
-
 (defun repeat0 (key times acc)
   (if (< times 1)
     acc
@@ -173,17 +182,6 @@
 
 (defun repeat (key times)
   (repeat0 key times nil))
-
-;; use native flatten instead
-(defun xflatten0 (tree acc)
-  (cond
-    (nil? tree) acc
-    (not (list? tree)) tree
-    (list? (first tree)) (flatten0 (rest tree) (flatten0 (first tree) acc))
-    t (flatten0 (rest tree) (cons (first tree) acc))))
-
-(defun xflatten (tree)
-  (reverse (flatten0 tree nil)))
 
 ;; other functions, they might be useful
 (defun split0 (lst n acc)

@@ -108,6 +108,7 @@
 (insert-method "envir-get" "Runtime" "envir_get" 1)
 
 (insert-method "native-invoke" "Lang" "nativeInvoke" 2)
+(insert-method "invoke" "Lateral" "lambda-invoke" 2)
 
 (insert-method "int?" "Lang" "int_p" 1)
 (insert-method "string?" "Lang" "string_p" 1)

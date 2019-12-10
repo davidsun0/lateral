@@ -22,7 +22,15 @@ public class Lang {
     }
 
     protected static Object nativeInvoke(Object function, Object args) {
-        if(function instanceof Method) {
+        if(!(function instanceof Method)) {
+            throw new TypeError(
+                    String.format("%s can't be invoked as a function", function)
+                    );
+        } else if(args != null && !(args instanceof ConsCell)) {
+            throw new TypeError(
+                    String.format("%s can't be used as args (need ConsCell)",
+                        args));
+        } else {
             Method m = (Method)function;
             ConsCell a = (ConsCell)args;
             Object[] arglist;
@@ -57,9 +65,6 @@ public class Lang {
                 c.printStackTrace();
             }
             throw new RuntimeException("failed to invoke method " + m);
-        } else {
-            throw new TypeError(String.format("can't invoke %s as function",
-                        function));
         }
     }
 
@@ -178,16 +183,7 @@ public class Lang {
         }
     }
 
-    protected static Object lambda(Object params, Object expr) {
-        if(params == null || params instanceof ConsCell) {
-            return new Lambda((ConsCell)params, expr, false);
-        } else {
-            throw new TypeError();
-        }
-    }
-
-    protected static Object lambda(Object params, Object expr,
-            Environment envir) {
+    public static Object lambda(Object params, Object expr) {
         if(params == null || params instanceof ConsCell) {
             return new Lambda((ConsCell)params, expr, false);
         } else {
@@ -367,15 +363,6 @@ public class Lang {
         return new Keyword(s);
     }
 
-    public static Object string(Object ... args) {
-        StringBuilder sb = new StringBuilder();
-        for(int i = 0; i < args.length; i ++) {
-            Object o = args[i];
-            sb.append(o);
-        }
-        return sb.toString();
-    }
-
     public static Object string0(Object args) {
         if(args instanceof ConsCell) {
             ConsCell arglist = (ConsCell)args;
@@ -385,6 +372,24 @@ public class Lang {
                 arglist = arglist.getCdr();
             }
             return sb.toString();
+        } else {
+            throw new TypeError();
+        }
+    }
+
+    public static Object string_bytes(Object str) {
+        if(str instanceof String) {
+            try {
+                byte bytes[] = ((String)str).getBytes("UTF8");
+                ConsCell res = null;
+                for(int i = bytes.length - 1; i >= 0; i --) {
+                    res = new ConsCell(Integer.valueOf(bytes[i]), res);
+                }
+                return res;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
         } else {
             throw new TypeError();
         }
