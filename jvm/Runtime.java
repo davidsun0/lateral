@@ -58,10 +58,6 @@ public class Runtime {
             userTable.put(new Symbol("rest"), Lang.class.getMethod("cdr",
                         Object.class));
 
-            /*
-            userTable.put(new Symbol("eval"), Runtime.class.getMethod("eval",
-                        Object.class));
-                        */
             userTable.put(new Symbol("load-class"), Runtime.class.getMethod(
                         "load_class", Object.class));
             userTable.put(new Symbol("user-envir"), Runtime.class.getMethod(
@@ -81,6 +77,27 @@ public class Runtime {
         return name.replace('_', '-');
     }
 
+    protected static Object insertMethod(Object classx, Object name,
+            Object lispName, Object argc) {
+        if(classx instanceof Class &&
+                name instanceof String &&
+                lispName instanceof String &&
+                argc instanceof Integer) {
+            try {
+                Class[] args = new Class[(Integer)argc];
+                for(int i = 0; i < (Integer)argc; i ++) {
+                    args[i] = Object.class;
+                }
+                envir_set(new Symbol((String)lispName),
+                        ((Class)classx).getMethod((String)name, args));
+            } catch (NoSuchMethodException e) {
+                e.printStackTrace();
+            }
+            return null;
+        } else {
+            throw new TypeError("Can't insert method");
+        }
+    }
 
     public static Object getUserEnvir() {
         return userEnvir;
@@ -147,12 +164,9 @@ public class Runtime {
     */
 
     public static void main(String[] args) {
-        // Lang.include("core.lisp");
         while(true) {
             try {
                 Lateral.main();
-            } catch (NoSuchElementException n) {
-                return;
             } catch (RuntimeException e) {
                 e.printStackTrace();
             }

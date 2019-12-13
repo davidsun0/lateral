@@ -418,17 +418,19 @@
             (list (list :funcall 'list :argc (length ast))))
       (quote-flatten0 ast nil))))
 
-(defun closure-flatten0 (args ast acc)
+(defun closure-flatten0 (args locals ast acc)
   (cond
     (nil? ast) acc
 
     (list? ast)
     (closure-flatten0
       args
+      locals
       (rest ast)
-      (cons (closure-flatten1 args (first ast)) acc))
+      (cons (closure-flatten1 args locals (first ast)) acc))
 
     (index ast args) (list :push :symbol ast)
+    (index ast locals) (list :push :arg-num (index ast locals))
 
     (int? ast) (list :push :int-const ast)
     (string? ast) (list :push :str-const)
@@ -442,18 +444,16 @@
 
     t (print "closure-flatten0 can't handle " ast)))
 
-(defun closure-flatten1 (args ast)
+(defun closure-flatten1 (args locals ast)
   (if (list? ast)
-    (list (closure-flatten0 args ast nil)
+    (list (closure-flatten0 args locals ast nil)
           (list :funcall 'list :argc (length ast)))
-    (closure-flatten0 args ast nil)))
+    (closure-flatten0 args locals ast nil)))
 
-(defun closure-flatten (args ast)
-   (list
-         (list :funcall 'make-lambda :argc 2)
-         (reverse (closure-flatten1 args ast))
-         (reverse (quote-flatten args))
-   ))
+(defun closure-flatten (args locals ast)
+   (list (list :funcall 'make-lambda :argc 2)
+         (reverse (closure-flatten1 args locals ast))
+         (reverse (quote-flatten args))))
 
 ;;; reduces a tree to a list of lists
 (defun semi-flatten0 (in acc)
@@ -667,12 +667,12 @@
 
     (equal? (first ast) (quote lambda))
     (list (if name (list :return) (list nil))
-          (closure-flatten (second ast) (third ast)))
+          (closure-flatten (second ast) args (third ast)))
 
     ;; TODO: check arg is symbol
     (equal? (first ast) (quote def))
     (list (if name (list :return) (list nil))
-          (list :funcall :envir-set :argc 2)
+          (list :funcall 'envir-set :argc 2)
           (ir0 nil args (third ast) nil)
           (list :push :symbol (second ast)))
 
@@ -689,4 +689,3 @@
     t
     (cons (list :funcall (first ast) :argc (dec (length ast)))
           (ir1 args (rest ast) nil))))
-
