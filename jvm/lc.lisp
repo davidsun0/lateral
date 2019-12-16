@@ -1,142 +1,4 @@
-(defun ir (name args ast)
-  (->> (ir0 name args ast)
-       (semi-flatten)
-       (reverse)
-       (filter first)))
-
 (include "jvmtable.lisp")
-
-(defun u1 (x)
-  (if (< x 0x100)
-    (list x)
-    (throw "int too large for 1 byte")))
-
-(defun u2 (x)
-  (if (or (< x 0xFFFF) (= x 0xFFFF))
-    (list (bit-and (bit-asr x 8) 0xFF)
-          (bit-and x 0xFF))
-    (throw "int too large for 2 bytes")))
-
-(defun u4 (x)
-  (concat (u2 (// x 0x10000))
-          (u2 (bit-and x 0xFFFF))))
-
-(defun len1-attribs (const-list)
-  (u2 (nth 1 const-list)))
-
-(defun len2-attribs (const-list)
-  (concat (u2 (nth 1 const-list))
-          (u2 (nth 2 const-list))))
-
-(defun const-to-bin (const-list)
-  (case (first const-list)
-    :utf8 (cons 0x01 (u2 (length (to-chars (second const-list))))
-                (string-bytes (second const-list)))
-    :classref    (cons 0x07 (len1-attribs const-list))
-    :string      (cons 0x08 (len1-attribs const-list))
-    :fieldref    (cons 0x09 (len2-attribs const-list))
-    :methodref   (cons 0x0A (len2-attribs const-list))
-    :nametyperef (cons 0x0C (len2-attribs const-list))
-    (list :unknown const-list)))
-
-(defun pool-search! (constpool expr)
-  (if (contains? constpool expr)
-    (first (get constpool expr))
-    (let (pool-count (get constpool :count 1))
-      (progn
-        (insert! constpool expr pool-count)
-        (insert! constpool :count (inc pool-count))
-        pool-count))))
-
-(defun pool-get! (constpool expr)
-  (let (expr (if (string? expr) (list :utf8 expr) expr)
-        tag (first expr))
-    (case tag
-      :utf8 (pool-search! constpool expr)
-
-      (:classref :string)
-      (pool-search!
-        constpool
-        (list tag (pool-get! constpool (string (second expr)))))
-
-      (:nametyperef :methodref :fieldref)
-      (pool-search!
-        constpool
-        (list tag
-              (pool-get! constpool (second expr))
-              (pool-get! constpool (third expr))))
-
-      :getstatic
-      (pool-search!
-        constpool
-        (list tag
-              (pool-get! constpool (second expr))
-              (pool-get! constpool (third expr))
-              (pool-get! constpool (fourth expr))))
-
-      (throw "can't pool-get" expr tag "test"))))
-
-; generates code to store stack onto local args for tail recursion
-(defun set-locals (n i acc)
-  (if (< n i)
-    acc
-    (set-locals n (inc i) (cons (list :astore i) acc))))
-
-(defun ir-to-jvm (expr)
-    (case (first expr)
-      :return (list :areturn)
-
-      :push
-      (case (nth 1 expr)
-        :arg-num (list :aload (nth 2 expr))
-        :nil     (list :aconst_null)
-        :true    (list :getstatic
-                       "java/lang/Boolean"
-                       "TRUE"
-                       "Ljava/lang/Boolean;")
-        :int-const
-        (list (list :iconst (nth 2 expr))
-              (list :invokestatic "java/lang/Integer"
-                    "valueOf" "(I)Ljava/lang/Integer;"))
-
-        :char-const
-        (list (list :iconst (integer (nth 2 expr)))
-              (list :invokestatic "java/lang/Character"
-                    "valueOf" "(C)Ljava/lang/Character;"))
-
-        :str-const
-        (list :ldc (list :string (nth 2 expr)))
-
-        :symbol
-        (list (list :ldc (list :string (string (nth 2 expr))))
-              (list :invokestatic "Symbol" "makeSymbol"
-                    "(Ljava/lang/String;)LSymbol;"))
-
-        :keyword
-        (list (list :ldc (list :string (string (nth 2 expr))))
-              (list :invokestatic "Keyword" "makeKeyword"
-                    "(Ljava/lang/String;)LKeyword;"))
-
-        (progn (print "ir-to-jvm: can't push" expr) (throw "error")))
-
-      :store        (list :astore (second expr))
-      :jump-if-nil  (cons :ifnull (rest expr))
-      :jump-not-nil (cons :ifnonnull (rest expr))
-      :tail-recur   (set-locals (dec (nth 2 expr)) 0 (list (list :goto :start)))
-      ;TODO: figure out how to call function objects
-      :dynamcall    (list (list :funcall 'list :argc (dec (third expr)))
-                          (cons :funcall 'invoke :argc (rest expr)))
-      expr))
-
-;; prepends start label to ir if there are tail recursive calls
-(defun check-tco0 (in curr)
-  (cond
-    (nil? curr) in
-    (equal? (first (first curr)) :tail-recur) (cons (list :label :start) in)
-    t (check-tco0 in (rest curr))))
-
-(defun check-tco (in)
-  (check-tco0 in in))
 
 (defun funcall-resolve (method-list expr)
   (if (equal? (first expr) :funcall)
@@ -176,15 +38,7 @@
         (and (< (- 2) val) (< val 6))       (list (+ val 3))
         ; bipush
         (and (< (- 129) val) (< val 128))   (list 0x10 val)
-        t (print "can't iconst value:" val)))
-
-    :checkcast
-    (->> (second in)
-         (list :classref)
-         (pool-get! pool)
-         (u2)
-         (cons 0xC0))
-
+        t (list :ldc val)))
     in))
 
 (defun pool-resolve! (pool in)
@@ -214,6 +68,13 @@
       (if (< idx 0x100)
         (cons 0x12 (u1 idx))
         (cons 0x13 (u2 idx))))
+
+    :checkcast
+    (->> (second in)
+         (list :classref)
+         (pool-get! pool)
+         (u2)
+         (cons 0xC0))
 
     in))
 
@@ -306,8 +167,8 @@
       (list mstack (inc cstack) lablist)
 
       ;; stack -1
-      ;; goto decreases the stack when jumping to another branch
-      ;; goto to start keeps the stack the same
+      ;; goto decrements the stack when jumping to another branch
+      ;; except goto to start keeps the stack the same
       (:areturn :pop :astore :ifnull :ifnonnull :goto)
       (list mstack
             (if (equal? expr (quote (:goto :start)))
@@ -423,16 +284,12 @@
         _ (map print jvm-asm)
         ; human readable jvm bytecode
         _ (print "====")
-        bytecode (->> jvm-asm
-                      (map jvm-assemble)
-                      (map (lambda (x) (pool-resolve! pool x)))
-                      (jump-resolve)
-                      (flatten))
+        basebytes (->> jvm-asm
+                       (map jvm-assemble)
+                       (map (lambda (x) (pool-resolve! pool x))))
+        bytecode (flatten (jump-resolve basebytes))
         _ (print "bytecode: " bytecode)
-        label-i (->> jvm-asm
-                     (map jvm-assemble)
-                     (map (lambda (x) (pool-resolve! pool x)))
-                     (label-resolve))
+        label-i (label-resolve basebytes)
         _ (print "label info: " label-i)
         local-i (local-info (arg-count args) jvm-asm)
         _ (print "local info: " local-i)
@@ -444,7 +301,7 @@
     (list
       0x00 0x09 ; public static
       ; name of function
-      (u2 (pool-get! pool (string name)))
+      (u2 (pool-get! pool name))
       ; type signature
       (u2 (pool-get! pool signature))
       0x00 0x01 ; attribute size of 1
@@ -478,7 +335,7 @@
     (compile0! 
       cpool
       method-list
-      name
+      (java-name (string name))
       args
       (->> (ir name (filter symbol? args) expr)
            (check-tco)
@@ -551,51 +408,72 @@
 
 (defun compile2 (path classname)
   (let (exprs (read-all path)
-        _ (print "done reading")
         splits (call-split exprs nil nil nil)
-        _ (print "funs====")
-        ;_ (map print funs)
+        ;; TODO: filter out etc after macro expansion
         macros (second splits)
-        _ (print "macros===")
-        ;_ (map print macros)
         etc (third splits)
-        _ (print "other===")
-        ;_ (map print etc)
+        _ (print "hi")
+        _ (print macros)
         ; how to expand macros within macros?
         macro-list (hashmap)
         _ (map
             (lambda (x) 
               (progn
+                (print (list (quote lambda) (third x) (fourth x)))
+                (print macro-list)
+                (print "uh oh")
                 (insert! macro-list (second x)
-                         (eval (list (quote lambda) (third x) (nth 3 x))))
+                         (eval (list (quote lambda) (third x) (fourth x))))
                 ))
             macros)
-        _ (print "???")
         _ (print macro-list)
         ;; macroexpand
         funs (first splits)
+        _ (print "macro expansion...")
         funs (map (lambda (x) (comp-expand x macro-list)) funs)
         _ (print "expanded funs====")
         _ (map print funs)
         cpool (hashmap)
         ;; insert all functions into method-list
+        ;; TODO: make a copy of base method-list
+        method-list *method-list*
         _ (map (lambda (x) (insert-lambda! method-list classname x)) funs)
         _ (print "cinitbin")
-        _ (print (cons 'progn etc))
-        cinitbin (compile-special! cpool method-list "<clinit>" nil
-                           (cons (quote progn) etc)
-                           "()V")
+        cinitbin (compile0!
+                   cpool
+                   method-list
+                   "<clinit>"
+                   nil
+                   (->> (cons 'progn etc)
+                        (ir nil nil)
+                        (map ir-to-jvm)
+                        (concat
+                          ;(map (lambda (x)
+                          ;       (gen-insert classname (second x) (third x) t))
+                          ;     macros)
+                          (map (lambda (x)
+                                 (gen-insert classname (second x) (third x) nil))
+                               funs))
+                        ((lambda (x) (append x (list :return))))
+                        (semi-flatten)
+                        (map (lambda (x) (funcall-resolve method-list x)))
+                        (semi-flatten))
+                   "()V")
         _ (print "mainbin")
-        mainbin 
-        ;(if (get method-list "main" nil)
-          (compile-special! cpool method-list "main" (quote (0))
-                                 (quote (main))
-                                 "([Ljava/lang/String;)V");)
+        mainbin (if (get method-list "main" nil)
+                  (compile-special!
+                    cpool
+                    method-list
+                    "main"
+                    (quote (0))
+                    (quote (main))
+                    "([Ljava/lang/String;)V"))
         _ (print "Ready")
         )
     (->> funs
          (map (lambda (x) (compile1! cpool method-list x)))
-         (cons cinitbin mainbin)
+         ((lambda (x) (if mainbin (cons mainbin x) x)))
+         (cons cinitbin)
          (class-headers cpool classname "java/lang/Object")
          (flatten)
          (write-bytes (string classname ".class")))))
@@ -614,7 +492,8 @@
 
     (and (nil? acc) (get macros (first in) nil))
     (comp-expand
-      (apply (get (user-envir) (first in) nil) (rest in))
+      ;(apply (get (user-envir) (first in) nil) (rest in))
+      (apply (get macros (first in) nil) (rest in))
       macros)
 
     t (comp-expand0 (rest in)
@@ -624,14 +503,10 @@
                     macros)))
 
 ;; method adding for :rest params
-;(lambda (n)
-  ;(cons (funcall-resolve (list :funcall (quote list) :argc (- l n)))
-        ;(list :funcall (quote name-symbol) :argc l)))
-
-;(eval
-  ;`(lambda (n)
-     ;(cons (funcall-resolve (:funcall list :argc (- ,l n)))
-           ;(:funcall ,name :argc ,l))))
+;(defun make-params (class name n-params)
+;  (lambda (ml n)
+;    (append (funcall-resolve ml `(:funcall list :argc (- n ,n-params)))
+;           `(:invokestatic ,class ,name (method-type ,(inc n-params))))))
 
 (defun make-params (class name n-params)
   (eval
@@ -654,7 +529,7 @@
                       (method-type (inc n-params)))))))
 
 (defun insert-lambda! (method-list classname lamb)
-  (let (string-name (string (second lamb)))
+  (let (string-name (java-name (string (second lamb))))
     (if (index :rest (third lamb))
       (->> (third lamb)
            (index :rest)
@@ -666,7 +541,25 @@
            (list classname string-name)
            (insert! method-list string-name)))))
 
-(defun reload ()
-  (progn
-    (def mlist method-list)
-    (map (lambda (x) (insert-lambda! mlist "MyClass" x)) funs)))
+;(defun gen-insert (class)
+;  (lambda (x)
+;    (map ir-to-jvm
+;         `((:ldc (:classref ,(string class)))
+;           (:push :str-const ,(java-name (string (second x))))
+;           (:push :str-const ,name)
+;           (:push :int-const ,(length (third x)))
+;           (:invokestatic "Runtime" "insertMethod" ,(method-type 4))))))
+
+(defun gen-insert (class name args macro?)
+(->> (list
+       (list :ldc (list :classref (string class)))
+       (list :push :str-const (java-name (string name)))
+       (list :push :str-const (string name))
+       (list :push :int-const (arg-count args))
+       (list :push (if (index :rest args) :true :nil))
+       (list :push (if macro? :true :nil))
+       (->> '(")V")
+            (concat '("(") (repeat "Ljava/lang/Object;" 6))
+            (apply string)
+            (list :invokestatic "Runtime" "insertMethod")))
+     (map ir-to-jvm)))

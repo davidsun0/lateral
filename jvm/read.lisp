@@ -62,9 +62,8 @@
     (nil? ch) nil
     (whitespace? ch) (progn (r-next!) (read-form))
     (equal? ch ";") (progn (wait-for "\n") (read-form))
-
     (equal? ch "'") (progn (r-next!) (list (quote quote) (read-form)))
-
+    (equal? ch "`") (progn (r-next!) (read-quasi))
     (equal? ch "(") (progn (r-next!) (read-list nil))
     (equal? ch ")") (print "unexpected )")
     t (progn (def *read-tail* *read-pos*) (read-atom)))))
@@ -76,6 +75,40 @@
       (whitespace? ch) (progn (r-next!) (read-list acc))
       (equal? ch ")") (progn (r-next!) (reverse acc))
       t (read-list (cons (read-form) acc)))))
+
+(defun read-quasi ()
+  (progn (print "next:" (r-peek 0))
+  (cond
+    (equal? (r-peek 0) ",")
+    (if (equal? (r-peek 1) "@")
+      (print "can't uquote splicing")
+      (progn (r-next!) (read-form)))
+
+    (equal? (r-peek 0) "`") (progn (r-next!) (read-quasi))
+    (equal? (r-peek 0) "(") (progn (r-next!) (read-quasi-list nil))
+    t (list 'quote (read-form)))))
+
+(defun read-quasi-list (acc)
+ (progn (print "rl next: " (r-peek 0))
+  (cond
+    (equal? (r-peek 0) ")") (cons 'concat (reverse acc))
+    (whitespace? (r-peek 0)) (progn (r-next!) (read-quasi-list acc))
+
+    (equal? (r-peek 0) ",")
+    (progn
+      (r-next!)
+      (read-quasi-list
+        (cons
+          (if (equal? (r-peek 0) "@")
+            (progn (r-next!) (read-form))
+            (list 'list (read-form)))
+          acc)))
+
+    (equal? (r-peek 0) "`")
+    (progn (r-next!) (read-quasi-list (cons (list 'list (read-quasi)) acc)))
+
+    t (read-quasi-list (cons (list 'list (list 'quote (read-form))) acc))
+  )))
 
 (defun read (str)
   (progn

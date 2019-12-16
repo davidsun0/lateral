@@ -22,15 +22,11 @@ public class Lang {
     }
 
     protected static Object nativeInvoke(Object function, Object args) {
-        if(!(function instanceof Method)) {
-            throw new TypeError(
-                    String.format("%s can't be invoked as a function", function)
-                    );
-        } else if(args != null && !(args instanceof ConsCell)) {
+        if(args != null && !(args instanceof ConsCell)) {
             throw new TypeError(
                     String.format("%s can't be used as args (need ConsCell)",
                         args));
-        } else {
+        } else if(function instanceof Method) {
             Method m = (Method)function;
             ConsCell a = (ConsCell)args;
             Object[] arglist;
@@ -65,6 +61,47 @@ public class Lang {
                 c.printStackTrace();
             }
             throw new RuntimeException("failed to invoke method " + m);
+        } else if(function instanceof CompiledLambda) {
+            CompiledLambda cl = (CompiledLambda)function;
+            Method m = cl.method;
+            ConsCell arglist = (ConsCell)args;
+            Object[] argarray = new Object[cl.argc];
+            if(cl.isRest) {
+                if((Integer)Lateral.length(arglist) < cl.argc - 1) {
+                    throw new RuntimeException("too few args");
+                }
+                for(int i = 0; i < cl.argc - 1; i ++) {
+                    argarray[i] = arglist.getCar();
+                    arglist = arglist.getCdr();
+                }
+                argarray[cl.argc - 1] = arglist;
+            } else {
+                if((Integer)Lateral.length(arglist) != cl.argc) {
+                    System.out.println(arglist);
+                    throw new RuntimeException("mismatched args: " + m);
+                }
+                for(int i = 0; i < cl.argc; i ++) {
+                    argarray[i] = arglist.getCar();
+                    arglist = arglist.getCdr();
+                }
+            }
+            try {
+                return m.invoke(null, argarray);
+            } catch (IllegalAccessException | ExceptionInInitializerError e) {
+                System.out.println("failed to invoke method " + m);
+                e.printStackTrace();
+            } catch (IllegalArgumentException b) {
+                System.out.println("invalid arguments for method " + m);
+                System.out.println(arglist);
+                b.printStackTrace();
+            } catch (InvocationTargetException c) {
+                System.out.println("error occured while invoking method " + m);
+                c.printStackTrace();
+            }
+            throw new RuntimeException("failed to invoke method " + m);
+        } else {
+            throw new TypeError(
+                    String.format("%s can't be invoked as a function", function));
         }
     }
 
@@ -122,8 +159,9 @@ public class Lang {
     }
 
     public static Object slurp(Object s) {
-        if(!(s instanceof String))
+        if(!(s instanceof String)) {
             throw new TypeError();
+        }
 
         try{
             String path = (String)s;
@@ -195,7 +233,7 @@ public class Lang {
     public static Object lambda_p(Object l) {
         if(l instanceof Lambda && !((Lambda)l).isMacro) {
             return Boolean.TRUE;
-        } else if(l instanceof Method) {
+        } else if(l instanceof Method || l instanceof CompiledLambda) {
             return Boolean.TRUE;
         } else {
             return null;
@@ -204,7 +242,11 @@ public class Lang {
 
     // native?
     public static Object native_p(Object fn) {
-        return fn instanceof Method ? Boolean.TRUE : null;
+        if(fn instanceof Method || fn instanceof CompiledLambda) {
+            return Boolean.TRUE;
+        } else {
+            return null;
+        }
     }
 
     protected static Object macro(Object a, Object e) {

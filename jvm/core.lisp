@@ -45,7 +45,7 @@
 (defun case0 (term exprs acc)
   (cond
     (not exprs) (reverse acc)
-    (nil? (rest exprs)) (reverse (cons (first exprs) t acc))
+    (nil? (rest exprs)) (reverse (cons (first exprs) 't acc))
     t (case0 term
              (rest (rest exprs))
              (cons (second exprs)
@@ -76,6 +76,11 @@
              (cons (second exprs)
                    (cons (list (quote equal?) (first exprs) term)
                          acc)))))
+
+;(defun case1 (terms)
+;  (let (val (gensym "case-"))
+;    `(let (,val ,(first terms))
+;       ,(cons 'cond (case0 val (rest terms) nil)))))
 
 ;; TODO: wrap in let and only eval term once
 (defun case1 (terms)

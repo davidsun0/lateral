@@ -24,13 +24,13 @@
     (first list)
     (nth (dec n) (rest list))))
 
-(defun length0 (list acc)
-  (if list
-    (length0 (rest list) (inc acc))
+(defun length0 (lst acc)
+  (if lst
+    (length0 (rest lst) (inc acc))
     acc))
 
-(defun length (list)
-  (length0 list 0))
+(defun length (lst)
+  (length0 lst 0))
 
 (defun reverse0 (in acc)
   (if in
@@ -67,9 +67,24 @@
 (defun append (in obj)
   (reverse (cons obj (reverse in))))
 
-;(defun cons (:rest l)
-;  (let (rl (reverse l))
-;    (reverse0 (rest rl) (first rl))))
+(defun map0 (fn in acc)
+  (if in
+    (map0 fn (rest in) (cons (fn (first in)) acc))
+    acc))
+
+(defun map (fn in)
+  (reverse (map0 fn in nil)))
+
+(defun filter0 (pred in acc)
+  (if in
+    (filter0 pred (rest in)
+             (if (pred (first in))
+               (cons (first in) acc)
+               acc))
+    acc))
+
+(defun filter (pred in)
+  (reverse (filter0 pred in nil)))
 
 (defun flatten0 (tree acc)
   (cond
@@ -101,6 +116,14 @@
 (defun pprint (:rest args)
   (pprint1 args))
 
+(defun to-chars0 (s i acc)
+  (if (char-at s i)
+    (to-chars0 s (inc i) (cons (char-at s i) acc))
+    (reverse acc)))
+
+(defun to-chars (s)
+  (to-chars0 s 0 nil))
+
 (defun get (hmap key :rest missing)
   (let (res (get0 hmap key))
     (cond
@@ -115,6 +138,61 @@
       (list (if prefix (first prefix) "gsym")
             (def *gensym-count*
                  (inc *gensym-count*))))))
+
+(defun ->>0 (exprs acc)
+  (if exprs
+    (->>0 (rest exprs) (append (first exprs) acc))
+    acc))
+
+(defmacro ->> (:rest exprs)
+  (->>0 (rest exprs) (first exprs)))
+
+;; bug when nil in a case list
+(defun case0 (term exprs acc)
+  (cond
+    (nil? exprs) (reverse acc)
+
+    ;; append else clause
+    (nil? (rest exprs)) (reverse (cons (first exprs) 'hello acc))
+
+    ;; list to match
+    (list? (first exprs))
+    (case0 term
+           (rest (rest exprs))
+           (cons (second exprs)
+                 (cons (list (quote index)
+                             term
+                             (list (quote quote) (first exprs)))
+                       acc)))
+
+    ;; single term
+    t (case0 term
+             (rest (rest exprs))
+             (cons (second exprs)
+                   (cons (list (quote equal?) (first exprs) term)
+                         acc)))))
+
+;(defun case1 (terms)
+;  (let (val (gensym "case-"))
+;    `(let (,val ,(first terms))
+;       ,(cons 'cond (case0 val (rest terms) nil)))))
+
+;; TODO: wrap in let and only eval term once
+(defun case1 (terms)
+  (let (val (gensym))
+    (list (quote let)
+          (list val (first terms))
+          (cons (quote cond)
+            (case0 val
+                   (rest terms)
+                   nil)))))
+
+(defmacro case (:rest terms)
+  (case1 terms))
+
+;;=============================================================================
+;; READ FUNCTIONS
+;;=============================================================================
 
 (def *read-pos* 0)
 (def *read-tail* 0)
@@ -170,14 +248,14 @@
 
 (defun read-form ()
   (let (ch (r-peek 0))
-  (cond
-    (nil? ch)         nil
-    (whitespace? ch)  (progn (r-next!) (read-form))
-    (equal? ch ";")   (progn (wait-for "\n") (read-form))
-    (equal? ch "'")   (progn (r-next!) (list (quote quote) (read-form)))
-    (equal? ch "(")   (progn (r-next!) (read-list nil))
-    (equal? ch ")")   (print "unexpected )")
-    t                 (progn (def *read-tail* *read-pos*) (read-atom)))))
+    (cond
+      (nil? ch)         nil
+      (whitespace? ch)  (progn (r-next!) (read-form))
+      (equal? ch ";")   (progn (wait-for "\n") (read-form))
+      (equal? ch "'")   (progn (r-next!) (list (quote quote) (read-form)))
+      (equal? ch "(")   (progn (r-next!) (read-list nil))
+      (equal? ch ")")   (print "unexpected )")
+      t                 (progn (def *read-tail* *read-pos*) (read-atom)))))
 
 (defun read-list (acc)
   (let (ch (r-peek 0))
@@ -205,10 +283,14 @@
 (defun read-all (path)
   (read-all0 (list (read (slurp path)))))
 
+;;=============================================================================
+;; INTERPRETER
+;;=============================================================================
+
 (defun interleave0 (lista listb acc)
   (cond
     (equal? :rest (first lista))
-    (reverse (cons listb (cons (second lista) acc)))
+    (reverse (cons listb (second lista) acc))
 
     (and lista listb)
     (interleave0 (rest lista) (rest listb)
@@ -390,9 +472,13 @@
 (include "core.lisp")
 (defun main ()
   (progn
-    (pprint0 "user>> ")
+    (pprint0 "user> ")
     (print (apply0 (read (readline)) (user-envir)))
     (main)))
+
+;;=============================================================================
+;; COMPILER
+;;=============================================================================
 
 (defun quote-flatten0 (ast acc)
   (cond
@@ -609,6 +695,8 @@
                (string? (first ast)) :str-const
                (keyword? (first ast)) :keyword
                (equal? (first ast) (quote t)) :true
+               ;; TODO fix bug in compile-time macro expansion that generates t
+               (equal? (first ast) t) :true
                (equal? (first ast) (quote nil)) :nil
                t :unknown)
              (first ast)))
@@ -689,3 +777,60 @@
     t
     (cons (list :funcall (first ast) :argc (dec (length ast)))
           (ir1 args (rest ast) nil))))
+
+(defun ir (name args ast)
+  (->> (ir0 name args ast nil)
+       (semi-flatten)
+       (reverse)
+       (filter first)))
+
+(defun u1 (x)
+  (if (< x 0x100)
+    (list x)))
+
+(defun u2 (x)
+  (if (or (< x 0xFFFF) (= x 0xFFFF))
+    (list (bit-and (bit-asr x 8) 0xFF)
+          (bit-and x 0xFF))))
+
+(defun u4 (x)
+  (concat (u2 (// x 0x10000))
+          (u2 (bit-and x 0xFFFF))))
+
+(defun len1-attribs (const-list)
+  (u2 (second const-list)))
+
+(defun len2-attribs (const-list)
+  (concat (u2 (second const-list))
+          (u2 (third const-list))))
+
+;const to bin
+
+(defun pool-search! (constpool expr)
+  (if (contains? constpool expr)
+    (first (get constpool expr))
+    (let (pool-count (get constpool :count 1))
+      (progn
+        (insert! constpool expr pool-count)
+        (insert! constpool :count (inc pool-count))
+        pool-count))))
+
+;pool-get!
+
+; generates code to store stack onto local args for tail recursion
+(defun set-locals (n i acc)
+  (if (< n i)
+    acc
+    (set-locals n (inc i) (cons (list :astore i) acc))))
+
+;ir-to-jvm
+
+;; prepends start label to ir if there are tail recursive calls
+(defun check-tco0 (in curr)
+  (cond
+    (nil? curr) in
+    (equal? (first (first curr)) :tail-recur) (cons (list :label :start) in)
+    t (check-tco0 in (rest curr))))
+
+(defun check-tco (in)
+  (check-tco0 in in))

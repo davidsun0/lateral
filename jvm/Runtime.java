@@ -22,12 +22,14 @@ public class Runtime {
         HashMap<Object, Object> userTable = new HashMap<>(256);
         userEnvir = new Environment(userTable);
 
+        //*
         for (Method m : Lateral.class.getMethods()) {
             int mod = m.getModifiers();
             if(Modifier.isStatic(mod) && Modifier.isPublic(mod)) {
                 userTable.put(new Symbol(toLispName(m.getName())), m);
             }
         }
+        //*/
 
         for (Method m : Lang.class.getMethods()) {
             int mod = m.getModifiers();
@@ -62,6 +64,8 @@ public class Runtime {
                         "load_class", Object.class));
             userTable.put(new Symbol("user-envir"), Runtime.class.getMethod(
                         "getUserEnvir"));
+            userTable.put(new Symbol("java-name"), Runtime.class.getMethod(
+                        "java_name", Object.class));
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
@@ -77,23 +81,39 @@ public class Runtime {
         return name.replace('_', '-');
     }
 
-    protected static Object insertMethod(Object classx, Object name,
-            Object lispName, Object argc) {
+    public static Object java_name(Object methodName) {
+        if(methodName instanceof String) {
+            String mname = ((String)methodName)
+                    .replace("\\", "\\5C")
+                    .replace("<", "\\3C")
+                    .replace(">", "\\3E");
+            return mname;
+        } else {
+            throw new TypeError();
+        }
+    }
+
+    protected static void insertMethod(Object classx, Object javaName,
+            Object lispName, Object argc, Object isRest, Object isMacro) {
         if(classx instanceof Class &&
-                name instanceof String &&
+                javaName instanceof String &&
                 lispName instanceof String &&
                 argc instanceof Integer) {
+            boolean rest = isRest == null ? false : true;
+            boolean macro = isMacro == null ? false : true;
             try {
-                Class[] args = new Class[(Integer)argc];
+                Class<?>[] args = new Class<?>[(Integer)argc];
                 for(int i = 0; i < (Integer)argc; i ++) {
                     args[i] = Object.class;
                 }
+                Method method = ((Class<?>)classx).getMethod((String)javaName,
+                            args);
                 envir_set(new Symbol((String)lispName),
-                        ((Class)classx).getMethod((String)name, args));
+                        new CompiledLambda(method, (Integer)argc, rest, macro));
+                // System.out.println(javaName + " " + argc + " " + method);
             } catch (NoSuchMethodException e) {
                 e.printStackTrace();
             }
-            return null;
         } else {
             throw new TypeError("Can't insert method");
         }
@@ -138,7 +158,7 @@ public class Runtime {
             byteList = byteList.getCdr();
         }
 
-        Class c = new FunctionLoader().defineClass(bytes);
+        Class<?> c = new FunctionLoader().defineClass(bytes);
 
         ConsCell output = new ConsCell(null, null);
         ConsCell curr = output;
@@ -167,6 +187,9 @@ public class Runtime {
         while(true) {
             try {
                 Lateral.main();
+            } catch(NoSuchElementException e) {
+                System.out.println();
+                return;
             } catch (RuntimeException e) {
                 e.printStackTrace();
             }

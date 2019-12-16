@@ -27,7 +27,7 @@
 (insert! *bytecodes* :ifnonnull 0xC7)
 
 ;; core method list
-(def method-list (hashmap))
+(def *method-list* (hashmap))
 
 (defun method-type (argc)
   (->> (list ")Ljava/lang/Object;")
@@ -36,7 +36,7 @@
        (apply string)))
 
 (defun insert-method (sym class name argc)
-  (insert! method-list sym 
+  (insert! *method-list* sym 
            (list class name (method-type argc))))
 
 ;(defmacro reduce-method (sym)
@@ -50,14 +50,14 @@
 (insert-method "rest" "Lang" "cdr" 1)
 (insert-method "cons0" "Lang" "cons0" 2)
 
-(insert! method-list "cons"
+(insert! *method-list* "cons"
          (lambda (ml n)
            (repeat (funcall-resolve
                      ml
                      (list :funcall (quote cons0) :argc 2))
                    (dec n))))
 
-(insert! method-list "list"
+(insert! *method-list* "list"
          (lambda (ml n)
            (cons (list :aconst_null)
                  (funcall-resolve
@@ -65,7 +65,7 @@
                    (list :funcall (quote cons) :argc (inc n))))))
 
 (insert-method "add0" "Lang" "add0" 2)
-(insert! method-list "+"
+(insert! *method-list* "+"
          (lambda (ml n)
            (repeat (funcall-resolve
                      ml
@@ -73,7 +73,7 @@
                    (dec n))))
 
 (insert-method "subtract0" "Lang" "subtract0" 2)
-(insert! method-list "-"
+(insert! *method-list* "-"
          (lambda (ml n)
            (repeat (funcall-resolve
                      ml
@@ -95,6 +95,9 @@
 (insert-method "=" "Lang" "isNumericallyEqual" 2)
 (insert-method "<" "Lang" "less_than0" 2)
 (insert-method "//" "Lang" "divide" 2)
+
+(insert-method "bit-asr" "Lang" "bit_asr" 2)
+(insert-method "bit-and" "Lang" "bit-and" 2)
 
 (insert-method "slurp" "Lang" "slurp" 1)
 (insert-method "readline" "Lang" "readLine" 0)
