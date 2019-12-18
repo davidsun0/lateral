@@ -22,7 +22,7 @@ public class Runtime {
         HashMap<Object, Object> userTable = new HashMap<>(256);
         userEnvir = new Environment(userTable);
 
-        //*
+        /*
         for (Method m : Lateral.class.getMethods()) {
             int mod = m.getModifiers();
             if(Modifier.isStatic(mod) && Modifier.isPublic(mod)) {

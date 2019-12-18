@@ -175,10 +175,10 @@
     (last (rest in))
     (first in)))
 
-(defun reverse0 (in acc)
-  (if in
-    (reverse0 (rest in) (cons0 (first in) acc))
-    acc))
+;(defun reverse0 (in acc)
+;  (if in
+;    (reverse0 (rest in) (cons0 (first in) acc))
+;    acc))
 
 (defun repeat0 (key times acc)
   (if (< times 1)

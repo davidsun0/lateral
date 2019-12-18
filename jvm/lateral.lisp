@@ -5,10 +5,23 @@
   (if p nil t))
 
 (defun inc (n)
-  (+ 1 n))
+  (add0 1 n))
 
 (defun dec (n)
-  (- n 1))
+  (add0 n (negate 1)))
+
+(defun add1 (nums acc)
+  (if nums
+    (add1 (rest nums) (add0 (first nums) acc))
+    acc))
+
+(defun + (:rest nums)
+  (add1 nums 0))
+
+(defun - (:rest nums)
+  (if (rest nums)
+    (add0 (first nums) (negate (add1 (rest nums) 0)))
+    (negate (first nums))))
 
 (defun second (lst)
   (first (rest lst)))
@@ -67,6 +80,14 @@
 (defun append (in obj)
   (reverse (cons obj (reverse in))))
 
+(defun repeat0 (key times acc)
+  (if (< times 1)
+    acc
+    (repeat0 key (dec times) (cons key acc))))
+
+(defun repeat (key times)
+  (repeat0 key times nil))
+
 (defun map0 (fn in acc)
   (if in
     (map0 fn (rest in) (cons (fn (first in)) acc))
@@ -85,6 +106,11 @@
 
 (defun filter (pred in)
   (reverse (filter0 pred in nil)))
+
+(defun foldl (fun acc in)
+  (if in
+    (foldl fun (fun acc (first in)) (rest in))
+    acc))
 
 (defun flatten0 (tree acc)
   (cond
@@ -124,6 +150,9 @@
 (defun to-chars (s)
   (to-chars0 s 0 nil))
 
+(defun string (:rest s)
+  (string0 s))
+
 (defun get (hmap key :rest missing)
   (let (res (get0 hmap key))
     (cond
@@ -153,7 +182,7 @@
     (nil? exprs) (reverse acc)
 
     ;; append else clause
-    (nil? (rest exprs)) (reverse (cons (first exprs) 'hello acc))
+    (nil? (rest exprs)) (reverse (cons (first exprs) 't acc))
 
     ;; list to match
     (list? (first exprs))
@@ -486,27 +515,27 @@
 
     (list? ast)
     (quote-flatten0 (rest ast)
-                    (cons (quote-flatten (first ast)) acc))
+                    (concat (quote-flatten (first ast)) acc))
 
-    t (list :push
+    t (list (list :push
             (cond
               (symbol? ast) :symbol
               (keyword? ast) :keyword
               (string? ast) :str-const
               (int? ast) :int-const
               t (print "can't quote flatten " ast))
-            ast)))
+            ast))))
 
 (defun quote-flatten (ast)
   (semi-flatten
     (if (list? ast)
-      (cons (quote-flatten0 ast nil)
+      (concat (quote-flatten0 ast nil)
             (list (list :funcall 'list :argc (length ast))))
       (quote-flatten0 ast nil))))
 
 (defun closure-flatten0 (args locals ast acc)
   (cond
-    (nil? ast) acc
+    (nil? ast) (reverse acc)
 
     (list? ast)
     (closure-flatten0
@@ -515,18 +544,18 @@
       (rest ast)
       (cons (closure-flatten1 args locals (first ast)) acc))
 
-    (index ast args) (list :push :symbol ast)
-    (index ast locals) (list :push :arg-num (index ast locals))
+    (index ast args) (list (list :push :symbol ast))
+    (index ast locals) (list (list :push :arg-num (index ast locals)))
 
-    (int? ast) (list :push :int-const ast)
-    (string? ast) (list :push :str-const)
-    (keyword? ast) (list :push keyword-const)
+    (int? ast) (list (list :push :int-const ast))
+    (string? ast) (list (list :push :str-const))
+    (keyword? ast) (list (list :push keyword-const))
 
     (symbol? ast)
-    (list (list :funcall 'list :argc 2)
-          (list :funcall 'envir-get :argc 1)
+    (list (list :push :symbol 'quote)
           (list :push :symbol ast)
-          (list :push :symbol 'quote))
+          (list :funcall 'envir-get :argc 1)
+          (list :funcall 'list :argc 2))
 
     t (print "closure-flatten0 can't handle " ast)))
 
@@ -538,7 +567,7 @@
 
 (defun closure-flatten (args locals ast)
    (list (list :funcall 'make-lambda :argc 2)
-         (reverse (closure-flatten1 args locals ast))
+         (reverse (semi-flatten (closure-flatten1 args locals ast)))
          (reverse (quote-flatten args))))
 
 ;;; reduces a tree to a list of lists
@@ -751,7 +780,7 @@
 
     (equal? (first ast) (quote quote))
     (list (if name (list :return) (list nil))
-          (quote-flatten (second ast)))
+          (reverse (quote-flatten (second ast))))
 
     (equal? (first ast) (quote lambda))
     (list (if name (list :return) (list nil))
@@ -784,53 +813,3 @@
        (reverse)
        (filter first)))
 
-(defun u1 (x)
-  (if (< x 0x100)
-    (list x)))
-
-(defun u2 (x)
-  (if (or (< x 0xFFFF) (= x 0xFFFF))
-    (list (bit-and (bit-asr x 8) 0xFF)
-          (bit-and x 0xFF))))
-
-(defun u4 (x)
-  (concat (u2 (// x 0x10000))
-          (u2 (bit-and x 0xFFFF))))
-
-(defun len1-attribs (const-list)
-  (u2 (second const-list)))
-
-(defun len2-attribs (const-list)
-  (concat (u2 (second const-list))
-          (u2 (third const-list))))
-
-;const to bin
-
-(defun pool-search! (constpool expr)
-  (if (contains? constpool expr)
-    (first (get constpool expr))
-    (let (pool-count (get constpool :count 1))
-      (progn
-        (insert! constpool expr pool-count)
-        (insert! constpool :count (inc pool-count))
-        pool-count))))
-
-;pool-get!
-
-; generates code to store stack onto local args for tail recursion
-(defun set-locals (n i acc)
-  (if (< n i)
-    acc
-    (set-locals n (inc i) (cons (list :astore i) acc))))
-
-;ir-to-jvm
-
-;; prepends start label to ir if there are tail recursive calls
-(defun check-tco0 (in curr)
-  (cond
-    (nil? curr) in
-    (equal? (first (first curr)) :tail-recur) (cons (list :label :start) in)
-    t (check-tco0 in (rest curr))))
-
-(defun check-tco (in)
-  (check-tco0 in in))

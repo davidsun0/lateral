@@ -64,21 +64,20 @@
                    ml
                    (list :funcall (quote cons) :argc (inc n))))))
 
-(insert-method "add0" "Lang" "add0" 2)
-(insert! *method-list* "+"
-         (lambda (ml n)
-           (repeat (funcall-resolve
-                     ml
-                     (list :funcall (quote add0) :argc 2))
-                   (dec n))))
+;(insert! *method-list* "+"
+;         (lambda (ml n)
+;           (repeat (funcall-resolve
+;                     ml
+;                     (list :funcall (quote add0) :argc 2))
+;                   (dec n))))
 
-(insert-method "subtract0" "Lang" "subtract0" 2)
-(insert! *method-list* "-"
-         (lambda (ml n)
-           (repeat (funcall-resolve
-                     ml
-                     (list :funcall (quote subtract0) :argc 2))
-                   (dec n))))
+;(insert-method "subtract0" "Lang" "subtract0" 2)
+;(insert! *method-list* "-"
+;         (lambda (ml n)
+;           (repeat (funcall-resolve
+;                     ml
+;                     (list :funcall (quote subtract0) :argc 2))
+;                   (dec n))))
 
 (insert-method "contains?" "Lang" "contains_p" 2)
 
@@ -87,6 +86,7 @@
 (insert-method "char" "Lang" "to_char" 1)
 (insert-method "char-at" "Lang" "char_at" 2)
 (insert-method "substr" "Lang" "substr" 3)
+(insert-method "string-bytes" "Lang" "string_bytes" 1)
 (insert-method "whitespace?" "Lang" "whitespace_p" 1)
 
 (insert-method "pprint0" "Lang" "pprint0" 1)
@@ -95,9 +95,11 @@
 (insert-method "=" "Lang" "isNumericallyEqual" 2)
 (insert-method "<" "Lang" "less_than0" 2)
 (insert-method "//" "Lang" "divide" 2)
+(insert-method "add0" "Lang" "add0" 2)
+(insert-method "negate" "Lang" "negate" 1)
 
 (insert-method "bit-asr" "Lang" "bit_asr" 2)
-(insert-method "bit-and" "Lang" "bit-and" 2)
+(insert-method "bit-and" "Lang" "bit_and" 2)
 
 (insert-method "slurp" "Lang" "slurp" 1)
 (insert-method "readline" "Lang" "readLine" 0)
@@ -124,7 +126,10 @@
 
 ; TODO: convert java functions to variadic args
 (insert-method "string0" "Lang" "string0" 1)
+(insert-method "integer" "Lang" "integer" 1)
 (insert-method "symbol" "Lang" "symbol" 1)
+(insert-method "hashmap" "Lang" "hashmap" 0)
+(insert-method "to-char" "Lang" "to_char" 1)
 
 (insert-method "insert!" "Lang" "insert_b" 3)
 (insert-method "get0" "Lang" "get0" 2)

@@ -619,7 +619,15 @@ public class Lang {
         if(a instanceof Integer && b instanceof Integer) {
             return Integer.valueOf(((Integer)a) - ((Integer)b));
         } else {
-            throw new TypeError("subtract0 " + a + " " + b);
+            throw new TypeError("subtract" + a + " " + b);
+        }
+    }
+
+    public static Object negate(Object n) {
+        if(n instanceof Integer) {
+            return Integer.valueOf(-1 * (Integer)n);
+        } else {
+            throw new TypeError();
         }
     }
 
