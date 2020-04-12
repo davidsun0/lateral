@@ -1,3 +1,6 @@
+# Lateral Lisp has moved
+[New repository](https://github.com/whetfire/lateral-lang)
+
 # Lateral Lisp
 
 Lateral is a simple dialect of Lisp.
