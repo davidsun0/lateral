@@ -1,0 +1,9 @@
+# Compiled output
+*.fasl
+*.o
+*.s
+a.out
+
+# misc
+cmd
+*.c

@@ -1,0 +1,19 @@
+(defun compile1! (cpool method-list defnexpr)
+  (let (name (second defnexpr)
+        args (third defnexpr)
+        expr (fourth defnexpr))
+    (compile0! 
+      cpool
+      method-list
+      name
+      args
+      (->> (ir name (filter symbol? args) expr)
+           (check-tco)
+           (map ir-to-jvm)
+           (semi-flatten)
+           (map (lambda (x) (funcall-resolve method-list x)))
+           (semi-flatten)
+           ;((lambda (x) (if x x (quote ((:return))))))
+           )
+      (method-type (arg-count args)))))
+

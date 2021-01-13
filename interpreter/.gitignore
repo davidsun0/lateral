@@ -1,0 +1,10 @@
+# compiled output
+lateral
+a.out
+*.class
+
+# c files
+*.o
+
+# vim temporary files
+*.swp

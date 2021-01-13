@@ -1,0 +1,19 @@
+(print {
+     "rest" (list "Lang" "cdr"
+                 "(Ljava/lang/Object;)Ljava/lang/Object;")
+     "cons" (list "Lang" "cons"
+                  "(Ljava/lang/Object;Ljava/lang/Object;)LConsCell;")
+     "equal?" (list "Lang" "is_equal"
+                    "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
+     "inc" (list "Lang" "inc"
+                 "(Ljava/lang/Object;)Ljava/lang/Object;")
+     "char-at" (list "Lang" "charat"
+                     "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;")
+     "readline" (list "Lang" "readline"
+                      "()Ljava/lang/String;")
+     "print" (list "Lang" "print"
+                   "(Ljava/lang/Object;)Ljava/lang/Object;")
+     "println" ("Lang" "println"
+                   "(Ljava/lang/Object;)Ljava/lang/Object;")
+     "test" (list 1 2 3)
+     })
