@@ -1,3 +1,6 @@
+# Lateral Lisp has moved
+[New repository](https://github.com/whetfire/lateral-lang)
+
 # Lateral Lisp
 
 This repository contains various related compilers and interpreters for a new
