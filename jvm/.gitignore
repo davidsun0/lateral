@@ -1,0 +1,10 @@
+# IntelliJ
+.idea/
+out/
+
+# Java
+*.class
+
+# vim, hidden files
+.*
+!.gitignore

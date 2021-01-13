@@ -1,14 +1,11 @@
 # compiled output
-lateral
 a.out
 *.class
-!jvm/Lateral.class
+*.fasl
+*.s
 
 # c files
 *.o
 
 # vim temporary files
 *.swp
-*.txt
-
-old/*
